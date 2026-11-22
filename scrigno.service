@@ -1,0 +1,19 @@
+# Servizio systemd: avvia Scrigno automaticamente all'accensione del mini server (Linux).
+# Installazione (sostituisci UTENTE e il percorso se diversi):
+#   sudo cp scrigno.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now scrigno
+[Unit]
+Description=Scrigno - archivio personale
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=UTENTE
+WorkingDirectory=/home/UTENTE/app-personale-/server
+Environment=SCRIGNO_DATA=/home/UTENTE/app-personale-/dati
+ExecStart=/home/UTENTE/app-personale-/.venv/bin/python app.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

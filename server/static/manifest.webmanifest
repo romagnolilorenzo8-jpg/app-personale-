@@ -1,0 +1,22 @@
+{
+  "name": "Scrigno — il mio archivio",
+  "short_name": "Scrigno",
+  "description": "Documenti, password, scadenze e visite mediche in un unico posto.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f5fb",
+  "theme_color": "#5b5bf6",
+  "lang": "it",
+  "icons": [
+    { "src": "/static/icona-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icona-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/icona.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "share_target": {
+    "action": "/condividi",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": { "title": "titolo", "text": "note", "files": [{ "name": "file", "accept": ["*/*"] }] }
+  }
+}
