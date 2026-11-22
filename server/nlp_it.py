@@ -155,7 +155,7 @@ def analizza(testo: str, oggi: date | None = None) -> Risultato:
     if inizio is None:
         m = t.cerca(r"\b(?:alle ore|alle|all'|ore|verso le|per le|a partire dalle|dalle)\s*" + TIME + PERIODO + r"\b")
         if not m:
-            m = t.cerca(r"\b(\d{1,2})[:.](\d{2})()" + PERIODO + r"\b")
+            m = t.cerca(r"\b(\d{1,2})[:.](\d{2})(?![.\d/])()" + PERIODO + r"\b")
         if m:
             g = m.groups()
             inizio = (_ora(_num(g[0]), g[3]), _minuti(g[1], g[2]))
@@ -273,7 +273,7 @@ def analizza(testo: str, oggi: date | None = None) -> Risultato:
         if pref.startswith(("all'ospedale", "alla clinica", "al centro", "nello studio", "allo studio")):
             base = {"all'ospedale": "Ospedale", "alla clinica": "Clinica", "al centro": "Centro",
                     "nello studio": "Studio", "allo studio": "Studio"}[pref]
-            luogo = f"{base} {luogo}".strip()
+            luogo = f"{base} {t.orig[m.start(1):m.end(1)].strip()}".strip()
         r.luogo = t.orig[m.start(1):m.end(1)].strip() if not pref.startswith(("all", "al ", "nello")) else luogo
         if r.luogo:
             r.luogo = r.luogo[0].upper() + r.luogo[1:]

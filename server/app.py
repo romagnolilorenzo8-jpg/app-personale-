@@ -509,6 +509,10 @@ async def carica(request: Request, who=Depends(autorizzato)):
         cartella = form.get("cartella")
         cartella = int(cartella) if cartella and str(cartella).isdigit() else None
         note = str(form.get("note") or "")
+        scadenza = str(form.get("scadenza") or "").strip() or None
+        if scadenza:
+            date.fromisoformat(scadenza)
+        nome_scelto = str(form.get("nome") or "").strip()
         with db() as con:
             testi = []
             for k, v in form.multi_items():
@@ -541,6 +545,17 @@ async def carica(request: Request, who=Depends(autorizzato)):
             nuovi.append(_salva(con, nome, [corpo], mime, cartella, "", origine))
     if not nuovi:
         raise HTTPException(400, "Nessun file ricevuto")
+    if ctype.startswith(("multipart/form-data", "application/x-www-form-urlencoded")):
+        with db() as con:
+            if scadenza:
+                con.execute(f"UPDATE documenti SET scadenza=? WHERE id IN ({','.join('?' * len(nuovi))})", [scadenza, *nuovi])
+            if nome_scelto and len(nuovi) == 1:
+                vecchio = con.execute("SELECT nome FROM documenti WHERE id=?", (nuovi[0],)).fetchone()["nome"]
+                est = Path(vecchio).suffix
+                nuovo = _nome_sicuro(nome_scelto)
+                if est and not nuovo.lower().endswith(est.lower()):
+                    nuovo += est
+                con.execute("UPDATE documenti SET nome=? WHERE id=?", (nuovo, nuovi[0]))
     return {"ok": True, "ids": nuovi, "messaggio": f"{len(nuovi)} file salvati in Scrigno"}
 
 
@@ -614,6 +629,92 @@ def backup(_=Depends(sessione)):
         import shutil
         shutil.rmtree(tmp, ignore_errors=True)
     return FileResponse(tmp / nome, media_type="application/zip", filename=nome, background=BackgroundTask(pulisci))
+
+
+@app.post("/api/importa")
+async def importa(request: Request, s: str = Depends(sessione)):
+    """Importa il backup creato dalla modalità iPhone (file .zip con scrigno.json)."""
+    import io
+    import json
+    import zipfile
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    form = await request.form()
+    up, pw = form.get("file"), str(form.get("password") or "")
+    if not hasattr(up, "file"):
+        raise HTTPException(400, "Nessun file ricevuto")
+    try:
+        z = zipfile.ZipFile(io.BytesIO(await up.read()))
+        m = json.loads(z.read("scrigno.json"))
+        assert m.get("formato") == "scrigno-backup"
+    except Exception:
+        raise HTTPException(400, "Il file non è un backup di Scrigno creato sull'iPhone")
+
+    # password della cassaforte del telefono (AES-GCM, chiave PBKDF2-SHA256)
+    voci_chiare = []
+    cass = m.get("cassaforte") or {}
+    if cass.get("voci"):
+        if not cass.get("chiave"):
+            raise HTTPException(400, "Backup incompleto: manca la chiave della cassaforte")
+        if not pw:
+            raise HTTPException(400, "Inserisci la password della cassaforte dell'iPhone per importare anche le password")
+        k = hashlib.pbkdf2_hmac("sha256", pw.encode(), base64.b64decode(cass["chiave"]["sale"]), 310000)
+        aes = AESGCM(k)
+        dec = lambda x: json.loads(aes.decrypt(base64.b64decode(x["iv"]), base64.b64decode(x["ct"]), None))
+        try:
+            dec(cass["chiave"]["verifica"])
+        except Exception:
+            raise HTTPException(401, "Password della cassaforte dell'iPhone errata")
+        voci_chiare = [dec(v) for v in cass["voci"]]
+        if s not in _chiavi_vault:
+            raise HTTPException(423, "Apri prima la sezione Password per sbloccare la cassaforte, poi riprova")
+
+    with _lock, db() as con:
+        # cartelle: unisce per nome con quelle già presenti
+        mappa: dict = {}
+        cart = {c["id"]: c for c in m["cartelle"]}
+
+        def id_cartella(cid):
+            if cid is None or cid not in cart:
+                return None
+            if cid in mappa:
+                return mappa[cid]
+            c = cart[cid]
+            padre = id_cartella(c.get("padre"))
+            r = con.execute("SELECT id FROM cartelle WHERE nome=? AND padre IS ?", (c["nome"], padre)).fetchone()
+            if r:
+                mappa[cid] = r["id"]
+            else:
+                mappa[cid] = con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,?)",
+                                         (c["nome"], padre, c.get("icona") or "📁", c.get("ordine") or 0)).lastrowid
+            return mappa[cid]
+        for cid in cart:
+            id_cartella(cid)
+        n_doc = 0
+        for d in m["documenti"]:
+            try:
+                dati = z.read(d["file"])
+            except KeyError:
+                continue
+            nid = _salva(con, d["nome"], [dati], d.get("mime"), id_cartella(d.get("cartella")), d.get("note") or "", "iphone")
+            con.execute("UPDATE documenti SET scadenza=?, creato=? WHERE id=?", (d.get("scadenza"), d.get("creato"), nid))
+            n_doc += 1
+        n_app = 0
+        for a in m["appuntamenti"]:
+            if con.execute("SELECT 1 FROM appuntamenti WHERE uid=?", (a.get("uid"),)).fetchone():
+                continue
+            con.execute("INSERT INTO appuntamenti (uid, titolo, inizio, fine, tutto_il_giorno, luogo, note, categoria, icona, creato) "
+                        "VALUES (?,?,?,?,?,?,?,?,?,?)", (a.get("uid") or f"{uuid.uuid4()}@scrigno", a["titolo"], a["inizio"], a["fine"],
+                                                       int(bool(a.get("tutto_il_giorno"))), a.get("luogo") or "", a.get("note") or "",
+                                                       a.get("categoria") or "altro", a.get("icona") or "📅", a.get("creato")))
+            n_app += 1
+        if voci_chiare:
+            f = Fernet(_chiavi_vault[s])
+            ora = datetime.now(TZ).isoformat(timespec="seconds")
+            for v in voci_chiare:
+                con.execute("INSERT INTO password (titolo, utente, segreto, sito, note, categoria, creato, modificato) VALUES (?,?,?,?,?,?,?,?)",
+                            (v.get("titolo", ""), v.get("utente", ""), f.encrypt(v.get("segreto", "").encode()).decode(), v.get("sito", ""),
+                             v.get("note", ""), v.get("categoria", ""), v.get("creato") or ora, ora))
+    return {"ok": True, "documenti": n_doc, "appuntamenti": n_app, "password": len(voci_chiare)}
 
 
 @app.get("/api/scadenze")

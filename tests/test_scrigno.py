@@ -81,3 +81,24 @@ def test_condivisione_testo_link_e_backup():
     z = zipfile.ZipFile(io.BytesIO(c.get("/api/backup").content))
     assert "dati/scrigno.db" in z.namelist() and any(n.startswith("dati/file/") for n in z.namelist())
     assert TestClient(app).get("/api/backup").status_code == 401
+
+
+def test_import_backup_iphone():
+    """Importa nel server un backup creato dalla modalità iPhone (se il test e2e l'ha prodotto)."""
+    import glob
+    zips = glob.glob("/tmp/claude-0/**/backup-iphone.zip", recursive=True)
+    if not zips:
+        import pytest
+        pytest.skip("backup di prova non disponibile")
+    c = TestClient(app)
+    c.post("/api/accedi", json={"password": "segreta2"})
+    with open(zips[0], "rb") as f:
+        dati = f.read()
+    r = c.post("/api/importa", files={"file": ("b.zip", dati, "application/zip")}, data={"password": "sbagliata"})
+    assert r.status_code == 401
+    r = c.post("/api/importa", files={"file": ("b.zip", dati, "application/zip")}, data={"password": "segreta123"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"ok": True, "documenti": 2, "appuntamenti": 1, "password": 1}
+    assert any(v["titolo"] == "Poste" for v in c.get("/api/cassaforte").json())
+    bolli = c.get("/api/documenti?raccolta=bollo").json()
+    assert bolli and bolli[0]["scadenza"] == "2026-12-10"

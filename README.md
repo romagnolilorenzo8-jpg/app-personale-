@@ -15,6 +15,23 @@ Gira sul tuo computer o sul mini server di casa: i file restano tuoi e non passa
 
 ---
 
+## 0. Subito sull'iPhone, senza server (“modalità iPhone”)
+
+L'app funziona anche **da sola sull'iPhone**: documenti, visite e password vengono salvati nella memoria del telefono (le password cifrate) e funziona anche senza internet.
+
+**Da fare una volta sola (2 minuti, dall'iPhone):**
+1. Apri **github.com** → il repository **app-personale-** → **Settings** → **Pages**.
+2. In *Build and deployment*: Source **Deploy from a branch** → Branch **`claude/personal-docs-health-app-v5nfcp`**, cartella **`/docs`** → **Save**.
+3. Dopo 1-2 minuti apri con **Safari**: **https://romagnolilorenzo8-jpg.github.io/app-personale-/**
+4. Tocca **Condividi → Aggiungi alla schermata Home** e da quel momento apri Scrigno **solo dall'icona**.
+
+Note:
+- Online c'è solo il **codice** dell'app (il repository è pubblico): i tuoi documenti **non escono mai dal telefono**.
+- In **Altro → Backup** crei un file con tutto, da salvare nell'app File. Fallo ogni tanto: se cancelli l'app o cambi telefono, è l'unica copia.
+- Il menu “Condividi” e il Calendario funzionano tramite due Comandi Rapidi: le istruzioni passo passo sono in **Altro**.
+- Quando il server di casa sarà pronto: crea un backup sull'iPhone, apri Scrigno dal server → **Altro → Importa backup dall'iPhone**.
+- La cartella `docs/` si rigenera con `python3 tools/crea_versione_iphone.py` dopo ogni modifica a `server/static/`.
+
 ## 1. Avvio (prova sul tuo computer)
 
 Serve **Python 3.10 o più recente** ([python.org](https://www.python.org/downloads/)).
@@ -52,6 +69,14 @@ sudo cp scrigno.service /etc/systemd/system/ && sudo systemctl enable --now scri
 - **Backup**: tutto quello che conta è nella cartella `dati/` (database + file). Copiala ogni tanto su un disco esterno.
 - **Fuori casa**: installa [Tailscale](https://tailscale.com) (gratuito) sul server e sull'iPhone. Scrigno è raggiungibile ovunque, in modo sicuro, **senza aprire porte sul router**. Sconsiglio di esporlo direttamente su Internet.
 
+## Quanto spazio serve sul server?
+
+I documenti occupano poco: un PDF 100 KB–2 MB, una foto 2–5 MB. **1.000 documenti ≈ 2–4 GB.** Lo spazio non è il problema: conta l'**affidabilità**.
+
+- **Va bene:** il disco interno del PC (meglio se SSD) oppure un **SSD/HDD esterno USB** (un SSD da 250–500 GB costa 30–50 €).
+- **Sconsigliata come disco principale:** la chiavetta USB. Funziona, ma è pensata per copiare file ogni tanto, non per restare accesa giorno e notte con un database che scrive di continuo. Si consuma e può rompersi senza preavviso.
+- **La chiavetta da 256 GB usala per il backup:** una copia della cartella `dati/` ogni settimana. Due copie in due posti diversi ti proteggono quasi da tutto.
+
 ## Impostazioni avanzate (variabili d'ambiente)
 
 | Variabile | Predefinito | Significato |
@@ -67,6 +92,9 @@ server/app.py        API (FastAPI) + database SQLite
 server/nlp_it.py     comprende appuntamenti scritti in italiano
 server/ics.py        genera i calendari per iPhone (.ics / abbonamento webcal)
 server/static/       interfaccia web (HTML/CSS/JS, nessuna dipendenza esterna)
+server/static/locale.js   modalità iPhone: archivio nella memoria del telefono, backup, cifratura
+server/static/nlp.js      riconoscimento appuntamenti sul telefono (stesso risultato di nlp_it.py)
+docs/                versione iPhone pubblicata con GitHub Pages (generata da tools/crea_versione_iphone.py)
 tests/               test automatici:  python -m pytest tests/
 ```
 

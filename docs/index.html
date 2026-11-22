@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Scrigno">
+  <meta name="theme-color" content="#f4f5fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e0f17" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="static/icona.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="static/icona-180.png">
+  <link rel="stylesheet" href="static/app.css">
+  <title>Scrigno</title>
+</head>
+<body>
+  <div id="app"></div>
+  <nav id="tabbar" class="tabbar" hidden>
+    <a href="#/" data-tab="home"><span class="ti">🗂️</span><span>Archivio</span></a>
+    <a href="#/da-smistare" data-tab="da-smistare"><span class="ti">📥</span><span>Da smistare</span><b class="badge" id="badge-smistare" hidden></b></a>
+    <a href="#/agenda" data-tab="agenda"><span class="ti">🗓️</span><span>Visite</span></a>
+    <a href="#/password" data-tab="password"><span class="ti">🔐</span><span>Password</span></a>
+    <a href="#/altro" data-tab="altro"><span class="ti">⚙️</span><span>Altro</span></a>
+  </nav>
+  <div id="toast" class="toast"></div>
+  <div id="drop" class="drop" hidden><div>Rilascia i file qui</div></div>
+  <input type="file" id="file-input" multiple hidden>
+  <script>window.SCRIGNO_LOCALE = true;</script>
+  <script src="static/nlp.js"></script>
+  <script src="static/locale.js"></script>
+  <script src="static/app.js"></script>
+</body>
+</html>
