@@ -21,7 +21,9 @@ Gira sul tuo computer o sul mini server di casa: i file restano tuoi e non passa
 
 L'app funziona anche **da sola sull'iPhone**: documenti, visite e password vengono salvati nella memoria del telefono (le password cifrate) e funziona anche senza internet.
 
-**Come aprirla:** con **Safari** vai su **https://romagnolilorenzo8-jpg.github.io/app-personale-/**, poi **Condividi → Aggiungi alla schermata Home** e da quel momento apri Scrigno **solo dall'icona**. Tutti i passaggi sono in **[GUIDA-RAPIDA.md](GUIDA-RAPIDA.md)**.
+⚠️ Il repository è **privato**: GitHub Pages (il sito gratuito per aprirla) funziona solo con repository pubblici o con GitHub Pro. Per ora si usa la versione con server sul PC.
+
+**Se in futuro attivi Pages:** con **Safari** vai su **https://romagnolilorenzo8-jpg.github.io/app-personale-/**, poi **Condividi → Aggiungi alla schermata Home** e da quel momento apri Scrigno **solo dall'icona**. Tutti i passaggi sono in **[GUIDA-RAPIDA.md](GUIDA-RAPIDA.md)**.
 
 Note:
 - Online c'è solo il **codice** dell'app (il repository è pubblico): i tuoi documenti **non escono mai dal telefono**.
