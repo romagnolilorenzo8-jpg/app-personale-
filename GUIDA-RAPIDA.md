@@ -37,21 +37,26 @@ Istruzioni in **⚙️ Altro → Ricevere file dal menu “Condividi”**. Senza
 
 ---
 
-## B. Sul computer Windows (5 minuti)
+## B. Sul computer Windows
 
-Serve Python installato (da **python.org/downloads**, con la spunta **“Add python.exe to PATH”**).
-
+### Installare o aggiornare (3 minuti)
 1. Se è aperta la finestra nera di Scrigno, **chiudila**.
-2. Premi il tasto **Windows**, scrivi **powershell** e premi **Invio**.
-3. Incolla questa riga (clic destro) e premi **Invio**:
-   ```
-   irm https://raw.githubusercontent.com/romagnolilorenzo8-jpg/app-personale-/main/installa.ps1 | iex
-   ```
-4. Il comando crea la cartella **C:\Users\(tuo nome)\App personale** con tutto dentro (app e documenti nella sottocartella `dati`), recupera i documenti già caricati, pulisce Download, crea l'icona **Scrigno** sul Desktop e avvia l'app.
+2. Sul sito di GitHub (dove hai già fatto l'accesso): **Code → Download ZIP**.
+3. In **Download**: clic destro sullo zip appena scaricato → **Estrai tutto…** → **Estrai**.
+4. Nella cartella estratta fai **doppio clic su `installa.bat`** (se Windows avvisa: **Ulteriori informazioni → Esegui comunque**).
 
-- **Per avviare Scrigno:** doppio clic sull'icona **Scrigno** del Desktop. Non chiudere la finestra nera finché lo usi.
-- **Per aggiornare:** chiudi la finestra nera e fai doppio clic su **aggiorna.bat** nella cartella App personale.
-- **Dove sono i documenti:** `App personale\dati\file` (con nomi in codice: si consultano dall'app) e l'elenco in `App personale\dati\scrigno.db`. Per il backup copia l'intera cartella **dati** sulla chiavetta.
+Il programma fa tutto da solo:
+- mette app e documenti in **C:\Users\(tuo nome)\App personale**;
+- recupera i documenti che avevi già caricato;
+- cancella zip e cartelle da **Download**;
+- crea l'icona **Scrigno** sul Desktop e avvia l'app.
+
+Per gli aggiornamenti futuri basta rifare questi stessi 4 passi: i documenti non vengono mai toccati.
+
+### Usarlo
+- **Avvio:** doppio clic sull'icona **Scrigno** del Desktop. Non chiudere la finestra nera finché lo usi.
+- **Dove sono i documenti:** `App personale\dati\file` (i nomi sono in codice: si consultano dall'app) e l'elenco in `App personale\dati\scrigno.db`.
+- **Backup:** copia l'intera cartella **dati** sulla chiavetta.
 
 ## C. Più avanti: il server di casa
 - Disco: quello interno del PC (meglio SSD) o un **SSD esterno USB**. La **chiavetta da 256 GB usala per i backup**, non come disco principale.
