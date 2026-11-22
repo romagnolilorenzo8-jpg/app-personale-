@@ -1,5 +1,7 @@
 # 🔐 Scrigno — la mia app personale
 
+> 👉 **Cosa fare adesso: [GUIDA-RAPIDA.md](GUIDA-RAPIDA.md)**
+
 Archivio personale per **documenti, password, bolli, assicurazioni, salute e visite mediche**.
 Gira sul tuo computer o sul mini server di casa: i file restano tuoi e non passano da nessun servizio esterno.
 
@@ -19,18 +21,14 @@ Gira sul tuo computer o sul mini server di casa: i file restano tuoi e non passa
 
 L'app funziona anche **da sola sull'iPhone**: documenti, visite e password vengono salvati nella memoria del telefono (le password cifrate) e funziona anche senza internet.
 
-**Da fare una volta sola (2 minuti, dall'iPhone):**
-1. Apri **github.com** → il repository **app-personale-** → **Settings** → **Pages**.
-2. In *Build and deployment*: Source **Deploy from a branch** → Branch **`claude/personal-docs-health-app-v5nfcp`**, cartella **`/docs`** → **Save**.
-3. Dopo 1-2 minuti apri con **Safari**: **https://romagnolilorenzo8-jpg.github.io/app-personale-/**
-4. Tocca **Condividi → Aggiungi alla schermata Home** e da quel momento apri Scrigno **solo dall'icona**.
+**Come aprirla:** con **Safari** vai su **https://romagnolilorenzo8-jpg.github.io/app-personale-/**, poi **Condividi → Aggiungi alla schermata Home** e da quel momento apri Scrigno **solo dall'icona**. Tutti i passaggi sono in **[GUIDA-RAPIDA.md](GUIDA-RAPIDA.md)**.
 
 Note:
 - Online c'è solo il **codice** dell'app (il repository è pubblico): i tuoi documenti **non escono mai dal telefono**.
 - In **Altro → Backup** crei un file con tutto, da salvare nell'app File. Fallo ogni tanto: se cancelli l'app o cambi telefono, è l'unica copia.
 - Il menu “Condividi” e il Calendario funzionano tramite due Comandi Rapidi: le istruzioni passo passo sono in **Altro**.
 - Quando il server di casa sarà pronto: crea un backup sull'iPhone, apri Scrigno dal server → **Altro → Importa backup dall'iPhone**.
-- La cartella `docs/` si rigenera con `python3 tools/crea_versione_iphone.py` dopo ogni modifica a `server/static/`.
+- La cartella `docs/` si rigenera con `python3 tools/crea_versione_iphone.py` dopo ogni modifica a `server/static/`; il sito pubblicato è il ramo `gh-pages` (`git subtree split --prefix docs` del contenuto di `docs/`).
 
 ## 1. Avvio (prova sul tuo computer)
 
