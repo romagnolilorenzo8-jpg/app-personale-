@@ -62,3 +62,22 @@ def test_flusso_completo():
     ics = anon.get(f"/calendario/{cal}.ics").text
     assert "BEGIN:VEVENT" in ics and "Dentista" in ics
     assert anon.get("/calendario/sbagliato.ics").status_code == 404
+
+
+def test_condivisione_testo_link_e_backup():
+    import io
+    import zipfile
+    c = TestClient(app)
+    c.post("/api/accedi", json={"password": "segreta2"})
+    tok = c.get("/api/impostazioni").json()["token_api"]
+    anon = TestClient(app)
+    r = anon.post("/api/documenti", headers={"X-Token": tok}, data={"file": "https://www.agenziaentrate.gov.it"})
+    assert r.status_code == 200
+    r = anon.post("/api/documenti", headers={"X-Token": tok}, data={"file": "Codice cancello: 4512"})
+    assert r.status_code == 200
+    nomi = [d["nome"] for d in c.get("/api/documenti?da_smistare=true").json()]
+    print(nomi)
+    assert any(n.endswith(".url") for n in nomi) and any(n.endswith(".txt") for n in nomi)
+    z = zipfile.ZipFile(io.BytesIO(c.get("/api/backup").content))
+    assert "dati/scrigno.db" in z.namelist() and any(n.startswith("dati/file/") for n in z.namelist())
+    assert TestClient(app).get("/api/backup").status_code == 401

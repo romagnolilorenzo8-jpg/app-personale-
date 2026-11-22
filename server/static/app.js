@@ -167,18 +167,50 @@ function sceltaCartella(titolo, { attuale = null, consentiRadice = false, esclud
   });
 }
 
+/* ------------------------------------------------------------------ suggerimenti cartella */
+const REGOLE = [
+  [/bollo/, /^bollo/], [/assicura|polizza|rca\b|quietanza/, /^assicurazione/], [/revision/, /^revisione/],
+  [/libretto|carta di circolazione/, /^libretto/], [/tagliando|manutenz|officina|gomme/, /^manutenzione/],
+  [/analisi|emocromo|sangue|prelievo|laboratorio/, /^analisi del sangue/],
+  [/panoramica|ortopan|rx.*dent|radiograf.*dent|dentist|odonto/, /^radiografie denti/],
+  [/referto|visita|lettera di dimissione/, /^referti/], [/ecograf|risonanza|\btac\b|radiograf|\brx\b/, /^esami e radiografie/],
+  [/ricetta|farmac/, /^ricette/], [/vaccin|green ?pass/, /^vaccini/],
+  [/bolletta|enel|\bluce\b|\bgas\b|acqua|\btari\b/, /^bollette/], [/contratto|affitto/, /^contratti/],
+  [/garanzia|scontrino|fattura/, /^garanzie/], [/busta paga|cedolino/, /^buste paga/], [/\b730\b|redditi|\bf24\b|\bcud\b|certificazione unica/, /^dichiarazione/],
+  [/carta d.?identit|\bcie\b/, /^carta d/], [/patente/, /^patente/], [/passaporto/, /^passaporto/], [/tessera sanitaria|codice fiscale/, /^tessera sanitaria/],
+];
+function suggerimenti(d) {
+  const n = (d.nome + " " + (d.note || "")).toLowerCase().replace(/[_\-.]+/g, " ");
+  const moto = /moto|scooter|ciclomotore/.test(n), auto = /\bauto\b|macchina|vettura/.test(n);
+  for (const [chiave, cartella] of REGOLE) {
+    if (!chiave.test(n)) continue;
+    let c = S.cartelle.filter((x) => cartella.test(x.nome.toLowerCase()));
+    const sotto = (x, nome) => percorso(x.id).some((p) => p.nome.toLowerCase() === nome);
+    if (moto) c = c.filter((x) => !sotto(x, "auto")) ; if (auto) c = c.filter((x) => !sotto(x, "motorino"));
+    if (c.length) return c.slice(0, 3);
+  }
+  return [];
+}
+
 /* ------------------------------------------------------------------ documenti */
-function htmlDocs(docs, { mostraCartella = false } = {}) {
+function htmlDocs(docs, { mostraCartella = false, suggerisci = false } = {}) {
   if (!docs.length) return "";
   return `<div class="lista">${docs.map((d) => {
-    const thumb = (d.mime || "").startsWith("image/") ? `<img loading="lazy" src="${urlFile(d)}" alt="">` : iconaFile(d);
+    const thumb = (d.mime || "").startsWith("image/") ? `<img loading="lazy" src="${urlFile(d)}" alt="" onerror="this.replaceWith('🖼️')">` : iconaFile(d);
     const sub = [mostraCartella ? (d.cartella ? "📁 " + esc(d.nome_cartella) : "📥 Da smistare") : "", dataIt(d.creato), dimensione(d.dimensione), d.origine === "iphone" ? "📲" : ""].filter(Boolean).join(" · ");
     return `<div class="voce" data-doc="${d.id}"><div class="thumb">${thumb}</div><div class="corpo"><div class="tit">${esc(d.nome)}</div>
-      <div class="sub">${sub}</div>${d.scadenza ? `<div style="margin-top:3px">${tagScadenza(d.scadenza)}</div>` : ""}</div><div class="dx">›</div></div>`;
+      <div class="sub">${sub}</div>${d.scadenza ? `<div style="margin-top:3px">${tagScadenza(d.scadenza)}</div>` : ""}
+      ${suggerisci ? suggerimenti(d).map((c) => `<button class="btn sec small sugg" data-sposta="${d.id}" data-in="${c.id}">✨ ${percorso(c.id).slice(-2).map((p) => esc(p.nome)).join(" › ")}</button>`).join("") : ""}</div><div class="dx">›</div></div>`;
   }).join("")}</div>`;
 }
 function collegaDocs(el, docs, ricarica) {
-  el.addEventListener("click", (e) => {
+  el.addEventListener("click", async (e) => {
+    const sp = e.target.closest("[data-sposta]");
+    if (sp) {
+      e.stopPropagation();
+      await api(`/api/documenti/${sp.dataset.sposta}`, { method: "PATCH", json: { sposta: true, cartella: +sp.dataset.in } });
+      toast("📁 Spostato in " + S.byId[sp.dataset.in].nome); await caricaCartelle(); ricarica && ricarica(); return;
+    }
     const v = e.target.closest("[data-doc]"); if (!v) return;
     const d = docs.find((x) => x.id === +v.dataset.doc); if (d) apriDoc(d, ricarica);
   });
@@ -378,7 +410,7 @@ async function vistaCartella(id) {
 async function vistaDaSmistare() {
   const docs = await api("/api/documenti?da_smistare=true");
   app.innerHTML = `<div class="top"><h1>Da smistare<small>File arrivati dal menu Condividi</small></h1></div>
-    ${docs.length ? `<p class="muted small" style="margin:-6px 4px 14px">Tocca un documento e scegli <b>Sposta</b> per metterlo nella cartella giusta.</p><div id="docs">${htmlDocs(docs)}</div>`
+    ${docs.length ? `<p class="muted small" style="margin:-6px 4px 14px">Tocca un suggerimento ✨ oppure apri il documento e scegli <b>Sposta</b>.</p><div id="docs">${htmlDocs(docs, { suggerisci: true })}</div>`
       : `<div class="vuoto"><span class="big">📭</span>Tutto in ordine!<br>Quando condividi un file dall'iPhone a Scrigno, lo trovi qui.<br><br><a href="#/altro">Come configurare il menu Condividi →</a></div>`}`;
   if (docs.length) collegaDocs($("#docs"), docs, vistaDaSmistare);
   fab(undefined, vistaDaSmistare);
@@ -641,6 +673,7 @@ async function vistaAltro() {
     <div class="voce" id="cambia"><div class="thumb">🔑</div><div class="corpo"><div class="tit">Cambia password</div><div class="sub">Usata anche per cifrare la cassaforte</div></div><div class="dx">›</div></div>
     <div class="voce" id="rig-api"><div class="thumb">♻️</div><div class="corpo"><div class="tit">Rigenera codice per i Comandi Rapidi</div><div class="sub">Se pensi che qualcuno l'abbia visto</div></div></div>
     <div class="voce" id="rig-cal"><div class="thumb">♻️</div><div class="corpo"><div class="tit">Rigenera link del calendario</div><div class="sub">Dovrai ricollegare il calendario</div></div></div>
+    <a class="voce" href="/api/backup" download><div class="thumb">💾</div><div class="corpo"><div class="tit">Scarica backup completo</div><div class="sub">Tutti i documenti e le password (cifrate) in un file .zip</div></div><div class="dx">›</div></a>
     <div class="voce" id="esci"><div class="thumb">🚪</div><div class="corpo"><div class="tit" style="color:var(--danger)">Esci</div></div></div>
   </div>
   <p class="small muted" style="margin:18px 4px">Server: <b>${esc(s.nome_host)}</b><br>Dati salvati in: <span class="occhio">${esc(s.cartella_dati)}</span></p>`;

@@ -225,3 +225,4 @@ details.card .dentro { padding: 0 16px 16px; }
 .occhio { font-family: ui-monospace, Menlo, monospace; letter-spacing: .04em; }
 @keyframes su { from { transform: translateY(30px); opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
+.sugg { margin: 6px 6px 0 0; font-size: 12.5px; padding: 6px 10px; background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }

@@ -504,15 +504,29 @@ async def carica(request: Request, who=Depends(autorizzato)):
     origine = "iphone" if who == "api" else "app"
     ctype = request.headers.get("content-type", "")
     nuovi = []
-    if ctype.startswith("multipart/form-data"):
+    if ctype.startswith(("multipart/form-data", "application/x-www-form-urlencoded")):
         form = await request.form(max_files=100, max_fields=100)
         cartella = form.get("cartella")
         cartella = int(cartella) if cartella and str(cartella).isdigit() else None
         note = str(form.get("note") or "")
         with db() as con:
-            for _, v in form.multi_items():
+            testi = []
+            for k, v in form.multi_items():
                 if hasattr(v, "filename") and hasattr(v, "file"):
                     nuovi.append(_salva(con, v.filename or "", _blocchi(v), v.content_type, cartella, note, origine))
+                elif k not in ("cartella", "note", "titolo") and str(v).strip():
+                    testi.append(str(v).strip())
+            # Condivisione di testo o link (es. da Safari o Note): salvati come nota
+            if not nuovi and testi:
+                testo = "\n\n".join(testi)
+                titolo = str(form.get("titolo") or "").strip()
+                if re.match(r"^https?://\S+$", testo):
+                    nome = titolo or f"Link {datetime.now(TZ):%d-%m-%Y %H.%M}"
+                    dati = f"[InternetShortcut]\r\nURL={testo}\r\n".encode()
+                    nuovi.append(_salva(con, nome + ".url", [dati], "text/plain", cartella, testo, origine))
+                else:
+                    nome = titolo or f"Nota {datetime.now(TZ):%d-%m-%Y %H.%M}"
+                    nuovi.append(_salva(con, nome + ".txt", [testo.encode()], "text/plain", cartella, note, origine))
     else:
         nome = request.query_params.get("nome") or request.headers.get("x-nome-file") or ""
         cartella = request.query_params.get("cartella")
@@ -577,6 +591,29 @@ def scarica(did: int, scarica: bool = False, _=Depends(autorizzato)):
         raise HTTPException(404, "File non trovato")
     return FileResponse(FILES / r["file"], media_type=r["mime"], filename=r["nome"],
                         content_disposition_type="attachment" if scarica else "inline")
+
+
+@app.get("/api/backup")
+def backup(_=Depends(sessione)):
+    """Scarica un unico file .zip con database e documenti."""
+    import tempfile
+    import zipfile
+    from starlette.background import BackgroundTask
+    tmp = Path(tempfile.mkdtemp())
+    copia_db = tmp / "scrigno.db"
+    with db() as con, sqlite3.connect(copia_db) as dest:
+        con.backup(dest)
+    nome = f"scrigno-backup-{datetime.now(TZ):%Y-%m-%d}.zip"
+    with zipfile.ZipFile(tmp / nome, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(copia_db, "dati/scrigno.db")
+        for f in FILES.iterdir():
+            if f.is_file():
+                z.write(f, f"dati/file/{f.name}")
+
+    def pulisci():
+        import shutil
+        shutil.rmtree(tmp, ignore_errors=True)
+    return FileResponse(tmp / nome, media_type="application/zip", filename=nome, background=BackgroundTask(pulisci))
 
 
 @app.get("/api/scadenze")
