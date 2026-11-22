@@ -31,13 +31,18 @@ import ics
 from nlp_it import analizza
 
 BASE = Path(__file__).resolve().parent
+# Tutto resta nella cartella dell'app: i dati sono in "dati" accanto al programma
+# (gli aggiornamenti non toccano mai questa cartella).
 DATA = Path(os.environ.get("SCRIGNO_DATA", BASE.parent / "dati")).resolve()
 FILES = DATA / "file"
+MINI = DATA / "miniature"
 DB_PATH = DATA / "scrigno.db"
 TZ = ZoneInfo(os.environ.get("SCRIGNO_TZ", "Europe/Rome"))
 PORT = int(os.environ.get("SCRIGNO_PORT", "8080"))
 MAX_UPLOAD = 200 * 1024 * 1024
 FILES.mkdir(parents=True, exist_ok=True)
+MINI.mkdir(parents=True, exist_ok=True)
+CACHE_FILE = {"Cache-Control": "private, max-age=31536000, immutable"}
 
 _lock = threading.Lock()
 _chiavi_vault: dict[str, bytes] = {}       # sessione -> chiave Fernet (solo in memoria)
@@ -595,6 +600,7 @@ def elimina_doc(did: int, _=Depends(sessione)):
             raise HTTPException(404)
         con.execute("DELETE FROM documenti WHERE id=?", (did,))
     (FILES / r["file"]).unlink(missing_ok=True)
+    (MINI / (Path(r["file"]).stem + ".jpg")).unlink(missing_ok=True)
     return {"ok": True}
 
 
@@ -604,8 +610,28 @@ def scarica(did: int, scarica: bool = False, _=Depends(autorizzato)):
         r = con.execute("SELECT * FROM documenti WHERE id=?", (did,)).fetchone()
     if not r or not (FILES / r["file"]).exists():
         raise HTTPException(404, "File non trovato")
-    return FileResponse(FILES / r["file"], media_type=r["mime"], filename=r["nome"],
+    return FileResponse(FILES / r["file"], media_type=r["mime"], filename=r["nome"], headers=CACHE_FILE,
                         content_disposition_type="attachment" if scarica else "inline")
+
+
+@app.get("/api/documenti/{did}/miniatura")
+def miniatura(did: int, _=Depends(autorizzato)):
+    """Anteprima piccola (pochi KB) per le liste: molto più veloce della foto originale."""
+    with db() as con:
+        r = con.execute("SELECT file, mime FROM documenti WHERE id=?", (did,)).fetchone()
+    if not r or not (FILES / r["file"]).exists():
+        raise HTTPException(404, "File non trovato")
+    dest = MINI / (Path(r["file"]).stem + ".jpg")
+    if not dest.exists():
+        try:
+            from PIL import Image, ImageOps
+            with Image.open(FILES / r["file"]) as im:
+                im = ImageOps.exif_transpose(im)
+                im.thumbnail((480, 480))
+                im.convert("RGB").save(dest, "JPEG", quality=78, optimize=True)
+        except Exception:
+            return FileResponse(FILES / r["file"], media_type=r["mime"], headers=CACHE_FILE)
+    return FileResponse(dest, media_type="image/jpeg", headers=CACHE_FILE)
 
 
 @app.get("/api/backup")

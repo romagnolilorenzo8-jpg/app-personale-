@@ -3,3 +3,4 @@ uvicorn>=0.29
 python-multipart>=0.0.9
 cryptography>=42
 tzdata>=2024.1
+pillow>=10

@@ -37,22 +37,21 @@ Istruzioni in **⚙️ Altro → Ricevere file dal menu “Condividi”**. Senza
 
 ---
 
-## B. Sul computer (stasera, 15 minuti) — per provare la versione con server
+## B. Sul computer Windows (5 minuti)
 
-1. Installa Python da **https://www.python.org/downloads/**
-   - **Windows:** durante l'installazione spunta **“Add python.exe to PATH”**.
-2. Scarica Scrigno: **https://github.com/romagnolilorenzo8-jpg/app-personale-** → pulsante verde **Code** → **Download ZIP** → estrai la cartella.
-3. Avvia:
-   - **Windows:** doppio clic su **avvia.bat** (se Windows avvisa, “Ulteriori informazioni” → “Esegui comunque”).
-   - **Mac:** apri il Terminale nella cartella e scrivi `./avvia.sh`.
-   - La prima volta scarica i componenti (1-2 minuti), poi mostra un indirizzo tipo `http://192.168.1.20:8080`.
-4. Se Windows chiede di consentire l'accesso alla rete: **Consenti** sulle reti **private**.
-5. Sull'iPhone, **collegato allo stesso Wi-Fi**, apri quell'indirizzo con Safari e scegli la password.
-6. Per portarci i dati dell'iPhone: sull'iPhone **Altro → Backup**, poi nella versione del computer **Altro → Importa backup dall'iPhone**.
+Serve Python installato (da **python.org/downloads**, con la spunta **“Add python.exe to PATH”**).
 
-Se qualcosa non va, copia il messaggio che vedi (o fai uno screenshot) e mandamelo.
+1. Se è aperta la finestra nera di Scrigno, **chiudila**.
+2. Premi il tasto **Windows**, scrivi **powershell** e premi **Invio**.
+3. Incolla questa riga (clic destro) e premi **Invio**:
+   ```
+   irm https://raw.githubusercontent.com/romagnolilorenzo8-jpg/app-personale-/main/installa.ps1 | iex
+   ```
+4. Il comando crea la cartella **C:\Users\(tuo nome)\App personale** con tutto dentro (app e documenti nella sottocartella `dati`), recupera i documenti già caricati, pulisce Download, crea l'icona **Scrigno** sul Desktop e avvia l'app.
 
----
+- **Per avviare Scrigno:** doppio clic sull'icona **Scrigno** del Desktop. Non chiudere la finestra nera finché lo usi.
+- **Per aggiornare:** chiudi la finestra nera e fai doppio clic su **aggiorna.bat** nella cartella App personale.
+- **Dove sono i documenti:** `App personale\dati\file` (con nomi in codice: si consultano dall'app) e l'elenco in `App personale\dati\scrigno.db`. Per il backup copia l'intera cartella **dati** sulla chiavetta.
 
 ## C. Più avanti: il server di casa
 - Disco: quello interno del PC (meglio SSD) o un **SSD esterno USB**. La **chiavetta da 256 GB usala per i backup**, non come disco principale.

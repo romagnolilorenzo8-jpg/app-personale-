@@ -24,8 +24,20 @@ const memo = { get: (k) => { try { return localStorage.getItem("scrigno-" + k); 
   set: (k, v) => { try { v == null ? localStorage.removeItem("scrigno-" + k) : localStorage.setItem("scrigno-" + k, v); } catch { /* */ } } };
 
 /* ================================================================== utilità */
+/* Le pagine già viste si aprono subito: le risposte restano valide 20 secondi
+   e vengono cancellate a ogni modifica (salvataggio, spostamento, eliminazione…). */
+const memoria = new Map();
+const svuotaMemoria = () => memoria.clear();
 async function api(url, opts = {}) {
   if (LOC) return window.LOCALE.api(url, opts);
+  const get = !opts.method || opts.method.toUpperCase() === "GET";
+  if (get) { const c = memoria.get(url); if (c && Date.now() - c.t < 20000) return c.v; }
+  else svuotaMemoria();
+  const dati = await apiRete(url, opts);
+  if (get && !/cassaforte|impostazioni/.test(url)) memoria.set(url, { t: Date.now(), v: dati });
+  return dati;
+}
+async function apiRete(url, opts) {
   const o = { credentials: "same-origin", ...opts, headers: { ...(opts.headers || {}) } };
   if (o.json !== undefined) { o.body = JSON.stringify(o.json); o.headers["Content-Type"] = "application/json"; delete o.json; }
   const r = await fetch(url, o);
@@ -69,6 +81,7 @@ function iconaFile(d) {
   return "📎";
 }
 const urlFile = (d, scarica) => (LOC ? d._url : `/api/documenti/${d.id}/file${scarica ? "?scarica=1" : ""}`);
+const urlMini = (d) => (LOC ? d._url : `/api/documenti/${d.id}/miniatura`);
 
 function tagScadenza(iso) {
   if (!iso) return "";
@@ -278,6 +291,7 @@ async function caricaFile(files, { cartella = null, scadenza = null, nome = null
   }
   await new Promise((res) => {
     const fd = new FormData();
+    svuotaMemoria();
     files.forEach((f) => fd.append("file", f, f.name));
     if (cartella != null) fd.append("cartella", cartella);
     if (scadenza) fd.append("scadenza", scadenza);
@@ -332,7 +346,7 @@ function fab(cartella, dopo) {
 function htmlDocs(docs, { mostraCartella = false, suggerisci = false } = {}) {
   if (!docs.length) return "";
   return `<div class="lista">${docs.map((d) => {
-    const thumb = (d.mime || "").startsWith("image/") ? `<img loading="lazy" src="${urlFile(d)}" alt="" onerror="this.replaceWith('🖼️')">` : iconaFile(d);
+    const thumb = (d.mime || "").startsWith("image/") ? `<img loading="lazy" decoding="async" src="${urlMini(d)}" alt="" onerror="this.replaceWith('🖼️')">` : iconaFile(d);
     const sub = [mostraCartella ? (d.cartella ? "📁 " + esc(d.nome_cartella) : "📥 Da smistare") : "", dataIt(d.creato), dimensione(d.dimensione)].filter(Boolean).join(" · ");
     const sg = suggerisci ? suggerimenti(d.nome + " " + (d.note || "")) : [];
     return `<div class="voce" data-doc="${d.id}"><div class="thumb">${thumb}</div><div class="corpo"><div class="tit">${esc(d.nome)}</div>
@@ -374,7 +388,7 @@ function visore(d) {
 
 function apriDoc(d, ricarica) {
   const m = d.mime || "";
-  const prev = m.startsWith("image/") ? `<img src="${urlFile(d)}" alt="">` : `<div class="big">${iconaFile(d)}</div>`;
+  const prev = m.startsWith("image/") ? `<img src="${urlMini(d)}" alt="">` : `<div class="big">${iconaFile(d)}</div>`;
   const perc = d.cartella ? percorso(d.cartella).map((c) => esc(c.nome)).join(" › ") : "📥 Da smistare";
   const v = foglio(`<h3><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.nome)}</span> ${xBtn}</h3>
     <div class="anteprima-doc" data-a="apri">${prev}<div class="tocca">Tocca per aprire</div></div>
@@ -921,6 +935,7 @@ async function vistaAltroServer() {
     const v = foglio(`<h3>Importazione…</h3><div class="progresso"><div style="width:60%"></div></div>`);
     try {
       const fd = new FormData(); fd.append("file", f, f.name); fd.append("password", pw);
+      svuotaMemoria();
       const r = await fetch("/api/importa", { method: "POST", body: fd, credentials: "same-origin" });
       const d = await r.json(); v.remove();
       if (!r.ok) throw new Error(d.errore || "Errore");
@@ -1021,6 +1036,6 @@ async function avvia() {
 }
 addEventListener("hashchange", render);
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-cp]"); if (b) copia(b.dataset.cp); });
-document.addEventListener("visibilitychange", () => { if (!document.hidden && S.stato?.accesso) caricaCartelle().catch(() => {}); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.stato?.accesso) { svuotaMemoria(); caricaCartelle().catch(() => {}); } });
 if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("sw.js").catch(() => {});
 avvia();
