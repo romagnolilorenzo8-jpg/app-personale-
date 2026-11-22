@@ -2,9 +2,14 @@
 
 ## A. Sull'iPhone (adesso, circa 10 minuti)
 
+### 0. Accendi il sito dell'app (1 minuto, una volta sola)
+1. In Safari apri **https://github.com/romagnolilorenzo8-jpg/app-personale-/settings/pages** (accedi a GitHub se te lo chiede).
+2. Alla voce **Source** lascia **Deploy from a branch**.
+3. Alla voce **Branch** scegli **gh-pages**, cartella **/ (root)** → **Save**.
+4. Aspetta 2 minuti.
+
 ### 1. Apri e installa l'app (1 minuto)
 1. Apri **Safari** e vai su **https://romagnolilorenzo8-jpg.github.io/app-personale-/**
-   - Se compare “404”: vedi la sezione **Se il sito non si apre** in fondo.
 2. Tocca **Condividi** (il quadrato con la freccia in su) → **Aggiungi alla schermata Home** → **Aggiungi**.
 3. Chiudi Safari e apri **Scrigno dall'icona sulla Home**. D'ora in poi usa **solo l'icona**.
 4. Segui la breve presentazione → **Inizia**.
@@ -56,4 +61,4 @@ Se qualcosa non va, copia il messaggio che vedi (o fai uno screenshot) e mandame
 ---
 
 ### Se il sito non si apre (errore 404)
-Dall'iPhone vai su **github.com/romagnolilorenzo8-jpg/app-personale-** → **Settings** (se non lo vedi: menu **⋯**) → **Pages** → *Source*: **Deploy from a branch** → Branch **gh-pages**, cartella **/ (root)** → **Save**. Aspetta 2 minuti e riprova.
+Controlla di aver salvato il passo 0 con il ramo **gh-pages** e cartella **/ (root)**, aspetta altri 2 minuti e ricarica la pagina.
