@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import json
 import mimetypes
 import os
 import re
@@ -120,6 +121,8 @@ def imp_set(con, k, v):
 def init_db():
     with db() as con:
         con.executescript(SCHEMA)
+        if "extra" not in [r[1] for r in con.execute("PRAGMA table_info(diario)")]:
+            con.execute("ALTER TABLE diario ADD COLUMN extra TEXT")
         if not imp_get(con, "token_api"):
             imp_set(con, "token_api", secrets.token_urlsafe(24))
             imp_set(con, "token_calendario", secrets.token_urlsafe(24))
@@ -135,6 +138,13 @@ def init_db():
                         crea(*f, cur.lastrowid, i)
             for i, (n, ic, figli) in enumerate(CARTELLE_INIZIALI):
                 crea(n, ic, figli, None, i)
+        if not imp_get(con, "cartelle_v2"):
+            dp = con.execute("SELECT id FROM cartelle WHERE nome='Documenti personali' AND padre IS NULL").fetchone()
+            dp_id = dp["id"] if dp else con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES ('Documenti personali', NULL, '🪪', 3)").lastrowid
+            for nome, icona in (("Fototessera", "📸"), ("Curriculum", "📄")):
+                if not con.execute("SELECT 1 FROM cartelle WHERE nome=? AND padre=?", (nome, dp_id)).fetchone():
+                    con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,-1)", (nome, dp_id, icona))
+            imp_set(con, "cartelle_v2", "1")
 
 
 def _icona_auto(nome: str) -> str:
@@ -738,11 +748,13 @@ async def importa(request: Request, s: str = Depends(sessione)):
             n_app += 1
         n_diario = 0
         for x in m.get("diario") or []:
-            con.execute("INSERT INTO diario (tipo, titolo, autore, data, voto, commento, stato, giorno, mese, anno, creato) "
-                        "VALUES (?,?,?,?,?,?,?,?,?,?,?)", (x.get("tipo"), x.get("titolo"), x.get("autore") or "", x.get("data"), x.get("voto"),
-                                                         x.get("commento") or "", x.get("stato") or "", x.get("giorno"), x.get("mese"),
-                                                         x.get("anno"), x.get("creato")))
+            con.execute("INSERT INTO diario (tipo, titolo, autore, data, voto, commento, stato, giorno, mese, anno, creato, extra) "
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (x.get("tipo"), x.get("titolo"), x.get("autore") or "", x.get("data"), x.get("voto"),
+                                                           x.get("commento") or "", x.get("stato") or "", x.get("giorno"), x.get("mese"),
+                                                           x.get("anno"), x.get("creato"), json.dumps(x.get("extra") or {})))
             n_diario += 1
+        if m.get("profilo") and not imp_get(con, "profilo"):
+            imp_set(con, "profilo", json.dumps(m["profilo"]))
         if voci_chiare:
             f = Fernet(_chiavi_vault[s])
             ora = datetime.now(TZ).isoformat(timespec="seconds")
@@ -953,7 +965,7 @@ def _ev_ics(r) -> dict:
 
 
 # ======================================================================= diario
-TIPI_DIARIO = ("film", "libro", "serie", "compleanno")
+TIPI_DIARIO = ("film", "libro", "serie", "compleanno", "esame", "acquisto")
 
 
 class VoceDiario(BaseModel):
@@ -967,6 +979,38 @@ class VoceDiario(BaseModel):
     giorno: int | None = None
     mese: int | None = None
     anno: int | None = None
+    extra: dict | None = None
+
+
+def _numero(v):
+    try:
+        return None if v in ("", None) else round(float(v), 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def _norm_extra(tipo: str, e: dict | None) -> dict:
+    e = e or {}
+    if tipo == "acquisto":
+        x = {"prezzo": _numero(e.get("prezzo")), "vendita": _numero(e.get("vendita")),
+             "data_vendita": e.get("data_vendita") or None, "categoria": e.get("categoria") or "altro"}
+        if x["prezzo"] is None and x["vendita"] is None:
+            raise HTTPException(400, "Manca il prezzo")
+        if x["vendita"] is None:
+            x["data_vendita"] = None
+        return x
+    if tipo == "esame":
+        voto = _numero(e.get("voto"))
+        if voto is None or not 18 <= voto <= 30:
+            raise HTTPException(400, "Il voto deve essere tra 18 e 30")
+        return {"voto": voto, "lode": bool(e.get("lode")) and voto == 30, "cfu": _numero(e.get("cfu"))}
+    return {}
+
+
+def _riga_diario(r) -> dict:
+    d = dict(r)
+    d["extra"] = json.loads(d.get("extra") or "{}")
+    return d
 
 
 def _norm_diario(v: VoceDiario) -> VoceDiario:
@@ -987,6 +1031,7 @@ def _norm_diario(v: VoceDiario) -> VoceDiario:
             date.fromisoformat(v.data[:10])
         except ValueError:
             raise HTTPException(400, "Data non valida")
+    v.extra = _norm_extra(v.tipo, v.extra)
     return v
 
 
@@ -1006,7 +1051,7 @@ def _prossimo(giorno: int, mese: int) -> date:
 def diario(tipo: str = "", _=Depends(autorizzato)):
     with db() as con:
         q = "SELECT * FROM diario" + (" WHERE tipo=?" if tipo else "")
-        righe = [dict(r) for r in con.execute(q, (tipo,) if tipo else ())]
+        righe = [_riga_diario(r) for r in con.execute(q, (tipo,) if tipo else ())]
     comp = sorted([r for r in righe if r["tipo"] == "compleanno"], key=lambda r: _prossimo(r["giorno"], r["mese"]))
     altri = sorted([r for r in righe if r["tipo"] != "compleanno"], key=lambda r: (r["data"] or r["creato"] or "", r["id"]), reverse=True)
     return comp + altri
@@ -1016,22 +1061,39 @@ def diario(tipo: str = "", _=Depends(autorizzato)):
 def nuova_voce_diario(v: VoceDiario, _=Depends(autorizzato)):
     v = _norm_diario(v)
     with db() as con:
-        cur = con.execute("INSERT INTO diario (tipo, titolo, autore, data, voto, commento, stato, giorno, mese, anno, creato) "
-                          "VALUES (?,?,?,?,?,?,?,?,?,?,?)", (v.tipo, v.titolo, v.autore, v.data, v.voto, v.commento, v.stato,
-                                                           v.giorno, v.mese, v.anno, datetime.now(TZ).isoformat(timespec="seconds")))
-        return dict(con.execute("SELECT * FROM diario WHERE id=?", (cur.lastrowid,)).fetchone())
+        cur = con.execute("INSERT INTO diario (tipo, titolo, autore, data, voto, commento, stato, giorno, mese, anno, creato, extra) "
+                          "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (v.tipo, v.titolo, v.autore, v.data, v.voto, v.commento, v.stato,
+                                                             v.giorno, v.mese, v.anno, datetime.now(TZ).isoformat(timespec="seconds"),
+                                                             json.dumps(v.extra)))
+        return _riga_diario(con.execute("SELECT * FROM diario WHERE id=?", (cur.lastrowid,)).fetchone())
 
 
 @app.put("/api/diario/{vid}")
 def modifica_voce_diario(vid: int, v: VoceDiario, _=Depends(sessione)):
     v = _norm_diario(v)
     with db() as con:
-        con.execute("UPDATE diario SET tipo=?, titolo=?, autore=?, data=?, voto=?, commento=?, stato=?, giorno=?, mese=?, anno=? WHERE id=?",
-                    (v.tipo, v.titolo, v.autore, v.data, v.voto, v.commento, v.stato, v.giorno, v.mese, v.anno, vid))
+        con.execute("UPDATE diario SET tipo=?, titolo=?, autore=?, data=?, voto=?, commento=?, stato=?, giorno=?, mese=?, anno=?, extra=? WHERE id=?",
+                    (v.tipo, v.titolo, v.autore, v.data, v.voto, v.commento, v.stato, v.giorno, v.mese, v.anno, json.dumps(v.extra), vid))
         r = con.execute("SELECT * FROM diario WHERE id=?", (vid,)).fetchone()
     if not r:
         raise HTTPException(404)
-    return dict(r)
+    return _riga_diario(r)
+
+
+@app.get("/api/profilo")
+def profilo(_=Depends(sessione)):
+    with db() as con:
+        return json.loads(imp_get(con, "profilo", "{}"))
+
+
+@app.put("/api/profilo")
+async def salva_profilo(request: Request, _=Depends(sessione)):
+    dati = await request.json()
+    if not isinstance(dati, dict):
+        raise HTTPException(400, "Dati non validi")
+    with db() as con:
+        imp_set(con, "profilo", json.dumps({str(k)[:60]: str(v)[:2000] for k, v in dati.items()}))
+    return {"ok": True}
 
 
 @app.delete("/api/diario/{vid}")

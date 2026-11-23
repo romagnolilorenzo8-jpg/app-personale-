@@ -53,8 +53,18 @@
       if (n.includes(k)) return v;
     return "📁";
   }
+  async function cartellePersonali() {
+    if (await kv.get("cartelle_v2")) return;
+    const cart = await tutti("cartelle");
+    let dp = cart.find((c) => c.padre == null && c.nome === "Documenti personali");
+    if (!dp) dp = { id: await aggiungi("cartelle", { nome: "Documenti personali", icona: "🪪", padre: null, ordine: 3 }) };
+    const figli = cart.filter((c) => c.padre === dp.id);
+    for (const [nome, icona] of [["Fototessera", "📸"], ["Curriculum", "📄"]])
+      if (!figli.some((c) => c.nome === nome)) await aggiungi("cartelle", { nome, icona, padre: dp.id, ordine: -1 });
+    await kv.set("cartelle_v2", true);
+  }
   async function inizializza() {
-    if (await kv.get("inizializzato")) return;
+    if (await kv.get("inizializzato")) return cartellePersonali();
     const crea = async (nome, icona, figli, padre, ordine) => {
       const id = await aggiungi("cartelle", { nome, icona, padre, ordine });
       for (let i = 0; i < figli.length; i++) {
@@ -64,6 +74,7 @@
     };
     for (let i = 0; i < INIZIALI.length; i++) await crea(...INIZIALI[i], null, i);
     await kv.set("inizializzato", true);
+    await cartellePersonali();
   }
 
   async function discendenti(id) {
@@ -231,6 +242,7 @@
       documenti: docs.map((d) => ({ ...d, file: `file/${d.id}-${nomeSicuro(d.nome)}` })),
       appuntamenti: await tutti("appuntamenti"),
       diario: await tutti("diario"),
+      profilo: (await kv.get("profilo")) || {},
       cassaforte: { chiave: await kv.get("cassaforte") || null, voci: await tutti("password") } };
     const voci = [{ nome: "scrigno.json", blob: new Blob([JSON.stringify(manifest, null, 1)], { type: "application/json" }) }];
     for (const d of manifest.documenti) { const b = await blobDoc(d.id); if (b) voci.push({ nome: d.file, blob: b }); }
@@ -253,6 +265,7 @@
     }
     for (const a of m.appuntamenti) await scrivi("appuntamenti", a);
     for (const x of m.diario || []) await scrivi("diario", x);
+    if (m.profilo) await kv.set("profilo", m.profilo);
     for (const p of m.cassaforte?.voci || []) await scrivi("password", p);
     await kv.set("cassaforte", m.cassaforte?.chiave || undefined);
     await kv.set("inizializzato", true);
@@ -261,12 +274,29 @@
   }
 
   /* ------------------------------------------------------------ diario */
-  const TIPI = ["film", "libro", "serie", "compleanno"];
+  const TIPI = ["film", "libro", "serie", "compleanno", "esame", "acquisto"];
+  const numero = (v) => (v === "" || v == null || isNaN(+v) ? null : Math.round(+v * 100) / 100);
+  function normExtra(tipo, e) {
+    e = e || {};
+    if (tipo === "acquisto") {
+      const x = { prezzo: numero(e.prezzo), vendita: numero(e.vendita), data_vendita: e.data_vendita || null, categoria: e.categoria || "altro" };
+      if (x.prezzo == null && x.vendita == null) throw errore(400, "Manca il prezzo");
+      if (x.vendita == null) x.data_vendita = null;
+      return x;
+    }
+    if (tipo === "esame") {
+      const voto = numero(e.voto);
+      if (voto == null || voto < 18 || voto > 30) throw errore(400, "Il voto deve essere tra 18 e 30");
+      return { voto, lode: !!e.lode && voto === 30, cfu: numero(e.cfu) };
+    }
+    return {};
+  }
   function normDiario(b) {
     const x = { tipo: b.tipo, titolo: String(b.titolo || "").trim(), autore: String(b.autore || "").trim(), data: b.data || null,
       voto: b.voto ? Math.max(1, Math.min(5, +b.voto)) : null, commento: String(b.commento || "").trim(), stato: b.stato || "",
       giorno: b.giorno ? +b.giorno : null, mese: b.mese ? +b.mese : null, anno: b.anno ? +b.anno : null };
     if (!TIPI.includes(x.tipo)) throw errore(400, "Tipo non valido");
+    x.extra = normExtra(x.tipo, b.extra);
     if (!x.titolo) throw errore(400, x.tipo === "compleanno" ? "Manca il nome" : "Manca il titolo");
     if (x.tipo === "compleanno" && !(x.giorno >= 1 && x.giorno <= 31 && x.mese >= 1 && x.mese <= 12)) throw errore(400, "Data del compleanno non valida");
     return x;
@@ -433,6 +463,12 @@
       if (!vecchio) throw errore(404, "Elemento non trovato");
       if (M === "PUT") { const x = { ...vecchio, ...normDiario({ ...vecchio, ...B }), id: vecchio.id }; await scrivi("diario", x); return x; }
       if (M === "DELETE") { await togli("diario", vecchio.id); return { ok: true }; }
+    }
+
+    // ---- profilo personale
+    if (path === "/api/profilo") {
+      if (M === "PUT") { await kv.set("profilo", { ...(B || {}) }); return { ok: true }; }
+      return (await kv.get("profilo")) || {};
     }
 
     // ---- impostazioni
