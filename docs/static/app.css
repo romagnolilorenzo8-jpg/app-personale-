@@ -523,3 +523,20 @@ a, .link-btn { color: var(--accent); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 .numeri b.su { color: var(--ok); } .numeri b.giu { color: var(--danger); }
+
+/* --- esami a moduli */
+.voto-esame.attesa { background: var(--card2); color: var(--muted); box-shadow: none; border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent); font-size: 17px; }
+.moduli-riga { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+.mod { font-size: 12px; padding: 3px 8px; border-radius: 10px; background: var(--card2); color: var(--muted); white-space: nowrap; }
+.mod.ok { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text); }
+.mod i { font-style: normal; opacity: .7; }
+.modulo { border: 1px solid var(--line); border-radius: 16px; padding: 10px; margin-bottom: 8px; background: var(--card2); display: grid; gap: 8px; }
+.modulo .riga { align-items: center; gap: 8px; }
+.modulo input, .modulo select { min-height: 40px; padding: 8px 10px; }
+.mini-cfu { display: flex; align-items: center; gap: 4px; flex: 0 0 92px !important; font-size: 13px; color: var(--muted); }
+.mini-cfu input { width: 56px; }
+.mini-lode { display: flex; align-items: center; gap: 4px; flex: 0 0 auto !important; font-size: 13px; color: var(--muted); }
+.mini-lode input { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+.modulo .iconbtn { width: 34px; height: 34px; font-size: 13px; flex: none; }
+.totale-moduli { font-size: 13.5px; color: var(--muted); margin: 2px 4px 12px; }
+.switch input:checked { background: var(--grad) !important; border-color: transparent; box-shadow: 0 0 14px rgba(192, 132, 252, .55); }

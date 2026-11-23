@@ -1000,10 +1000,20 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
             x["data_vendita"] = None
         return x
     if tipo == "esame":
+        moduli = []
+        for i, m in enumerate(e.get("moduli") or []):
+            v = _numero(m.get("voto"))
+            if v is not None and not 18 <= v <= 30:
+                raise HTTPException(400, "Il voto di ogni modulo deve essere tra 18 e 30")
+            moduli.append({"nome": str(m.get("nome") or f"Modulo {i + 1}").strip() or f"Modulo {i + 1}",
+                           "cfu": _numero(m.get("cfu")) or 6, "voto": v, "lode": bool(m.get("lode")) and v == 30,
+                           "data": m.get("data") or None})
+        if moduli:
+            return {"moduli": moduli, "cfu": sum(m["cfu"] for m in moduli)}
         voto = _numero(e.get("voto"))
         if voto is None or not 18 <= voto <= 30:
             raise HTTPException(400, "Il voto deve essere tra 18 e 30")
-        return {"voto": voto, "lode": bool(e.get("lode")) and voto == 30, "cfu": _numero(e.get("cfu"))}
+        return {"voto": voto, "lode": bool(e.get("lode")) and voto == 30, "cfu": _numero(e.get("cfu")) or 6}
     return {}
 
 

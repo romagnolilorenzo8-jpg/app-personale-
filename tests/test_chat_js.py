@@ -20,6 +20,19 @@ CASI = {
     "quando è il compleanno di Marco?": {"azione": "domanda", "cosa": "compleanno", "nome": "Marco"},
     "prossimi compleanni": {"azione": "domanda", "cosa": "compleanni"},
     "il 16 dicembre dentista dalle 10 alle 11": {"azione": "appuntamento", "inizio": "2026-12-16T10:00"},
+    "ho comprato una maglia a 40 euro": {"azione": "acquisto", "nome": "Maglia", "prezzo": 40, "categoria": "vestiti"},
+    "intanto ho comprato una felpa Nike a 30 €": {"azione": "acquisto", "nome": "Felpa Nike", "prezzo": 30},
+    "ho venduto la maglia a 50 euro": {"azione": "vendita", "nome": "Maglia", "prezzo": 50},
+    "ieri ho comprato una macchina usata a 8.500 euro": {"prezzo": 8500, "categoria": "veicoli", "data": "2026-11-22"},
+    "bilancio": {"azione": "domanda", "cosa": "bilancio"},
+    "ho passato l'esame di Analisi 1 con 28": {"azione": "esame", "materia": "Analisi 1", "voto": 28, "modulo": None},
+    "esame di diritto privato 30 e lode 9 cfu": {"materia": "Diritto privato", "voto": 30, "lode": True, "cfu": 9},
+    "esame di Fisica da 12 cfu": {"azione": "esame_nuovo", "materia": "Fisica", "cfu": 12},
+    "ho passato il primo modulo di Fisica con 27": {"azione": "esame", "materia": "Fisica", "voto": 27, "modulo": 1},
+    "secondo modulo di fisica 30 e lode": {"materia": "Fisica", "voto": 30, "lode": True, "modulo": 2},
+    "la seconda parte di chimica con 25": {"materia": "Chimica", "voto": 25, "modulo": 2},
+    "il 12 gennaio esame di chimica": {"azione": "appuntamento"},
+    "esami del sangue il 3 dicembre alle 8": {"azione": "appuntamento"},
 }
 
 

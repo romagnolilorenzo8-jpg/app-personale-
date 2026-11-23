@@ -285,9 +285,17 @@
       return x;
     }
     if (tipo === "esame") {
+      const votoOk = (v) => v == null || (v >= 18 && v <= 30);
+      const moduli = Array.isArray(e.moduli) ? e.moduli.map((m, i) => ({
+        nome: String(m.nome || `Modulo ${i + 1}`).trim() || `Modulo ${i + 1}`, cfu: numero(m.cfu) ?? 6, voto: numero(m.voto),
+        lode: !!m.lode && numero(m.voto) === 30, data: m.data || null })) : [];
+      if (moduli.length) {
+        if (!moduli.every((m) => votoOk(m.voto))) throw errore(400, "Il voto di ogni modulo deve essere tra 18 e 30");
+        return { moduli, cfu: moduli.reduce((a, m) => a + m.cfu, 0) };
+      }
       const voto = numero(e.voto);
-      if (voto == null || voto < 18 || voto > 30) throw errore(400, "Il voto deve essere tra 18 e 30");
-      return { voto, lode: !!e.lode && voto === 30, cfu: numero(e.cfu) };
+      if (voto == null || !votoOk(voto)) throw errore(400, "Il voto deve essere tra 18 e 30");
+      return { voto, lode: !!e.lode && voto === 30, cfu: numero(e.cfu) ?? 6 };
     }
     return {};
   }
