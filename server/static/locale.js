@@ -4,14 +4,14 @@
   "use strict";
   if (!window.SCRIGNO_LOCALE) return;
 
-  const ARCHIVI = ["cartelle", "documenti", "blob", "password", "appuntamenti"];
+  const ARCHIVI = ["cartelle", "documenti", "blob", "password", "appuntamenti", "diario"];
   let _db, chiave = null, nascostoDa = 0;
   const urlCache = new Map();
 
   /* ------------------------------------------------------------ IndexedDB */
   function apri() {
     return (_db ||= new Promise((res, rej) => {
-      const r = indexedDB.open("scrigno", 1);
+      const r = indexedDB.open("scrigno", 2);
       r.onupgradeneeded = () => {
         const d = r.result;
         for (const s of ARCHIVI) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: "id", autoIncrement: true });
@@ -230,6 +230,7 @@
     const manifest = { formato: "scrigno-backup", versione: 1, creato: adesso(), cartelle: await tutti("cartelle"),
       documenti: docs.map((d) => ({ ...d, file: `file/${d.id}-${nomeSicuro(d.nome)}` })),
       appuntamenti: await tutti("appuntamenti"),
+      diario: await tutti("diario"),
       cassaforte: { chiave: await kv.get("cassaforte") || null, voci: await tutti("password") } };
     const voci = [{ nome: "scrigno.json", blob: new Blob([JSON.stringify(manifest, null, 1)], { type: "application/json" }) }];
     for (const d of manifest.documenti) { const b = await blobDoc(d.id); if (b) voci.push({ nome: d.file, blob: b }); }
@@ -251,11 +252,35 @@
       if (f) await scrivi("blob", { id: d.id, blob: new Blob([await (await f()).arrayBuffer()], { type: d.mime }) });
     }
     for (const a of m.appuntamenti) await scrivi("appuntamenti", a);
+    for (const x of m.diario || []) await scrivi("diario", x);
     for (const p of m.cassaforte?.voci || []) await scrivi("password", p);
     await kv.set("cassaforte", m.cassaforte?.chiave || undefined);
     await kv.set("inizializzato", true);
     chiave = null;
     return { cartelle: m.cartelle.length, documenti: m.documenti.length, appuntamenti: m.appuntamenti.length };
+  }
+
+  /* ------------------------------------------------------------ diario */
+  const TIPI = ["film", "libro", "serie", "compleanno"];
+  function normDiario(b) {
+    const x = { tipo: b.tipo, titolo: String(b.titolo || "").trim(), autore: String(b.autore || "").trim(), data: b.data || null,
+      voto: b.voto ? Math.max(1, Math.min(5, +b.voto)) : null, commento: String(b.commento || "").trim(), stato: b.stato || "",
+      giorno: b.giorno ? +b.giorno : null, mese: b.mese ? +b.mese : null, anno: b.anno ? +b.anno : null };
+    if (!TIPI.includes(x.tipo)) throw errore(400, "Tipo non valido");
+    if (!x.titolo) throw errore(400, x.tipo === "compleanno" ? "Manca il nome" : "Manca il titolo");
+    if (x.tipo === "compleanno" && !(x.giorno >= 1 && x.giorno <= 31 && x.mese >= 1 && x.mese <= 12)) throw errore(400, "Data del compleanno non valida");
+    return x;
+  }
+  function prossimoCompleanno(x) {
+    const o = new Date(oggi() + "T00:00:00");
+    let d = new Date(o.getFullYear(), x.mese - 1, x.giorno);
+    if (d < o) d = new Date(o.getFullYear() + 1, x.mese - 1, x.giorno);
+    return d;
+  }
+  function ordinaDiario(l) {
+    return l.sort((a, b) => a.tipo === "compleanno" && b.tipo === "compleanno"
+      ? prossimoCompleanno(a) - prossimoCompleanno(b)
+      : (b.data || b.creato || "").localeCompare(a.data || a.creato || "") || b.id - a.id);
   }
 
   /* ------------------------------------------------------------ "server" locale */
@@ -393,13 +418,30 @@
       if (M === "DELETE") { await togli("appuntamenti", vecchio.id); return { ok: true }; }
     }
 
+    // ---- diario: film, libri, serie, compleanni
+    if (path === "/api/diario" && M === "GET") {
+      let l = await tutti("diario");
+      if (q.get("tipo")) l = l.filter((x) => x.tipo === q.get("tipo"));
+      return ordinaDiario(l);
+    }
+    if (path === "/api/diario" && M === "POST") {
+      const x = normDiario(B); delete x.id; x.creato = adesso();
+      x.id = await aggiungi("diario", x); return x;
+    }
+    if ((m = path.match(/^\/api\/diario\/(\d+)$/))) {
+      const vecchio = await leggi("diario", +m[1]);
+      if (!vecchio) throw errore(404, "Elemento non trovato");
+      if (M === "PUT") { const x = { ...vecchio, ...normDiario({ ...vecchio, ...B }), id: vecchio.id }; await scrivi("diario", x); return x; }
+      if (M === "DELETE") { await togli("diario", vecchio.id); return { ok: true }; }
+    }
+
     // ---- impostazioni
     if (path === "/api/impostazioni") {
       let uso = null, quota = null;
       try { const e = await navigator.storage.estimate(); uso = e.usage; quota = e.quota; } catch (e) { /* non disponibile */ }
       let persistente = false;
       try { persistente = await navigator.storage.persisted(); } catch (e) { /* non disponibile */ }
-      return { locale: true, uso, quota, persistente, ultimo_backup: await kv.get("ultimo_backup") || null,
+      return { locale: true, uso, quota, persistente, ultimo_backup: await kv.get("ultimo_backup") || null, diario: (await tutti("diario")).length,
         documenti: (await tutti("documenti")).length };
     }
     throw errore(404, "Funzione non disponibile senza server");

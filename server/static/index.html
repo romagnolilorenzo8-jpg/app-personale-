@@ -18,16 +18,17 @@
 <body>
   <div id="app"></div>
   <nav id="tabbar" class="tabbar" hidden>
-    <a href="#/" data-tab="home"><span class="ti">🗂️</span><span>Archivio</span></a>
-    <a href="#/da-smistare" data-tab="da-smistare"><span class="ti">📥</span><span>Da smistare</span><b class="badge" id="badge-smistare" hidden></b></a>
+    <a href="#/" data-tab="home"><span class="ti">🗂️</span><span>Archivio</span><b class="badge" id="badge-smistare" hidden></b></a>
+    <a href="#/diario/film" data-tab="diario"><span class="ti">📔</span><span>Diario</span></a>
+    <a href="#/chat" data-tab="chat" class="tab-chat"><span class="ti">💬</span><span>Chat</span></a>
     <a href="#/agenda" data-tab="agenda"><span class="ti">🗓️</span><span>Visite</span></a>
-    <a href="#/password" data-tab="password"><span class="ti">🔐</span><span>Password</span></a>
     <a href="#/altro" data-tab="altro"><span class="ti">⚙️</span><span>Altro</span></a>
   </nav>
   <div id="toast" class="toast"></div>
   <div id="drop" class="drop" hidden><div>Rilascia i file qui</div></div>
   <input type="file" id="file-input" multiple hidden>
   <script src="static/nlp.js"></script>
+  <script src="static/chat.js"></script>
   <script src="static/locale.js"></script>
   <script src="static/app.js"></script>
 </body>

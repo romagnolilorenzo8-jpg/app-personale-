@@ -98,7 +98,7 @@ def test_import_backup_iphone():
     assert r.status_code == 401
     r = c.post("/api/importa", files={"file": ("b.zip", dati, "application/zip")}, data={"password": "segreta123"})
     assert r.status_code == 200, r.text
-    assert r.json() == {"ok": True, "documenti": 2, "appuntamenti": 1, "password": 1}
+    assert r.json() == {"ok": True, "documenti": 2, "appuntamenti": 1, "password": 1, "diario": 0}
     assert any(v["titolo"] == "Poste" for v in c.get("/api/cassaforte").json())
     bolli = c.get("/api/documenti?raccolta=bollo").json()
     assert bolli and bolli[0]["scadenza"] == "2026-12-10"

@@ -63,6 +63,9 @@ CREATE TABLE IF NOT EXISTS documenti (
 CREATE TABLE IF NOT EXISTS password (
   id INTEGER PRIMARY KEY, titolo TEXT NOT NULL, utente TEXT DEFAULT '', segreto TEXT,
   sito TEXT DEFAULT '', note TEXT DEFAULT '', categoria TEXT DEFAULT '', creato TEXT, modificato TEXT);
+CREATE TABLE IF NOT EXISTS diario (
+  id INTEGER PRIMARY KEY, tipo TEXT NOT NULL, titolo TEXT NOT NULL, autore TEXT DEFAULT '', data TEXT,
+  voto INTEGER, commento TEXT DEFAULT '', stato TEXT DEFAULT '', giorno INTEGER, mese INTEGER, anno INTEGER, creato TEXT);
 CREATE TABLE IF NOT EXISTS appuntamenti (
   id INTEGER PRIMARY KEY, uid TEXT, titolo TEXT NOT NULL, inizio TEXT NOT NULL, fine TEXT,
   tutto_il_giorno INTEGER DEFAULT 0, luogo TEXT DEFAULT '', note TEXT DEFAULT '',
@@ -733,6 +736,13 @@ async def importa(request: Request, s: str = Depends(sessione)):
                                                        int(bool(a.get("tutto_il_giorno"))), a.get("luogo") or "", a.get("note") or "",
                                                        a.get("categoria") or "altro", a.get("icona") or "📅", a.get("creato")))
             n_app += 1
+        n_diario = 0
+        for x in m.get("diario") or []:
+            con.execute("INSERT INTO diario (tipo, titolo, autore, data, voto, commento, stato, giorno, mese, anno, creato) "
+                        "VALUES (?,?,?,?,?,?,?,?,?,?,?)", (x.get("tipo"), x.get("titolo"), x.get("autore") or "", x.get("data"), x.get("voto"),
+                                                         x.get("commento") or "", x.get("stato") or "", x.get("giorno"), x.get("mese"),
+                                                         x.get("anno"), x.get("creato")))
+            n_diario += 1
         if voci_chiare:
             f = Fernet(_chiavi_vault[s])
             ora = datetime.now(TZ).isoformat(timespec="seconds")
@@ -740,7 +750,7 @@ async def importa(request: Request, s: str = Depends(sessione)):
                 con.execute("INSERT INTO password (titolo, utente, segreto, sito, note, categoria, creato, modificato) VALUES (?,?,?,?,?,?,?,?)",
                             (v.get("titolo", ""), v.get("utente", ""), f.encrypt(v.get("segreto", "").encode()).decode(), v.get("sito", ""),
                              v.get("note", ""), v.get("categoria", ""), v.get("creato") or ora, ora))
-    return {"ok": True, "documenti": n_doc, "appuntamenti": n_app, "password": len(voci_chiare)}
+    return {"ok": True, "documenti": n_doc, "appuntamenti": n_app, "password": len(voci_chiare), "diario": n_diario}
 
 
 @app.get("/api/scadenze")
@@ -942,6 +952,95 @@ def _ev_ics(r) -> dict:
             "note": r["note"], "avvisi": [24 * 60, 60] if not r["tutto_il_giorno"] else [12 * 60]}
 
 
+# ======================================================================= diario
+TIPI_DIARIO = ("film", "libro", "serie", "compleanno")
+
+
+class VoceDiario(BaseModel):
+    tipo: str
+    titolo: str
+    autore: str = ""
+    data: str | None = None
+    voto: int | None = None
+    commento: str = ""
+    stato: str = ""
+    giorno: int | None = None
+    mese: int | None = None
+    anno: int | None = None
+
+
+def _norm_diario(v: VoceDiario) -> VoceDiario:
+    if v.tipo not in TIPI_DIARIO:
+        raise HTTPException(400, "Tipo non valido")
+    v.titolo = v.titolo.strip()
+    if not v.titolo:
+        raise HTTPException(400, "Manca il nome" if v.tipo == "compleanno" else "Manca il titolo")
+    if v.voto is not None:
+        v.voto = max(1, min(5, v.voto)) if v.voto else None
+    if v.tipo == "compleanno":
+        try:
+            date(2000, v.mese or 0, v.giorno or 0)
+        except (ValueError, TypeError):
+            raise HTTPException(400, "Data del compleanno non valida")
+    if v.data:
+        try:
+            date.fromisoformat(v.data[:10])
+        except ValueError:
+            raise HTTPException(400, "Data non valida")
+    return v
+
+
+def _prossimo(giorno: int, mese: int) -> date:
+    oggi = datetime.now(TZ).date()
+    for anno in (oggi.year, oggi.year + 1, oggi.year + 2, oggi.year + 3, oggi.year + 4):
+        try:
+            d = date(anno, mese, giorno)
+        except ValueError:  # 29 febbraio
+            continue
+        if d >= oggi:
+            return d
+    return oggi
+
+
+@app.get("/api/diario")
+def diario(tipo: str = "", _=Depends(autorizzato)):
+    with db() as con:
+        q = "SELECT * FROM diario" + (" WHERE tipo=?" if tipo else "")
+        righe = [dict(r) for r in con.execute(q, (tipo,) if tipo else ())]
+    comp = sorted([r for r in righe if r["tipo"] == "compleanno"], key=lambda r: _prossimo(r["giorno"], r["mese"]))
+    altri = sorted([r for r in righe if r["tipo"] != "compleanno"], key=lambda r: (r["data"] or r["creato"] or "", r["id"]), reverse=True)
+    return comp + altri
+
+
+@app.post("/api/diario")
+def nuova_voce_diario(v: VoceDiario, _=Depends(autorizzato)):
+    v = _norm_diario(v)
+    with db() as con:
+        cur = con.execute("INSERT INTO diario (tipo, titolo, autore, data, voto, commento, stato, giorno, mese, anno, creato) "
+                          "VALUES (?,?,?,?,?,?,?,?,?,?,?)", (v.tipo, v.titolo, v.autore, v.data, v.voto, v.commento, v.stato,
+                                                           v.giorno, v.mese, v.anno, datetime.now(TZ).isoformat(timespec="seconds")))
+        return dict(con.execute("SELECT * FROM diario WHERE id=?", (cur.lastrowid,)).fetchone())
+
+
+@app.put("/api/diario/{vid}")
+def modifica_voce_diario(vid: int, v: VoceDiario, _=Depends(sessione)):
+    v = _norm_diario(v)
+    with db() as con:
+        con.execute("UPDATE diario SET tipo=?, titolo=?, autore=?, data=?, voto=?, commento=?, stato=?, giorno=?, mese=?, anno=? WHERE id=?",
+                    (v.tipo, v.titolo, v.autore, v.data, v.voto, v.commento, v.stato, v.giorno, v.mese, v.anno, vid))
+        r = con.execute("SELECT * FROM diario WHERE id=?", (vid,)).fetchone()
+    if not r:
+        raise HTTPException(404)
+    return dict(r)
+
+
+@app.delete("/api/diario/{vid}")
+def elimina_voce_diario(vid: int, _=Depends(sessione)):
+    with db() as con:
+        con.execute("DELETE FROM diario WHERE id=?", (vid,))
+    return {"ok": True}
+
+
 @app.get("/api/appuntamenti/{aid}.ics")
 def ics_singolo(aid: int, _=Depends(autorizzato)):
     with db() as con:
@@ -965,6 +1064,11 @@ def feed_calendario(token: str):
                            "inizio": r["scadenza"], "fine": r["scadenza"], "tutto_il_giorno": True,
                            "note": f"Documento in Scrigno: {_percorso_cartella(con, r['cartella'])}",
                            "avvisi": [7 * 24 * 60, 12 * 60]})
+        for r in con.execute("SELECT * FROM diario WHERE tipo='compleanno'"):
+            d = _prossimo(r["giorno"], r["mese"]).replace(year=datetime.now(TZ).year) if not (r["mese"] == 2 and r["giorno"] == 29) else _prossimo(29, 2)
+            eventi.append({"uid": f"compleanno-{r['id']}@scrigno", "titolo": f"🎂 Compleanno di {r['titolo']}", "inizio": d.isoformat(),
+                           "fine": d.isoformat(), "tutto_il_giorno": True, "rrule": "FREQ=YEARLY",
+                           "note": f"Nato/a nel {r['anno']}" if r["anno"] else "", "avvisi_assoluti": ["PT9H", "-PT15H"]})
     return Response(ics.calendario(eventi, "Scrigno", TZ), media_type="text/calendar; charset=utf-8")
 
 

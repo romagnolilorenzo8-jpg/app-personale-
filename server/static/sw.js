@@ -1,6 +1,6 @@
 // Service worker minimale: rete prima, cache come riserva per l'interfaccia.
 const CACHE = "scrigno-v1";
-const SHELL = ["/", "/static/app.css", "/static/app.js", "/static/nlp.js", "/static/locale.js", "/static/icona.svg"];
+const SHELL = ["/", "/static/app.css", "/static/app.js", "/static/nlp.js", "/static/chat.js", "/static/locale.js", "/static/icona.svg"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener("fetch", (e) => {

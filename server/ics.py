@@ -37,10 +37,14 @@ def evento(ev: dict, tz: ZoneInfo) -> list[str]:
         righe += [f"DTSTART;VALUE=DATE:{d0:%Y%m%d}", f"DTEND;VALUE=DATE:{d1:%Y%m%d}"]
     else:
         righe += [f"DTSTART:{_utc(ev['inizio'], tz)}", f"DTEND:{_utc(ev['fine'], tz)}"]
+    if ev.get("rrule"):
+        righe.append(f"RRULE:{ev['rrule']}")
     if ev.get("luogo"):
         righe.append(f"LOCATION:{_esc(ev['luogo'])}")
     if ev.get("note"):
         righe.append(f"DESCRIPTION:{_esc(ev['note'])}")
+    for trig in ev.get("avvisi_assoluti", []):
+        righe += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_esc(ev['titolo'])}", f"TRIGGER:{trig}", "END:VALARM"]
     for minuti in ev.get("avvisi", []):
         righe += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_esc(ev['titolo'])}",
                   f"TRIGGER:-PT{int(minuti)}M", "END:VALARM"]
