@@ -124,18 +124,33 @@
     }
 
     // ---------------------------------------------------------------- esami (università / scuola)
-    const votoEsame = low.match(rx("\\b(?:con|preso|presa|voto:?|votazione)?\\s*\\b(1[89]|2\\d|30)\\s*(?:\\/\\s*30|trentesimi)?\\s*(e lode|con lode|cum laude|l\\b)?", "iu"));
-    if (rx("\\b(esame|esami|ho passato|ho superato|ho dato|ho preso .* (?:a|in)\\b|trenta e lode|30 e lode)\\b").test(low) && votoEsame && !/sangue|analisi del|medic|visita/.test(low)) {
-      const lode = !!votoEsame[2] || /trenta e lode/.test(low);
-      const cfu = (low.match(/(\d{1,2})\s*(?:cfu|crediti)/) || [])[1];
-      const quando = dataPassata(low.replace(votoEsame[0], " ").replace(/\d{1,2}\s*(?:cfu|crediti)/, " "), oggi);
-      let materia = orig.replace(new RegExp(votoEsame[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), " ")
-        .replace(/\d{1,2}\s*(?:cfu|crediti)/i, " ");
-      if (quando.re) materia = materia.replace(new RegExp(quando.re.source, "iu"), " ");
-      materia = materia.replace(rx("\\b(?:ho|ho passato|ho superato|ho dato|ho fatto|ho preso|ho sostenuto|passato|superato|l'esame|un esame|esame|esami|di|del|della|dello|in|a|con|il|lo|la|voto|preso|presa|trenta|e lode|lode|oggi|ieri|stamattina|finalmente|che|trentesimi)\\b", "giu"), " ");
-      materia = pulisci(materia.replace(/[,.;:!]+/g, " "));
-      if (materia) {
-        return { azione: "esame", materia: cap(materia), voto: lode ? 30 : +votoEsame[1], lode, cfu: cfu ? +cfu : null, data: quando.data };
+    // modulo di un esame diviso in parti: "primo modulo", "modulo 2", "seconda parte"…
+    const MOD_RE = rx("\\b(?:(?:il |la )?(primo|secondo|terzo|1°|2°|3°|1|2|3)\\s+modulo|modulo\\s+(\\d|uno|due|tre|iii|ii|i|a|b)|(?:la )?(prima|seconda|terza)\\s+parte|parte\\s+(\\d|uno|due|tre))\\b", "iu");
+    const NUM_MOD = { primo: 1, prima: 1, uno: 1, "1": 1, "1°": 1, i: 1, a: 1, secondo: 2, seconda: 2, due: 2, "2": 2, "2°": 2, ii: 2, b: 2, terzo: 3, terza: 3, tre: 3, "3": 3, "3°": 3, iii: 3 };
+    const modM = low.match(MOD_RE);
+    const modulo = modM ? NUM_MOD[(modM[1] || modM[2] || modM[3] || modM[4]).toLowerCase()] : null;
+    const cfuM = low.match(/(\d{1,2})\s*(?:cfu|crediti)/);
+    const lowSenza = low.replace(/\d{1,2}\s*(?:cfu|crediti)/g, " ").replace(MOD_RE, " ");
+    const votoEsame = lowSenza.match(rx("\\b(?:con|preso|presa|voto:?|votazione)?\\s*\\b(1[89]|2\\d|30)\\s*(?:\\/\\s*30|trentesimi)?\\s*(e lode|con lode|cum laude|l\\b)?", "iu"));
+    const parlaDiEsame = rx("\\b(esame|esami|ho passato|ho superato|ho dato|ho preso .* (?:a|in)\\b|trenta e lode|30 e lode)\\b").test(low) || modulo;
+    const pulisciMateria = (t) => {
+      let m = t.replace(/\d{1,2}\s*(?:cfu|crediti)/gi, " ").replace(new RegExp(MOD_RE.source, "iu"), " ");
+      if (votoEsame) m = m.replace(new RegExp(votoEsame[0].trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), " ");
+      m = m.replace(rx("\\b(?:ho|ho passato|ho superato|ho dato|ho fatto|ho preso|ho sostenuto|passato|superato|l'esame|un esame|esame|esami|di|del|della|dello|in|a|da|con|il|lo|la|voto|preso|presa|trenta|e lode|lode|oggi|ieri|stamattina|finalmente|che|trentesimi|modulo|diviso|in due|due moduli|moduli)\\b", "giu"), " ");
+      return cap(pulisci(m.replace(/[,.;:!]+/g, " ")));
+    };
+    if (parlaDiEsame && !/sangue|analisi del|medic|visita/.test(low)) {
+      if (votoEsame) {
+        const lode = !!votoEsame[2] || /trenta e lode/.test(low);
+        let tmp = orig;
+        const quando = dataPassata(lowSenza.replace(votoEsame[0], " "), oggi);
+        if (quando.re) tmp = tmp.replace(new RegExp(quando.re.source, "iu"), " ");
+        const materia = pulisciMateria(tmp);
+        if (materia) return { azione: "esame", materia, voto: lode ? 30 : +votoEsame[1], lode, cfu: cfuM ? +cfuM[1] : null, modulo, data: quando.data };
+      } else if (cfuM && rx("\\besame\\b").test(low)) {
+        // "esame di Fisica da 12 cfu" → esame ancora da sostenere, diviso in moduli da 6
+        const materia = pulisciMateria(orig);
+        if (materia) return { azione: "esame_nuovo", materia, cfu: +cfuM[1] };
       }
     }
 

@@ -1049,7 +1049,7 @@ const TIPI_D = {
 const CATEGORIE_ACQ = { vestiti: "👕 Vestiti", veicoli: "🚗 Veicoli", tecnologia: "📱 Tecnologia", casa: "🛋️ Casa", collezionismo: "🃏 Collezionismo", altro: "📦 Altro" };
 const euro = (n) => (n == null ? "—" : n.toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }));
 const segno = (n) => (n > 0 ? "+" : "") + euro(n);
-const votoTesto = (e) => (e.lode ? "30 e lode" : String(e.voto));
+const votoTesto = (e) => { const c = esameCalcolato(e); return c.lode ? "30 e lode" : votoBreve(c.voto); };
 function bilancio(lista) {
   const b = { speso: 0, incassato: 0, spesoRiv: 0, incassatoRiv: 0, nRiv: 0, magazzino: 0, nMag: 0 };
   for (const x of lista) {
@@ -1061,13 +1061,25 @@ function bilancio(lista) {
   b.saldo = b.incassato - b.speso; b.guadagno = b.incassatoRiv - b.spesoRiv;
   return b;
 }
+/* Un esame può essere classico (un voto) o diviso in moduli (es. 12 CFU = 2 moduli da 6, ognuno col suo voto):
+   il voto finale è la media dei moduli pesata sui crediti, e conta solo quando tutti i moduli sono superati. */
+function esameCalcolato(e) {
+  e = e || {};
+  if (e.moduli && e.moduli.length) {
+    const cfu = e.moduli.reduce((a, m) => a + (m.cfu || 6), 0);
+    const fatti = e.moduli.filter((m) => m.voto).length, completo = fatti === e.moduli.length;
+    return { voto: completo ? e.moduli.reduce((a, m) => a + m.voto * (m.cfu || 6), 0) / cfu : null, cfu, completo, fatti, totali: e.moduli.length,
+      lode: completo && e.moduli.every((m) => m.lode), moduli: e.moduli };
+  }
+  return { voto: e.voto ?? null, cfu: e.cfu || 6, completo: e.voto != null, fatti: 1, totali: 1, lode: !!e.lode, moduli: null };
+}
+const votoBreve = (v) => (v == null ? "⏳" : Number.isInteger(v) ? String(v) : dec(v, 1));
 function statEsami(lista) {
-  const v = lista.map((x) => x.extra || {}).filter((e) => e.voto);
-  const conCfu = v.every((e) => e.cfu) ? v : [];   // la ponderata ha senso solo se tutti gli esami hanno i crediti
+  const tutti = lista.map((x) => esameCalcolato(x.extra)), v = tutti.filter((e) => e.completo);
+  const cfu = v.reduce((a, e) => a + e.cfu, 0);
   const media = v.length ? v.reduce((a, e) => a + e.voto, 0) / v.length : null;
-  const cfu = v.reduce((a, e) => a + (e.cfu || 0), 0), cfuPond = conCfu.reduce((a, e) => a + e.cfu, 0);
-  const ponderata = cfuPond ? conCfu.reduce((a, e) => a + e.voto * e.cfu, 0) / cfuPond : null;
-  return { n: v.length, media, ponderata, cfu, base: ponderata ? (ponderata * 110) / 30 : media ? (media * 110) / 30 : null, lodi: v.filter((e) => e.lode).length };
+  const ponderata = cfu ? v.reduce((a, e) => a + e.voto * e.cfu, 0) / cfu : null;
+  return { n: v.length, inCorso: tutti.length - v.length, media, ponderata, cfu, base: ponderata ? (ponderata * 110) / 30 : null, lodi: v.filter((e) => e.lode).length };
 }
 const dec = (n, c = 2) => (n == null ? "—" : n.toLocaleString("it-IT", { minimumFractionDigits: c, maximumFractionDigits: c }));
 const stelle = (v) => (v ? "★".repeat(v) + "☆".repeat(5 - v) : "");
@@ -1091,9 +1103,11 @@ function htmlVoceDiario(x) {
       <div style="margin-top:4px"><span class="tag ${i.g <= 1 ? "danger" : i.g <= 14 ? "warn" : ""}">${i.quando}</span></div></div><div class="dx">›</div></div>`;
   }
   if (x.tipo === "esame") {
-    const e = x.extra || {};
-    return `<div class="voce" data-dv="${x.id}"><div class="voto-esame ${e.lode ? "lode" : ""}">${e.voto || "?"}${e.lode ? "<small>L</small>" : ""}</div>
-      <div class="corpo"><div class="tit">${esc(x.titolo)}</div><div class="sub">${[e.cfu ? `${e.cfu} CFU` : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
+    const c = esameCalcolato(x.extra);
+    const dettaglio = c.moduli ? c.moduli.map((m) => `<span class="mod ${m.voto ? "ok" : ""}">${esc(m.nome)}: <b>${m.voto ? (m.lode ? "30L" : m.voto) : "—"}</b> <i>${m.cfu || 6} CFU</i></span>`).join("") : "";
+    return `<div class="voce" data-dv="${x.id}"><div class="voto-esame ${c.lode ? "lode" : ""} ${c.completo ? "" : "attesa"}">${votoBreve(c.voto)}${c.lode ? "<small>L</small>" : ""}</div>
+      <div class="corpo"><div class="tit">${esc(x.titolo)}</div><div class="sub">${[`${c.cfu} CFU`, c.moduli ? (c.completo ? `${c.totali} moduli` : `in corso: ${c.fatti}/${c.totali} moduli`) : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
+      ${dettaglio ? `<div class="moduli-riga">${dettaglio}</div>` : ""}
       ${x.commento ? `<div class="commento">“${esc(x.commento)}”</div>` : ""}</div><div class="dx">›</div></div>`;
   }
   if (x.tipo === "acquisto") {
@@ -1125,7 +1139,7 @@ async function vistaDiario(tipo) {
   app.innerHTML = `<div class="top"><h1>Diario<small>La mia vita: film, libri, serie e compleanni</small></h1></div>
     <div class="segmenti">${Object.entries(TIPI_D).map(([k, v]) => `<a href="#/diario/${k}" class="${k === tipo ? "on" : ""}"><span>${v.ico}</span>${v.nome}<b>${conta(k) || ""}</b></a>`).join("")}</div>
     ${tipo === "acquisto" && tuttiAcq.length ? htmlBilancio(bilancio(tuttiAcq), filtro) : ""}
-    ${tipo === "esame" && lista.length ? htmlStatEsami(statEsami(lista)) : ""}
+    ${tipo === "esame" && lista.length && statEsami(lista).n ? htmlStatEsami(statEsami(lista)) : ""}
     <a class="chat-invito" href="#/chat"><span>💬</span><span>${t.vuoto}</span></a>
     ${tipo === "compleanno" ? `<div class="riga" style="margin:4px 0 12px"><button class="btn sec" id="imp-comp">📥 Importa dai Promemoria</button>${lista.length ? `<button class="btn sec" id="cal-comp">🔔 Notifiche</button>` : ""}</div>` : ""}
     ${lista.length ? `<div class="lista" id="dl">${lista.map(htmlVoceDiario).join("")}</div>`
@@ -1151,7 +1165,7 @@ function htmlBilancio(b, filtro) {
 function htmlStatEsami(st) {
   return `<div class="bilancio">
     <div class="bil-top"><div><div class="bil-et">Media ${st.ponderata ? "ponderata" : ""}</div><div class="bil-num">${dec(st.ponderata ?? st.media)}</div>
-      <div class="bil-sub">${st.n} esam${st.n === 1 ? "e" : "i"}${st.lodi ? ` · ${st.lodi} lod${st.lodi === 1 ? "e" : "i"} ✨` : ""}</div></div><div class="bil-ico">🎓</div></div>
+      <div class="bil-sub">${st.n} esam${st.n === 1 ? "e" : "i"} superat${st.n === 1 ? "o" : "i"}${st.lodi ? ` · ${st.lodi} lod${st.lodi === 1 ? "e" : "i"} ✨` : ""}${st.inCorso ? ` · ${st.inCorso} in corso` : ""}</div></div><div class="bil-ico">🎓</div></div>
     <div class="bil-griglia">
       <div><div class="bil-et">Media aritmetica</div><div class="bil-n">${dec(st.media)}</div></div>
       <div><div class="bil-et">Crediti</div><div class="bil-n">${st.cfu || "—"}</div></div>
@@ -1197,9 +1211,12 @@ function modificaVoceSpeciale(x, dopo) {
   const t = TIPI_D[x.tipo], e = x.extra || {}, esame = x.tipo === "esame";
   const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : esame ? "Nuovo esame" : "Nuovo acquisto"} ${xBtn}</h3><form id="fs">
     <label class="campo"><span>${esame ? "Materia" : "Cosa"}</span><input type="text" name="titolo" value="${esc(x.titolo || "")}" required placeholder="${esame ? "Es. Analisi 1" : "Es. Maglia Nike"}"></label>
-    ${esame ? `<div class="riga"><label class="campo"><span>Voto</span><select name="voto">${Array.from({ length: 13 }, (_, i) => 18 + i).map((n) => `<option ${(e.voto || 30) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
-        <label class="campo"><span>Crediti (CFU)</span><input type="number" name="cfu" inputmode="numeric" min="0" max="30" value="${e.cfu ?? ""}"></label></div>
-      <label class="switch"><span>✨ Con lode</span><input type="checkbox" name="lode" ${e.lode ? "checked" : ""}></label>
+    ${esame ? `<label class="switch"><span>🧩 Diviso in moduli <i class="muted small">(es. 12 CFU = 2 × 6)</i></span><input type="checkbox" id="usa-moduli" ${e.moduli?.length ? "checked" : ""}></label>
+      <div id="classico" ${e.moduli?.length ? "hidden" : ""}><div class="riga"><label class="campo"><span>Voto</span><select name="voto">${Array.from({ length: 13 }, (_, i) => 18 + i).map((n) => `<option ${(e.voto || 30) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label class="campo"><span>Crediti (CFU)</span><input type="number" name="cfu" inputmode="numeric" min="1" max="30" value="${e.cfu ?? 6}"></label></div>
+        <label class="switch"><span>✨ Con lode</span><input type="checkbox" name="lode" ${e.lode ? "checked" : ""}></label></div>
+      <div id="blocco-moduli" ${e.moduli?.length ? "" : "hidden"}><div id="lista-moduli"></div>
+        <button type="button" class="link-btn" id="agg-modulo">＋ Aggiungi modulo</button><div id="tot-moduli" class="totale-moduli"></div></div>
       <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(x.data || "")}"></label>`
     : `<label class="campo"><span>Categoria</span><select name="categoria">${Object.entries(CATEGORIE_ACQ).map(([k, n]) => `<option value="${k}" ${(e.categoria || "altro") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>
       <div class="riga"><label class="campo"><span>🛒 Pagato (€)</span><input type="number" name="prezzo" inputmode="decimal" step="0.01" min="0" value="${e.prezzo ?? ""}"></label>
@@ -1217,6 +1234,38 @@ function modificaVoceSpeciale(x, dopo) {
     const p = parseFloat(f.prezzo.value), ve = parseFloat(f.vendita.value);
     $("#anteprima-diff", v).innerHTML = !isNaN(p) && !isNaN(ve) ? `Risultato: <b class="${ve - p >= 0 ? "su" : "giu"}">${segno(ve - p)}</b>` : "";
   };
+  let moduli = esame ? (e.moduli || []).map((m) => ({ ...m })) : [];
+  const opzVoto = (vv) => `<option value="">—</option>` + Array.from({ length: 13 }, (_, i) => 18 + i).map((n) => `<option ${vv === n ? "selected" : ""}>${n}</option>`).join("");
+  const leggiModuli = () => $$(".modulo", v).map((el, i) => ({ nome: $("[data-k=nome]", el).value.trim() || `Modulo ${i + 1}`, cfu: +$("[data-k=cfu]", el).value || 6,
+    voto: +$("[data-k=voto]", el).value || null, lode: $("[data-k=lode]", el).checked, data: $("[data-k=data]", el).value || null }));
+  const totale = () => {
+    const c = esameCalcolato({ moduli: leggiModuli() });
+    $("#tot-moduli", v).innerHTML = `Totale <b>${c.cfu} CFU</b> · ${c.completo ? `voto finale <b>${dec(c.voto, 2)}</b>${c.lode ? " e lode ✨" : ""}` : `superati ${c.fatti}/${c.totali}: il voto finale arriva quando li hai passati tutti`}`;
+  };
+  const disegnaModuli = () => {
+    $("#lista-moduli", v).innerHTML = moduli.map((m, i) => `<div class="modulo"><div class="riga"><input type="text" data-k="nome" value="${esc(m.nome || `Modulo ${i + 1}`)}" style="flex:3">
+      <label class="mini-cfu"><input type="number" data-k="cfu" inputmode="numeric" min="1" max="30" value="${m.cfu || 6}"><span>CFU</span></label>
+      ${moduli.length > 1 ? `<button type="button" class="iconbtn" data-togli="${i}" aria-label="Togli">✕</button>` : ""}</div>
+      <div class="riga"><select data-k="voto">${opzVoto(m.voto)}</select><label class="mini-lode"><input type="checkbox" data-k="lode" ${m.lode ? "checked" : ""}> lode</label>
+      <input type="date" data-k="data" value="${esc(m.data || "")}" style="flex:2"></div></div>`).join("");
+    totale();
+  };
+  if (esame) {
+    $("#usa-moduli", v).onchange = (ev) => {
+      const on = ev.target.checked;
+      $("#classico", v).hidden = on; $("#blocco-moduli", v).hidden = !on;
+      if (on && !moduli.length) {
+        const c = +f.cfu.value || 12, n = c > 6 && c % 6 === 0 ? c / 6 : 2;
+        moduli = Array.from({ length: n }, (_, i) => ({ nome: `Modulo ${i + 1}`, cfu: 6 }));
+      }
+      if (on) disegnaModuli();
+    };
+    $("#agg-modulo", v).onclick = () => { moduli = leggiModuli(); moduli.push({ nome: `Modulo ${moduli.length + 1}`, cfu: 6 }); disegnaModuli(); };
+    $("#lista-moduli", v).addEventListener("click", (ev) => { const t = ev.target.closest("[data-togli]"); if (t) { moduli = leggiModuli(); moduli.splice(+t.dataset.togli, 1); disegnaModuli(); } });
+    $("#lista-moduli", v).addEventListener("input", totale);
+    $("#lista-moduli", v).addEventListener("change", totale);
+    if (moduli.length) disegnaModuli();
+  }
   if (!esame) {
     $("#venduto", v).onchange = (ev) => { $("#riga-vendita", v).hidden = !ev.target.checked; diff(); };
     f.prezzo.oninput = diff; f.vendita.oninput = diff; diff();
@@ -1224,7 +1273,7 @@ function modificaVoceSpeciale(x, dopo) {
   f.onsubmit = async (ev) => {
     ev.preventDefault();
     const d = Object.fromEntries(new FormData(f));
-    const extra = esame ? { voto: +d.voto, lode: !!d.lode, cfu: d.cfu ? +d.cfu : null }
+    const extra = esame ? ($("#usa-moduli", v).checked ? { moduli: leggiModuli() } : { voto: +d.voto, lode: !!d.lode, cfu: d.cfu ? +d.cfu : 6 })
       : { categoria: d.categoria, prezzo: d.prezzo === "" ? null : +d.prezzo, vendita: $("#venduto", v).checked && d.vendita !== "" ? +d.vendita : null, data_vendita: $("#venduto", v).checked ? d.data_vendita : null };
     try {
       await api(x.id ? `/api/diario/${x.id}` : "/api/diario", { method: x.id ? "PUT" : "POST", json: { ...x, titolo: d.titolo, data: d.data || null, commento: d.commento, extra } });
@@ -1329,7 +1378,7 @@ function apriIcsCompleanni(lista) {
 }
 
 /* ================================================================== CHAT */
-const AIUTO = ["importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
+const AIUTO = ["importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "esame di Fisica da 12 cfu", "primo modulo di Fisica con 27", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
   "il 16 dicembre dentista dalle 10 alle 11", "quando è il compleanno di Marco?", "che film ho visto?"];
 const chatStoria = () => { try { return JSON.parse(memo.get("chat") || "[]"); } catch { return []; } };
 const chatSalva = (l) => memo.set("chat", JSON.stringify(l.slice(-150)));
@@ -1421,11 +1470,36 @@ async function rispondi(testo) {
     return { da: "scrigno", html: `${t.ico} Aggiunto ${dove}: <b>${esc(x.titolo)}</b>${x.autore ? " di " + esc(x.autore) : ""}<br><span class="muted">${giorno(x.data)}</span>
       ${x.voto ? `<br><span class="stelle">${stelle(x.voto)}</span>` : ""}${x.commento ? `<br>“${esc(x.commento)}”` : ""}${!x.voto ? "<br>Che voto gli dai?" : ""}`, azioni };
   }
-  if (r.azione === "esame") {
-    const x = await api("/api/diario", { method: "POST", json: { tipo: "esame", titolo: r.materia, data: r.data, extra: { voto: r.voto, lode: r.lode, cfu: r.cfu } } });
+  if (r.azione === "esame" || r.azione === "esame_nuovo") {
+    const esami = await api("/api/diario?tipo=esame");
+    let x = trova(esami, r.materia);
+    const salva = (dati) => (x ? api(`/api/diario/${x.id}`, { method: "PUT", json: { ...x, ...dati } }) : api("/api/diario", { method: "POST", json: { tipo: "esame", titolo: r.materia, ...dati } }));
+    const creaModuli = (cfu, almeno) => { const n = Math.max(almeno || 0, cfu > 6 && cfu % 6 === 0 ? cfu / 6 : 2); return Array.from({ length: n }, (_, i) => ({ nome: `Modulo ${i + 1}`, cfu: cfu && cfu % n === 0 ? cfu / n : 6 })); };
+    let nuovo = !x, salvato;
+    if (r.azione === "esame_nuovo") {
+      if (x) return { da: "scrigno", html: `<b>${esc(x.titolo)}</b> è già nei tuoi esami.`, azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }] };
+      const n = r.cfu > 6 && r.cfu % 6 === 0 ? r.cfu / 6 : 1;
+      salvato = await salva({ data: null, extra: { moduli: Array.from({ length: n }, (_, i) => ({ nome: n > 1 ? `Modulo ${i + 1}` : r.materia, cfu: r.cfu / n })) } });
+      return { da: "scrigno", html: `🎓 Ho aggiunto <b>${esc(salvato.titolo)}</b> (${r.cfu} CFU)${n > 1 ? `, diviso in ${n} moduli da ${r.cfu / n} CFU` : ""}.<br>Quando passi un modulo scrivimi ad esempio <i>primo modulo di ${esc(salvato.titolo.toLowerCase())} con 27</i>.`,
+        azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, { t: "annulla", url: `/api/diario/${salvato.id}`, etichetta: "↩️ Annulla" }] };
+    }
+    const mod = r.modulo || (x?.extra?.moduli && x.extra.moduli.filter((m) => !m.voto).length === 1 ? x.extra.moduli.findIndex((m) => !m.voto) + 1 : null);
+    if (mod) {
+      let moduli = x?.extra?.moduli?.length ? x.extra.moduli.map((m) => ({ ...m })) : creaModuli(r.cfu || x?.extra?.cfu || 12, mod);
+      while (moduli.length < mod) moduli.push({ nome: `Modulo ${moduli.length + 1}`, cfu: 6 });
+      moduli[mod - 1] = { ...moduli[mod - 1], voto: r.voto, lode: r.lode, data: r.data };
+      salvato = await salva({ extra: { moduli }, data: r.data });
+      const c = esameCalcolato(salvato.extra), m = salvato.extra.moduli[mod - 1];
+      const mancano = salvato.extra.moduli.filter((q) => !q.voto).map((q) => q.nome);
+      const st = statEsami(await api("/api/diario?tipo=esame"));
+      return { da: "scrigno", html: `🧩 <b>${esc(salvato.titolo)}</b> — ${esc(m.nome)}: <b>${r.lode ? "30 e lode" : r.voto}</b> (${m.cfu} CFU) ✅<br>` +
+        (c.completo ? `🎉 Esame completato! Voto finale <b>${dec(c.voto, 2)}</b>${c.lode ? " e lode" : ""} su ${c.cfu} CFU.<br>La tua media ora è <b>${dec(st.ponderata)}</b>.` : `Manca ancora: ${mancano.map(esc).join(", ")}.`),
+        azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, ...(nuovo ? [{ t: "annulla", url: `/api/diario/${salvato.id}`, etichetta: "↩️ Annulla" }] : [])] };
+    }
+    salvato = await salva({ data: r.data, extra: { voto: r.voto, lode: r.lode, cfu: r.cfu || x?.extra?.cfu || 6 } });
     const st = statEsami(await api("/api/diario?tipo=esame"));
-    return { da: "scrigno", html: `🎓 Complimenti! Ho salvato <b>${esc(x.titolo)}</b> con <b>${votoTesto(x.extra)}</b>${x.extra.cfu ? ` (${x.extra.cfu} CFU)` : ""}.<br>La tua media ora è <b>${dec(st.ponderata ?? st.media)}</b> su ${st.n} esam${st.n === 1 ? "e" : "i"}.${x.extra.cfu ? "" : "<br><span class='muted'>Per la media ponderata servono i crediti di ogni esame: apri l'esame e aggiungili.</span>"}`,
-      azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
+    return { da: "scrigno", html: `🎓 ${nuovo ? "Complimenti! Ho salvato" : "Ho aggiornato"} <b>${esc(salvato.titolo)}</b> con <b>${votoTesto(salvato.extra)}</b> (${salvato.extra.cfu} CFU${r.cfu ? "" : ", se sono di più cambialo nell'esame"}).<br>La tua media ora è <b>${dec(st.ponderata)}</b> su ${st.n} esam${st.n === 1 ? "e" : "i"}.`,
+      azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, ...(nuovo ? [{ t: "annulla", url: `/api/diario/${salvato.id}`, etichetta: "↩️ Annulla" }] : [])] };
   }
   if (r.azione === "acquisto") {
     const x = await api("/api/diario", { method: "POST", json: { tipo: "acquisto", titolo: r.nome, data: r.data, extra: { prezzo: r.prezzo, categoria: r.categoria } } });
@@ -1486,7 +1560,7 @@ async function rispondi(testo) {
       const l = await api("/api/diario?tipo=esame");
       if (!l.length) return { da: "scrigno", html: "Non hai ancora segnato esami. Scrivimi ad esempio <i>ho passato l'esame di Analisi 1 con 28</i>." };
       const st = statEsami(l);
-      return { da: "scrigno", html: `🎓 Esami: <b>${st.n}</b>${st.cfu ? `, ${st.cfu} crediti` : ""}<br>Media aritmetica: <b>${dec(st.media)}</b>${st.ponderata ? `<br>Media ponderata: <b>${dec(st.ponderata)}</b>` : ""}<br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
+      return { da: "scrigno", html: `🎓 Esami superati: <b>${st.n}</b>, ${st.cfu} crediti${st.inCorso ? ` (+${st.inCorso} in corso)` : ""}<br>Media ponderata: <b>${dec(st.ponderata)}</b><br>Media aritmetica: <b>${dec(st.media)}</b><br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
         azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }] };
     }
     if (r.cosa === "visite") {
