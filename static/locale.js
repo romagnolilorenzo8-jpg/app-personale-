@@ -88,6 +88,22 @@
     }
     await kv.set("lavori_v1", true);
   }
+  /* Dentro "Inventari": un lavoro per ogni sede, ognuno con Contratto e Buste paga */
+  const INVENTARI = ["Inventario NaturaSì Senigallia", "Inventario Leroy Merlin Baraccola"];
+  async function cartelleInventari() {
+    if (await kv.get("inventari_v1")) return;
+    const cart = await tutti("cartelle"), docs = await tutti("documenti");
+    const inv = cart.find((c) => c.tipo === "lavoro" && c.nome.toLowerCase() === "inventari");
+    if (inv) {
+      const figli = cart.filter((c) => c.padre === inv.id);
+      for (const nome of INVENTARI)
+        if (!figli.some((c) => c.nome.toLowerCase() === nome.toLowerCase())) await creaDaModello(nome, "📦", inv.id, "lavoro");
+      // le cartelle generiche di Inventari si tolgono solo se vuote
+      for (const c of figli.filter((x) => ["Contratto", "Buste paga"].includes(x.nome)))
+        if (!docs.some((d) => d.cartella === c.id) && !cart.some((x) => x.padre === c.id)) await togli("cartelle", c.id);
+    }
+    await kv.set("inventari_v1", true);
+  }
   /* Ripara le cartelle create due volte da una versione precedente (succedeva al primo avvio):
      unisce le cartelle con lo stesso nome allo stesso livello, spostando documenti e sottocartelle
      in quella più vecchia. Non cancella mai documenti. */
@@ -139,6 +155,7 @@
     await unisciDoppioni();
     await cartellePersonali();
     await cartelleLavori();
+    await cartelleInventari();
   }
 
   async function discendenti(id) {
