@@ -11,10 +11,12 @@
     undici: 11, dodici: 12, tredici: 13, quattordici: 14, quindici: 15, sedici: 16, diciassette: 17, diciotto: 18, diciannove: 19,
     venti: 20, ventuno: 21, ventidue: 22, ventitre: 23, "ventitré": 23, ventiquattro: 24, trenta: 30 };
   const CATEGORIE = [
-    ["salute", "🩺", "dentist|odontoiatr|igien\\w* dentale|medic|\\bvisit|analisi|prelievo|esam|oculist|ortoped|dermatolog|cardiolog|ginecolog|urolog|neurolog|pediatr|fisioterap|osteopat|radiograf|ecograf|risonanza|tac\\b|vaccin|ospedal|ambulatori|controllo|dottor|dott\\.|psicolog|nutrizionist|farmac|\\botorino|allergolog|mammograf|holter|sangue|denti\\b|ortodonz"],
+    ["universita", "🎓", "\\besame\\b(?!\\s+(?:del|delle|dell|di controllo))|\\bappell|lezion|universit|\\bateneo|laurea|\\btesi\\b|professor|ricevimento|seminari|tirocinio|esercitazion|sessione d|\\bcfu\\b|\\besonero"],
+    ["salute", "🩺", "dentist|odontoiatr|igien\\w* dentale|medic|\\bvisit|analisi del|analisi|prelievo|esami|urine|oculist|ortoped|dermatolog|cardiolog|ginecolog|urolog|neurolog|pediatr|fisioterap|osteopat|radiograf|ecograf|risonanza|tac\\b|vaccin|ospedal|ambulatori|controllo|dottor|dott\\.|psicolog|nutrizionist|farmac|\\botorino|allergolog|mammograf|holter|sangue|denti\\b|ortodonz"],
     ["veicoli", "🚗", "bollo|revisione|tagliando|gomm|pneumatic|meccanic|carrozz|assicurazion|motorino|scooter|auto\\b|macchina|moto\\b|officina|patente"],
     ["casa", "🏠", "bolletta|condominio|idraulic|elettricist|caldaia|affitto|trasloco"],
     ["lavoro", "💼", "riunione|meeting|colloquio|lavoro|ufficio|commercialist|cliente"],
+    ["personale", "🙋", "\\bcena\\b|pranzo|colazione con|aperitiv|\\bfesta\\b|uscita|palestra|calcetto|partita|allenament|parrucchier|barbier|estetist|viaggio|vacanz|\\bvolo\\b|concerto|cinema|teatro|matrimonio|battesimo|compleanno|amic|fidanzat|ragazz[ao]\\b|mamma|pap[aà]\\b|nonn[ao]|zi[ao]\\b|cugin|spesa\\b"],
   ];
   // \b di JavaScript non conosce le lettere accentate: lo sostituiamo con un confine "Unicode"
   const W = "[\\p{L}\\p{N}_]";

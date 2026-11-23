@@ -139,6 +139,19 @@
       m = m.replace(rx("\\b(?:ho|ho passato|ho superato|ho dato|ho fatto|ho preso|ho sostenuto|passato|superato|l'esame|un esame|esame|esami|di|del|della|dello|in|a|da|con|il|lo|la|voto|preso|presa|trenta|e lode|lode|oggi|ieri|stamattina|finalmente|che|trentesimi|modulo|diviso|in due|due moduli|moduli)\\b", "giu"), " ");
       return cap(pulisci(m.replace(/[,.;:!]+/g, " ")));
     };
+    // idoneità (inglese, obblighi formativi…): nessun voto, solo idoneo / non idoneo
+    const idon = rx("\\b(non idone[oa]|idone[oa]|idoneità|idoneita|obblighi formativi|ofa|non superat[oi]|superat[oi])\\b").test(low)
+      && rx("\\b(idone|idoneità|idoneita|obblighi formativi|ofa)").test(low);
+    if (idon && !votoEsame) {
+      const esito = rx("\\b(non idone[oa]|non (?:l'ho |li ho )?(?:passat|superat)|bocciat)").test(low) ? "non idoneo" : "idoneo";
+      let materia = orig.replace(/\d{1,2}\s*(?:cfu|crediti)/gi, " ");
+      const quando = dataPassata(low, oggi);
+      if (quando.re) materia = materia.replace(new RegExp(quando.re.source, "iu"), " ");
+      materia = materia.replace(rx("\\b(?:ho|non|passato|superato|superati|superata|passati|preso|presa|ottenuto|l'idoneità|l'idoneita|idoneità|idoneita|idoneo|idonea|test|esame|prova|bocciato|bocciata|di|del|della|dello|in|a|al|con|il|lo|la|gli|i|le|oggi|ieri|finalmente|che|sono|risultato|risultata)\\b", "giu"), " ");
+      materia = pulisci(materia.replace(/[,.;:!]+/g, " "));
+      if (rx("\\b(obblighi formativi|ofa)\\b").test(low)) materia = "Obblighi formativi (OFA)";
+      if (materia) return { azione: "esame", materia: cap(materia), esito, cfu: cfuM ? +cfuM[1] : null, data: quando.data };
+    }
     if (parlaDiEsame && !/sangue|analisi del|medic|visita/.test(low)) {
       if (votoEsame) {
         const lode = !!votoEsame[2] || /trenta e lode/.test(low);
