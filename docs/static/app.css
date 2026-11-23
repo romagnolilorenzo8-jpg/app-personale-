@@ -627,3 +627,11 @@ a, .link-btn { color: var(--accent); }
 .nota p { margin: 0; font-size: 14px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; color: var(--text); opacity: .9; }
 .nota span { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
 .nota-testo { min-height: 220px; font-size: 16px; line-height: 1.5; }
+
+/* --- case */
+.scelta-gruppo.due { grid-template-columns: repeat(2, 1fr); }
+.scelta-gruppo.due button { padding: 14px 4px; font-size: 14px; }
+.scelta-gruppo.due button span { font-size: 28px; }
+.lavoro-testa.affitto { background: linear-gradient(135deg, color-mix(in srgb, #0ea5a4 26%, transparent), color-mix(in srgb, var(--accent) 14%, transparent)); }
+.lavoro-testa.proprieta { background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 24%, transparent), color-mix(in srgb, var(--accent) 14%, transparent)); }
+.lavoro-testa .btn.small { flex: none; }

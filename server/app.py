@@ -100,12 +100,21 @@ CARTELLE_INIZIALI = [
 LAVORI = [('Xmasters', '💼'), ('Benzinaio', '⛽'), ('Inventari', '📦')]
 
 
-def _crea_lavoro(con, nome: str, icona: str | None, padre) -> int:
-    cid = con.execute("INSERT INTO cartelle (nome, padre, icona, ordine, tipo, note) VALUES (?,?,?,0,'lavoro','[]')",
-                      (nome, padre, icona or "💼")).lastrowid
-    con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES ('Contratto', ?, '📝', 0)", (cid,))
-    con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES ('Buste paga', ?, '💶', 1)", (cid,))
+MODELLI = {"lavoro": [["Contratto", "📝"], ["Buste paga", "💶"]], "affitto": [["Contratto d'affitto", "📝"], ["Bollette", "💡"], ["Ricevute affitto", "🧾"], ["Manutenzione", "🛠️"]], "proprieta": [["Atto e mutuo", "📜"], ["Bollette", "💡"], ["Condominio", "🏢"], ["Assicurazione casa", "🛡️"], ["Manutenzione", "🛠️"]]}
+ICONE_MODELLO = {"lavoro": "💼", "affitto": "🔑", "proprieta": "🏡"}
+
+
+def _crea_da_modello(con, nome: str, icona: str | None, padre, tipo: str) -> int:
+    """Crea una cartella già organizzata: un lavoro, una casa in affitto o di proprietà."""
+    cid = con.execute("INSERT INTO cartelle (nome, padre, icona, ordine, tipo, note) VALUES (?,?,?,0,?,'[]')",
+                      (nome, padre, icona or ICONE_MODELLO[tipo], tipo)).lastrowid
+    for i, (n, ic) in enumerate(MODELLI[tipo]):
+        con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,?)", (n, cid, ic, i))
     return cid
+
+
+def _crea_lavoro(con, nome: str, icona: str | None, padre) -> int:
+    return _crea_da_modello(con, nome, icona, padre, "lavoro")
 
 
 @contextmanager
@@ -417,9 +426,9 @@ def cartelle(_=Depends(autorizzato)):
 def crea_cartella(body: Cartella, _=Depends(sessione)):
     if not (body.nome or "").strip():
         raise HTTPException(400, "Nome obbligatorio")
-    if body.tipo == "lavoro":
+    if body.tipo in MODELLI:
         with db() as con:
-            return {"id": _crea_lavoro(con, body.nome.strip(), body.icona, body.padre)}
+            return {"id": _crea_da_modello(con, body.nome.strip(), body.icona, body.padre, body.tipo)}
     with db() as con:
         n = con.execute("SELECT COUNT(*) FROM cartelle WHERE padre IS ?", (body.padre,)).fetchone()[0]
         cur = con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,?)",
@@ -443,6 +452,15 @@ def modifica_cartella(cid: int, body: Cartella, _=Depends(sessione)):
             con.execute("UPDATE cartelle SET nome=? WHERE id=?", (body.nome.strip(), cid))
         if body.icona:
             con.execute("UPDATE cartelle SET icona=? WHERE id=?", (body.icona, cid))
+        if body.tipo in MODELLI:
+            r = con.execute("SELECT tipo, icona FROM cartelle WHERE id=?", (cid,)).fetchone()
+            if r and r["tipo"] != body.tipo:
+                icona = ICONE_MODELLO[body.tipo] if (not body.icona and r["icona"] in ICONE_MODELLO.values()) else (body.icona or r["icona"])
+                con.execute("UPDATE cartelle SET tipo=?, icona=?, note=COALESCE(note, '[]') WHERE id=?", (body.tipo, icona, cid))
+                esistenti = {x["nome"] for x in con.execute("SELECT nome FROM cartelle WHERE padre=?", (cid,))}
+                for n, ic in MODELLI[body.tipo]:
+                    if n not in esistenti:
+                        con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,9)", (n, cid, ic))
         if body.note is not None:
             ora = datetime.now(TZ).isoformat(timespec="seconds")
             note = [{"id": n.get("id") or secrets.token_hex(6), "titolo": str(n.get("titolo") or "").strip()[:200],

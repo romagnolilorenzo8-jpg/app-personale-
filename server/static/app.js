@@ -208,6 +208,8 @@ function sceltaCartella(titolo, { attuale = null, consentiRadice = false, esclud
 
 /* ================================================================== suggerimenti di cartella */
 const REGOLE = [
+  [/contratto d.?affitto|locazione|contratto di affitto/, /^contratto d.affitto/], [/ricevuta.*affitto|affitto .*(?:pagato|ricevuta)|canone/, /^ricevute affitto/],
+  [/rogito|\batto\b|mutuo|compravendita/, /^atto e mutuo/], [/condominio|condominial|amministratore/, /^condominio/],
   [/curriculum|\bcv\b|resume|europass/, /^curriculum/], [/fototessera|foto tessera|foto-tessera|passport photo/, /^fototessera/],
   [/bollo/, /^bollo/], [/assicura|polizza|rca\b|quietanza/, /^assicurazione/], [/revision/, /^revisione/],
   [/libretto|carta di circolazione/, /^libretto/], [/tagliando|manutenz|officina|gomme/, /^manutenzione/],
@@ -215,7 +217,7 @@ const REGOLE = [
   [/panoramica|ortopan|rx.*dent|radiograf.*dent|dentist|odonto/, /^radiografie denti/],
   [/referto|visita|lettera di dimissione/, /^referti/], [/ecograf|risonanza|\btac\b|radiograf|\brx\b/, /^esami e radiografie/],
   [/ricetta|farmac/, /^ricette/], [/vaccin|green ?pass/, /^vaccini/],
-  [/bolletta|enel|\bluce\b|\bgas\b|acqua|\btari\b/, /^bollette/], [/contratto|affitto/, /^contratti/],
+  [/bolletta|enel|\bluce\b|\bgas\b|acqua|\btari\b|hera|a2a|iren|eni plenitude|tim\b|fastweb|vodafone|wind/, /^bollette/], [/contratto|affitto/, /^contratt/],
   [/garanzia|scontrino|fattura/, /^garanzie/], [/busta ?paga|buste paga|cedolino|\bbp\b/, /^buste paga/], [/contratto di lavoro|assunzione|contratto/, /^contratt/], [/\b730\b|redditi|\bf24\b|\bcud\b|certificazione unica/, /^dichiarazione/],
   [/carta d.?identit|\bcie\b/, /^carta d/], [/patente/, /^patente/], [/passaporto/, /^passaporto/], [/tessera sanitaria|codice fiscale/, /^tessera sanitaria/],
 ];
@@ -577,11 +579,49 @@ async function vistaHome() {
   if (recenti.length) collegaDocs($("#recenti"), recenti, render);
 }
 
+/* ------------------------------------------------------------------ le mie case: in affitto e di proprietà */
+function htmlCase(figli) {
+  const aff = figli.filter((f) => f.tipo === "affitto"), prop = figli.filter((f) => f.tipo === "proprieta"), altro = figli.filter((f) => !["affitto", "proprieta"].includes(f.tipo));
+  const vuoto = (t) => `<div class="card vuoto-mini small">${t}</div>`;
+  return `<div class="sezione" style="margin-top:6px"><h2>🔑 In affitto</h2></div>${aff.length ? htmlCartelle(aff) : vuoto("Nessuna casa in affitto. Tocca “Aggiungi una casa”.")}
+    <div class="sezione"><h2>🏡 Di proprietà</h2></div>${prop.length ? htmlCartelle(prop) : vuoto("Nessuna casa di proprietà.")}
+    ${altro.length ? `<div class="sezione"><h2>📂 Altro della casa</h2></div>${htmlCartelle(altro)}` : ""}`;
+}
+function nuovaCasa(padre) {
+  let tipo = "affitto";
+  const v = foglio(`<h3>🏠 Nuova casa ${xBtn}</h3><form id="fc">
+    <label class="campo"><span>Nome o indirizzo</span><input type="text" name="nome" required placeholder="Es. Via Roma 12, Casa al mare, Appartamento Bologna"></label>
+    <div class="campo"><span>È…</span><div class="scelta-gruppo due" id="tipo-casa">
+      <button type="button" data-t="affitto" class="on" style="--c:#0ea5a4"><span>🔑</span>In affitto</button>
+      <button type="button" data-t="proprieta" style="--c:#f59e0b"><span>🏡</span>Di proprietà</button></div></div>
+    <p class="small muted" id="spiega-casa" style="margin:-2px 4px 14px"></p>
+    <button class="btn block">Crea</button></form>`);
+  const spiega = () => ($("#spiega-casa", v).textContent = tipo === "affitto"
+    ? "Dentro troverai: Contratto d'affitto, Bollette, Ricevute affitto, Manutenzione e le note."
+    : "Dentro troverai: Atto e mutuo, Bollette, Condominio, Assicurazione casa, Manutenzione e le note.");
+  spiega();
+  $("#tipo-casa", v).onclick = (e) => { const b = e.target.closest("[data-t]"); if (!b) return; tipo = b.dataset.t; $$("#tipo-casa button", v).forEach((x) => x.classList.toggle("on", x === b)); spiega(); };
+  setTimeout(() => $("[name=nome]", v).focus(), 80);
+  $("#fc", v).onsubmit = async (e) => {
+    e.preventDefault();
+    const nome = new FormData(e.target).get("nome").trim(); if (!nome) return;
+    const r = await api("/api/cartelle", { method: "POST", json: { nome, padre, tipo } });
+    v.chiudi(); await caricaCartelle(); toast(tipo === "affitto" ? "🔑 Casa in affitto aggiunta" : "🏡 Casa di proprietà aggiunta"); location.hash = `#/c/${r.id}`;
+  };
+}
+
 /* ------------------------------------------------------------------ note nelle cartelle (es. appunti su un lavoro) */
 const eCartellaLavori = (c) => c && c.padre == null && /^lavoro/i.test(c.nome);
+const eCartellaCase = (c) => c && c.padre == null && /^casa\b/i.test(c.nome);
+const CON_MODELLO = ["lavoro", "affitto", "proprieta"];
+const TESTA_MODELLO = {
+  lavoro: ["💼", "Il mio lavoro", "Contratto, buste paga e i tuoi appunti, tutto qui."],
+  affitto: ["🔑", "Casa in affitto", "Contratto d'affitto, bollette, ricevute e i tuoi appunti."],
+  proprieta: ["🏡", "Casa di proprietà", "Atto e mutuo, bollette, condominio e i tuoi appunti."],
+};
 function htmlNote(c) {
   const note = c.note || [];
-  if (!note.length && c.tipo !== "lavoro") return "";
+  if (!note.length && !CON_MODELLO.includes(c.tipo)) return "";
   return `<div class="sezione"><h2>📝 Note e commenti</h2><a href="#" id="nuova-nota">＋ Nuova</a></div>
     ${note.length ? `<div class="note-griglia">${note.slice().sort((a, b) => (b.data || "").localeCompare(a.data || "")).map((n) => `<button class="nota" data-nota="${esc(String(n.id))}">
       ${n.titolo ? `<b>${esc(n.titolo)}</b>` : ""}<p>${esc(n.testo).replace(/\n/g, "<br>")}</p><span>${n.data ? dataIt(n.data.slice(0, 10)) : ""}</span></button>`).join("")}</div>`
@@ -629,18 +669,28 @@ async function vistaCartella(id) {
       <h1 style="font-size:26px"><span class="icona-titolo">${esc(c.icona)}</span> ${esc(c.nome)}</h1>
       <button class="iconbtn" id="menu" aria-label="Opzioni">⋯</button></div>
     <div class="crumbs"><a href="#/">🏠 Home</a>${perc.map((p) => ` › <a href="#/c/${p.id}">${esc(p.nome)}</a>`).join("")}</div>
-    ${c.tipo === "lavoro" ? `<div class="lavoro-testa"><span>💼</span><div><b>Il mio lavoro</b><div class="small muted">Contratto, buste paga e i tuoi appunti, tutto qui.</div></div></div>` : ""}
+    ${TESTA_MODELLO[c.tipo] ? `<div class="lavoro-testa ${c.tipo}"><span>${TESTA_MODELLO[c.tipo][0]}</span><div style="flex:1"><b>${TESTA_MODELLO[c.tipo][1]}</b><div class="small muted">${TESTA_MODELLO[c.tipo][2]}</div></div>
+      ${c.tipo !== "lavoro" ? `<button class="btn sec small" id="cambia-tipo">${c.tipo === "affitto" ? "🏡 È mia" : "🔑 In affitto"}</button>` : ""}</div>` : ""}
     ${eCartellaLavori(c) ? `<button class="btn block" id="nuovo-lavoro" style="margin-bottom:14px">💼 Aggiungi un lavoro</button>` : ""}
+    ${eCartellaCase(c) ? `<button class="btn block" id="nuova-casa" style="margin-bottom:14px">🏠 Aggiungi una casa</button>` : ""}
     ${eCartellaLavori(c) && figli.some((f) => f.tipo === "lavoro")
       ? `<div class="sezione" style="margin-top:6px"><h2>💼 I miei lavori</h2></div>${htmlCartelle(figli.filter((f) => f.tipo === "lavoro"))}
          ${figli.some((f) => f.tipo !== "lavoro") ? `<div class="sezione"><h2>🏛️ Tasse e altro</h2></div>${htmlCartelle(figli.filter((f) => f.tipo !== "lavoro"))}` : ""}`
+      : eCartellaCase(c) ? htmlCase(figli)
       : figli.length ? htmlCartelle(figli) : ""}
     ${htmlNote(c)}
     ${docs.length ? `<div class="sezione"><h2>Documenti</h2><span class="muted small">${docs.length}</span></div><div id="docs">${htmlDocs(docs)}</div>` : ""}
-    ${!docs.length && c.tipo !== "lavoro" && !eCartellaLavori(c) ? `<button class="vuoto-cta" id="agg"><span class="big">${figli.length ? "📄" : esc(c.icona)}</span><b>${figli.length ? "Aggiungi un documento qui" : "Questa cartella è vuota"}</b><span class="muted small">Tocca per fotografare o scegliere un file</span></button>` : ""}`;
+    ${!docs.length && !CON_MODELLO.includes(c.tipo) && !eCartellaLavori(c) && !eCartellaCase(c) ? `<button class="vuoto-cta" id="agg"><span class="big">${figli.length ? "📄" : esc(c.icona)}</span><b>${figli.length ? "Aggiungi un documento qui" : "Questa cartella è vuota"}</b><span class="muted small">Tocca per fotografare o scegliere un file</span></button>` : ""}`;
   const ric = () => vistaCartella(id);
   if (docs.length) collegaDocs($("#docs"), docs, ric);
   collegaNote(c, ric);
+  $("#nuova-casa") && ($("#nuova-casa").onclick = () => nuovaCasa(id));
+  $("#cambia-tipo") && ($("#cambia-tipo").onclick = async () => {
+    const nuovo = c.tipo === "affitto" ? "proprieta" : "affitto";
+    if (!(await conferma(nuovo === "proprieta" ? "Segnare questa casa come di tua proprietà?" : "Segnare questa casa come in affitto?", "Conferma",
+      "Aggiungo le cartelle che mancano (nessun documento viene spostato o cancellato)."))) return;
+    await api(`/api/cartelle/${id}`, { method: "PATCH", json: { tipo: nuovo } }); await caricaCartelle(); toast("✅ Aggiornato"); ric();
+  });
   $("#nuovo-lavoro") && ($("#nuovo-lavoro").onclick = async () => {
     const nome = await chiedi("Nome del lavoro", "", { placeholder: "Es. Bar Centrale, Amazon, Ripetizioni…", aiuto: "Creo la cartella con dentro Contratto e Buste paga, più lo spazio per le tue note." });
     if (!nome || !nome.trim()) return;

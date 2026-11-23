@@ -65,12 +65,15 @@
   }
   /* I miei lavori dentro "Lavoro e tasse": ognuno con Contratto e Buste paga (e le note) */
   const LAVORI = [["Xmasters", "💼"], ["Benzinaio", "⛽"], ["Inventari", "📦"]];
-  async function creaLavoro(nome, icona, padre) {
-    const id = await aggiungi("cartelle", { nome, icona: icona || "💼", padre, ordine: 0, tipo: "lavoro", note: [] });
-    await aggiungi("cartelle", { nome: "Contratto", icona: "📝", padre: id, ordine: 0 });
-    await aggiungi("cartelle", { nome: "Buste paga", icona: "💶", padre: id, ordine: 1 });
+  /* Cartelle "con modello": un lavoro, una casa in affitto o di proprietà, già organizzate */
+  const MODELLI = {"lavoro": [["Contratto", "📝"], ["Buste paga", "💶"]], "affitto": [["Contratto d'affitto", "📝"], ["Bollette", "💡"], ["Ricevute affitto", "🧾"], ["Manutenzione", "🛠️"]], "proprieta": [["Atto e mutuo", "📜"], ["Bollette", "💡"], ["Condominio", "🏢"], ["Assicurazione casa", "🛡️"], ["Manutenzione", "🛠️"]]};
+  const ICONE_MODELLO = { lavoro: "💼", affitto: "🔑", proprieta: "🏡" };
+  async function creaDaModello(nome, icona, padre, tipo) {
+    const id = await aggiungi("cartelle", { nome, icona: icona || ICONE_MODELLO[tipo], padre, ordine: 0, tipo, note: [] });
+    for (let i = 0; i < MODELLI[tipo].length; i++) await aggiungi("cartelle", { nome: MODELLI[tipo][i][0], icona: MODELLI[tipo][i][1], padre: id, ordine: i });
     return id;
   }
+  const creaLavoro = (nome, icona, padre) => creaDaModello(nome, icona, padre, "lavoro");
   async function cartelleLavori() {
     if (await kv.get("lavori_v1")) return;
     const cart = await tutti("cartelle");
@@ -405,7 +408,7 @@
     if (path === "/api/cartelle" && M === "POST") {
       if (!(B.nome || "").trim()) throw errore(400, "Nome obbligatorio");
       const n = (await tutti("cartelle")).filter((c) => c.padre === (B.padre ?? null)).length;
-      if (B.tipo === "lavoro") return { id: await creaLavoro(B.nome.trim(), B.icona, B.padre ?? null) };
+      if (MODELLI[B.tipo]) return { id: await creaDaModello(B.nome.trim(), B.icona, B.padre ?? null, B.tipo) };
       return { id: await aggiungi("cartelle", { nome: B.nome.trim(), padre: B.padre ?? null, icona: B.icona || iconaAuto(B.nome), ordine: n }) };
     }
     if ((m = path.match(/^\/api\/cartelle\/(\d+)$/))) {
@@ -414,6 +417,12 @@
       if (M === "PATCH") {
         if (B.nome && B.nome.trim()) c.nome = B.nome.trim();
         if (B.icona) c.icona = B.icona;
+        if (B.tipo && MODELLI[B.tipo] && B.tipo !== c.tipo) {
+          c.tipo = B.tipo;
+          if (!B.icona && Object.values(ICONE_MODELLO).includes(c.icona)) c.icona = ICONE_MODELLO[B.tipo];
+          const figli = (await tutti("cartelle")).filter((x) => x.padre === c.id).map((x) => x.nome);
+          for (const [n, ic] of MODELLI[B.tipo]) if (!figli.includes(n)) await aggiungi("cartelle", { nome: n, icona: ic, padre: c.id, ordine: 9 });
+        }
         if (Array.isArray(B.note)) c.note = B.note.map((x) => ({ id: x.id || Date.now() + Math.random(), titolo: String(x.titolo || "").trim(), testo: String(x.testo || ""), data: x.data || adesso() }));
         if (B.sposta_padre) {
           if (B.padre != null && (await discendenti(id)).includes(B.padre)) throw errore(400, "Non puoi spostare una cartella dentro sé stessa");
