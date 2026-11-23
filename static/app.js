@@ -485,6 +485,7 @@ function bannerInstalla() {
 async function vistaHome() {
   const [recenti, appts, scad, info, comp] = await Promise.all([api("/api/documenti?recenti=true"), api("/api/appuntamenti"), api("/api/scadenze"),
     LOC ? api("/api/impostazioni") : Promise.resolve(null), api("/api/diario?tipo=compleanno")]);
+  const foto = await fotoProfilo().catch(() => null);
   const compVicini = comp.filter((x) => infoComp(x).g <= 30);
   const compOggi = comp.filter((x) => infoComp(x).g <= 1);
   const scadImm = scad.filter((d) => giorniA(d.scadenza) <= 60);
@@ -493,8 +494,8 @@ async function vistaHome() {
   const oggi = new Date();
   const backupVecchio = LOC && info.documenti > 0 && (!info.ultimo_backup || giorniA(info.ultimo_backup.slice(0, 10)) < -30);
   app.innerHTML = `
-    <div class="top"><h1>${saluto} 👋<small>${GIORNI[oggi.getDay()]} ${oggi.getDate()} ${MESI_L[oggi.getMonth()]}</small></h1>
-      <a class="iconbtn" href="#/altro" aria-label="Impostazioni">⚙️</a></div>
+    <div class="top"><h1><span class="grad">${saluto}</span> 👋<small>${GIORNI[oggi.getDay()]} ${oggi.getDate()} ${MESI_L[oggi.getMonth()]}</small></h1>
+      <a class="avatar" href="#/io" aria-label="La mia pagina">${foto ? `<img src="${urlMini(foto)}" alt="">` : "👤"}</a></div>
     ${bannerInstalla()}
     ${compOggi.map((x) => `<a class="avviso festa" href="#/diario/compleanno"><div class="av-ico">🎂</div><div style="flex:1"><b>${infoComp(x).g === 0 ? "Oggi" : "Domani"} è il compleanno di ${esc(x.titolo)}!</b><div class="small">${infoComp(x).anni ? `Compie ${infoComp(x).anni} anni. ` : ""}Ricordati di fargli gli auguri 🎉</div></div></a>`).join("")}
     <form class="chat-home" id="f-chat"><span>💬</span><input type="text" id="cq" placeholder="Scrivi a Scrigno: “ho visto After”…" enterkeyhint="send"><button aria-label="Invia">➤</button></form>
@@ -952,13 +953,123 @@ async function vistaAltroServer() {
   };
 }
 
+
+/* ================================================================== IO: la mia pagina personale */
+const CAMPI_PROFILO = [["nome", "Nome e cognome", "text"], ["nascita", "Data di nascita", "date"], ["luogo_nascita", "Luogo di nascita", "text"],
+  ["cf", "Codice fiscale", "text"], ["indirizzo", "Indirizzo", "text"], ["telefono", "Telefono", "tel"], ["email", "Email", "email"],
+  ["sangue", "Gruppo sanguigno", "text"], ["taglie", "Taglie (vestiti, scarpe…)", "text"], ["note", "Altre informazioni", "text"]];
+const cartellaPersonale = (nome) => S.cartelle.find((c) => c.nome === nome && S.byId[c.padre]?.nome === "Documenti personali") || S.cartelle.find((c) => c.nome === nome);
+async function fotoProfilo() {
+  const c = cartellaPersonale("Fototessera");
+  if (!c) return null;
+  const docs = (await api(`/api/documenti?cartella=${c.id}`)).filter((d) => (d.mime || "").startsWith("image/"));
+  return docs[0] || null;
+}
+function caricaIn(cartella, { foto = false, frontale = false, dopo } = {}) {
+  const inp = $("#file-input");
+  inp.value = ""; inp.accept = foto ? "image/*" : "";
+  foto ? inp.setAttribute("capture", frontale ? "user" : "environment") : inp.removeAttribute("capture");
+  inp.onchange = async () => { if (inp.files.length) { await caricaFile([...inp.files], { cartella }); if (dopo) dopo(); } };
+  inp.click();
+}
+function eta(iso) {
+  if (!iso) return null;
+  const n = new Date(iso + "T00:00"), o = new Date();
+  let a = o.getFullYear() - n.getFullYear();
+  if (o.getMonth() < n.getMonth() || (o.getMonth() === n.getMonth() && o.getDate() < n.getDate())) a--;
+  return a;
+}
+
+async function vistaIo() {
+  const cFoto = cartellaPersonale("Fototessera"), cCv = cartellaPersonale("Curriculum");
+  const [prof, diario, foto, cv] = await Promise.all([api("/api/profilo"), api("/api/diario"),
+    cFoto ? api(`/api/documenti?cartella=${cFoto.id}`) : [], cCv ? api(`/api/documenti?cartella=${cCv.id}`) : []]);
+  const fotoImg = foto.filter((d) => (d.mime || "").startsWith("image/"));
+  const quanti = (t) => diario.filter((x) => x.tipo === t).length;
+  const st = statEsami(diario.filter((x) => x.tipo === "esame")), b = bilancio(diario.filter((x) => x.tipo === "acquisto"));
+  const anni = eta(prof.nascita);
+  const totDoc = S.cartelle.reduce((a, c) => a + (c.documenti || 0), 0) + S.daSmistare;
+  app.innerHTML = `
+    <div class="io-testa">
+      <button class="io-foto" id="cambia-foto" aria-label="Fototessera">${fotoImg[0] ? `<img src="${urlMini(fotoImg[0])}" alt="">` : "<span>👤</span>"}<i>📷</i></button>
+      <h1 class="grad">${esc(prof.nome || "Io")}</h1>
+      <div class="muted">${[anni != null ? `${anni} anni` : "", prof.luogo_nascita ? esc(prof.luogo_nascita) : ""].filter(Boolean).join(" · ") || "Tocca “Modifica” per aggiungere i tuoi dati"}</div>
+    </div>
+    <div class="sezione"><h2>La mia vita in numeri</h2></div>
+    <div class="numeri">
+      <a href="#/diario/film"><b>${quanti("film")}</b><span>🎬 film</span></a>
+      <a href="#/diario/libro"><b>${quanti("libro")}</b><span>📚 libri</span></a>
+      <a href="#/diario/serie"><b>${quanti("serie")}</b><span>📺 serie</span></a>
+      <a href="#/diario/compleanno"><b>${quanti("compleanno")}</b><span>🎂 compleanni</span></a>
+      <a href="#/diario/esame"><b>${st.n ? dec(st.ponderata ?? st.media, 1) : "—"}</b><span>🎓 media</span></a>
+      <a href="#/diario/acquisto"><b class="${b.saldo >= 0 ? "su" : "giu"}">${quanti("acquisto") ? segno(Math.round(b.saldo)) : "—"}</b><span>💶 bilancio</span></a>
+      <a href="#/"><b>${totDoc}</b><span>📄 documenti</span></a>
+      <a href="#/password"><b>🔐</b><span>password</span></a>
+    </div>
+    <div class="sezione"><h2>Dati personali</h2><a href="#" id="mod-prof">✏️ Modifica</a></div>
+    <div class="lista">${CAMPI_PROFILO.filter(([k]) => prof[k]).map(([k, n, tipo]) => `<div class="voce dato"><div class="corpo"><div class="sub">${n}</div>
+      <div class="tit" style="white-space:normal">${esc(tipo === "date" ? dataIt(prof[k]) : prof[k])}</div></div><button class="btn sec small" data-cp="${esc(prof[k])}">Copia</button></div>`).join("")
+      || `<button class="vuoto-cta" id="primo-prof" style="margin:0;border:0"><span class="big">🪪</span><b>Aggiungi i tuoi dati</b><span class="muted small">Codice fiscale, indirizzo, taglie… sempre a portata di mano</span></button>`}</div>
+    <div class="sezione"><h2>Curriculum</h2>${cCv ? `<a href="#/c/${cCv.id}">Apri cartella</a>` : ""}</div>
+    ${cv.length ? `<div id="cv">${htmlDocs(cv.slice(0, 3))}</div>` : ""}
+    <button class="btn sec block" id="carica-cv" style="margin-top:${cv.length ? 10 : 0}px">📄 ${cv.length ? "Carica una nuova versione" : "Carica il tuo curriculum"}</button>
+    <div class="sezione"><h2>Fototessere</h2>${cFoto ? `<a href="#/c/${cFoto.id}">Apri cartella</a>` : ""}</div>
+    <div class="fototessere">${fotoImg.map((d) => `<button data-foto="${d.id}"><img src="${urlMini(d)}" alt=""></button>`).join("")}
+      <button id="nuova-foto" class="aggiungi-foto"><span>＋</span>Aggiungi</button></div>`;
+  const ric = () => vistaIo();
+  const modifica = () => {
+    const v = foglio(`<h3>🪪 I miei dati ${xBtn}</h3><form id="fp">${CAMPI_PROFILO.map(([k, n, tipo]) => `<label class="campo"><span>${n}</span><input type="${tipo}" name="${k}" value="${esc(prof[k] || "")}" ${k === "cf" ? 'autocapitalize="characters"' : ""}></label>`).join("")}
+      <button class="btn block">Salva</button></form>`);
+    $("#fp", v).onsubmit = async (e) => { e.preventDefault(); await api("/api/profilo", { method: "PUT", json: Object.fromEntries(new FormData(e.target)) }); v.chiudi(); toast("✅ Dati salvati"); ric(); };
+  };
+  $("#mod-prof").onclick = (e) => { e.preventDefault(); modifica(); };
+  $("#primo-prof") && ($("#primo-prof").onclick = modifica);
+  const sceltaFoto = () => {
+    const v = foglio(`<h3>📸 Fototessera ${xBtn}</h3><div class="azioni-grandi">
+      <button data-m="selfie"><span>🤳</span>Scatta una foto</button><button data-m="galleria"><span>🖼️</span>Scegli dalle foto</button></div>`);
+    v.addEventListener("click", (e) => { const m = e.target.closest("[data-m]")?.dataset.m; if (!m) return; v.chiudi();
+      caricaIn(cFoto?.id ?? null, { foto: true, frontale: m === "selfie", dopo: ric }); });
+  };
+  $("#cambia-foto").onclick = sceltaFoto;
+  $("#nuova-foto").onclick = sceltaFoto;
+  $("#carica-cv").onclick = () => caricaIn(cCv?.id ?? null, { dopo: ric });
+  if (cv.length) collegaDocs($("#cv"), cv, ric);
+  $$("[data-foto]").forEach((b) => (b.onclick = () => apriDoc(fotoImg.find((d) => d.id === +b.dataset.foto), ric)));
+}
+
 /* ================================================================== DIARIO: film, libri, serie, compleanni */
 const TIPI_D = {
   film: { ico: "🎬", nome: "Film", plurale: "Film visti", verbo: "visto il", vuoto: "Scrivi in chat: “stasera ho visto After”" },
   libro: { ico: "📚", nome: "Libri", plurale: "Libri letti", verbo: "letto il", vuoto: "Scrivi in chat: “ho letto Il nome della rosa”" },
   serie: { ico: "📺", nome: "Serie TV", plurale: "Serie viste", verbo: "vista il", vuoto: "Scrivi in chat: “ho finito la serie Stranger Things”" },
   compleanno: { ico: "🎂", nome: "Compleanni", plurale: "Compleanni", verbo: "", vuoto: "Scrivi in chat: “il 6 agosto è il compleanno di Marco Rossi”" },
+  esame: { ico: "🎓", nome: "Esami", plurale: "Esami superati", verbo: "", vuoto: "Scrivi in chat: “ho passato l'esame di Analisi 1 con 28”" },
+  acquisto: { ico: "💶", nome: "Acquisti", plurale: "Acquisti", verbo: "", vuoto: "Scrivi in chat: “ho comprato una maglia a 40 euro” e poi “ho venduto la maglia a 50 euro”" },
 };
+const CATEGORIE_ACQ = { vestiti: "👕 Vestiti", veicoli: "🚗 Veicoli", tecnologia: "📱 Tecnologia", casa: "🛋️ Casa", collezionismo: "🃏 Collezionismo", altro: "📦 Altro" };
+const euro = (n) => (n == null ? "—" : n.toLocaleString("it-IT", { style: "currency", currency: "EUR", minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 }));
+const segno = (n) => (n > 0 ? "+" : "") + euro(n);
+const votoTesto = (e) => (e.lode ? "30 e lode" : String(e.voto));
+function bilancio(lista) {
+  const b = { speso: 0, incassato: 0, spesoRiv: 0, incassatoRiv: 0, nRiv: 0, magazzino: 0, nMag: 0 };
+  for (const x of lista) {
+    const e = x.extra || {}, p = e.prezzo || 0;
+    b.speso += p;
+    if (e.vendita != null) { b.incassato += e.vendita; if (e.prezzo != null) { b.spesoRiv += p; b.incassatoRiv += e.vendita; b.nRiv++; } }
+    else { b.magazzino += p; b.nMag++; }
+  }
+  b.saldo = b.incassato - b.speso; b.guadagno = b.incassatoRiv - b.spesoRiv;
+  return b;
+}
+function statEsami(lista) {
+  const v = lista.map((x) => x.extra || {}).filter((e) => e.voto);
+  const conCfu = v.every((e) => e.cfu) ? v : [];   // la ponderata ha senso solo se tutti gli esami hanno i crediti
+  const media = v.length ? v.reduce((a, e) => a + e.voto, 0) / v.length : null;
+  const cfu = v.reduce((a, e) => a + (e.cfu || 0), 0), cfuPond = conCfu.reduce((a, e) => a + e.cfu, 0);
+  const ponderata = cfuPond ? conCfu.reduce((a, e) => a + e.voto * e.cfu, 0) / cfuPond : null;
+  return { n: v.length, media, ponderata, cfu, base: ponderata ? (ponderata * 110) / 30 : media ? (media * 110) / 30 : null, lodi: v.filter((e) => e.lode).length };
+}
+const dec = (n, c = 2) => (n == null ? "—" : n.toLocaleString("it-IT", { minimumFractionDigits: c, maximumFractionDigits: c }));
 const stelle = (v) => (v ? "★".repeat(v) + "☆".repeat(5 - v) : "");
 function prossimoComp(x) {
   const o = new Date(oggiIso() + "T00:00");
@@ -979,6 +1090,20 @@ function htmlVoceDiario(x) {
       <div class="corpo"><div class="tit">🎂 ${esc(x.titolo)}</div><div class="sub">${esc(i.testo)}</div>
       <div style="margin-top:4px"><span class="tag ${i.g <= 1 ? "danger" : i.g <= 14 ? "warn" : ""}">${i.quando}</span></div></div><div class="dx">›</div></div>`;
   }
+  if (x.tipo === "esame") {
+    const e = x.extra || {};
+    return `<div class="voce" data-dv="${x.id}"><div class="voto-esame ${e.lode ? "lode" : ""}">${e.voto || "?"}${e.lode ? "<small>L</small>" : ""}</div>
+      <div class="corpo"><div class="tit">${esc(x.titolo)}</div><div class="sub">${[e.cfu ? `${e.cfu} CFU` : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
+      ${x.commento ? `<div class="commento">“${esc(x.commento)}”</div>` : ""}</div><div class="dx">›</div></div>`;
+  }
+  if (x.tipo === "acquisto") {
+    const e = x.extra || {}, venduto = e.vendita != null, diff = venduto && e.prezzo != null ? e.vendita - e.prezzo : null;
+    return `<div class="voce" data-dv="${x.id}"><div class="thumb poster" style="--c:${venduto ? "#22c55e" : "#a855f7"}">${(CATEGORIE_ACQ[e.categoria] || "📦").split(" ")[0]}</div>
+      <div class="corpo"><div class="tit">${esc(x.titolo)}</div>
+      <div class="sub">🛒 Pagato <b>${euro(e.prezzo)}</b>${x.data ? " il " + dataIt(x.data) : ""}</div>
+      ${venduto ? `<div class="sub">💰 Venduto <b>${euro(e.vendita)}</b>${e.data_vendita ? " il " + dataIt(e.data_vendita) : ""}</div>` : `<div class="sub muted">Non ancora venduto</div>`}</div>
+      ${diff != null ? `<div class="delta ${diff >= 0 ? "su" : "giu"}">${segno(diff)}</div>` : `<div class="dx">›</div>`}</div>`;
+  }
   const t = TIPI_D[x.tipo];
   return `<div class="voce" data-dv="${x.id}"><div class="thumb poster" style="--c:${COLORI[(x.titolo.charCodeAt(0) || 0) % COLORI.length]}">${t.ico}</div>
     <div class="corpo"><div class="tit">${esc(x.titolo)}</div>
@@ -991,22 +1116,51 @@ async function vistaDiario(tipo) {
   tipo = TIPI_D[tipo] ? tipo : "film";
   const tutte = await api("/api/diario");
   const conta = (t) => tutte.filter((x) => x.tipo === t).length;
-  const lista = tutte.filter((x) => x.tipo === tipo);
+  let lista = tutte.filter((x) => x.tipo === tipo);
   const t = TIPI_D[tipo];
+  const filtro = tipo === "acquisto" ? memo.get("filtro-acq") || "tutti" : null;
+  const tuttiAcq = lista;
+  if (filtro === "venduti") lista = lista.filter((x) => x.extra?.vendita != null);
+  if (filtro === "da-vendere") lista = lista.filter((x) => x.extra?.vendita == null);
   app.innerHTML = `<div class="top"><h1>Diario<small>La mia vita: film, libri, serie e compleanni</small></h1></div>
     <div class="segmenti">${Object.entries(TIPI_D).map(([k, v]) => `<a href="#/diario/${k}" class="${k === tipo ? "on" : ""}"><span>${v.ico}</span>${v.nome}<b>${conta(k) || ""}</b></a>`).join("")}</div>
+    ${tipo === "acquisto" && tuttiAcq.length ? htmlBilancio(bilancio(tuttiAcq), filtro) : ""}
+    ${tipo === "esame" && lista.length ? htmlStatEsami(statEsami(lista)) : ""}
     <a class="chat-invito" href="#/chat"><span>💬</span><span>${t.vuoto}</span></a>
     ${tipo === "compleanno" ? `<div class="riga" style="margin:4px 0 12px"><button class="btn sec" id="imp-comp">📥 Importa dai Promemoria</button>${lista.length ? `<button class="btn sec" id="cal-comp">🔔 Notifiche</button>` : ""}</div>` : ""}
     ${lista.length ? `<div class="lista" id="dl">${lista.map(htmlVoceDiario).join("")}</div>`
       : `<div class="vuoto"><span class="big">${t.ico}</span>Ancora niente qui.<br>Tocca <b>＋</b> oppure scrivilo in chat.</div>`}`;
   $("#dl") && ($("#dl").onclick = (e) => { const v = e.target.closest("[data-dv]"); if (v) modificaVoceDiario(lista.find((x) => x.id === +v.dataset.dv), () => vistaDiario(tipo)); });
   $("#cal-comp") && ($("#cal-comp").onclick = () => notificheCompleanni(lista));
+  $$("[data-filtro]").forEach((b) => (b.onclick = () => { memo.set("filtro-acq", b.dataset.filtro); vistaDiario("acquisto"); }));
   $("#imp-comp") && ($("#imp-comp").onclick = () => importaCompleanni(() => vistaDiario("compleanno")));
   const b = document.createElement("button"); b.className = "fab"; b.innerHTML = "<span>＋</span>";
-  b.onclick = () => modificaVoceDiario({ tipo, data: oggiIso() }, () => vistaDiario(tipo)); app.appendChild(b);
+  b.onclick = () => modificaVoceDiario({ tipo, data: oggiIso(), extra: {} }, () => vistaDiario(tipo)); app.appendChild(b);
+  const seg = $(".segmenti .on"); seg && seg.scrollIntoView({ inline: "center", block: "nearest" });
+}
+function htmlBilancio(b, filtro) {
+  return `<div class="bilancio">
+    <div class="bil-top"><div><div class="bil-et">Bilancio complessivo</div><div class="bil-num ${b.saldo >= 0 ? "su" : "giu"}">${segno(b.saldo)}</div>
+      <div class="bil-sub">Spesi ${euro(b.speso)} · incassati ${euro(b.incassato)}</div></div><div class="bil-ico">💶</div></div>
+    <div class="bil-griglia">
+      <div><div class="bil-et">Comprato e rivenduto</div><div class="bil-n ${b.guadagno >= 0 ? "su" : "giu"}">${segno(b.guadagno)}</div><div class="bil-sub">${b.nRiv} cos${b.nRiv === 1 ? "a" : "e"}: ${euro(b.spesoRiv)} → ${euro(b.incassatoRiv)}</div></div>
+      <div><div class="bil-et">Ancora da vendere</div><div class="bil-n">${euro(b.magazzino)}</div><div class="bil-sub">${b.nMag} cos${b.nMag === 1 ? "a" : "e"} pagat${b.nMag === 1 ? "a" : "e"}</div></div>
+    </div></div>
+    <div class="filtri">${[["tutti", "Tutti"], ["da-vendere", "Da vendere"], ["venduti", "Venduti"]].map(([k, n]) => `<button class="chip ${filtro === k ? "on" : ""}" data-filtro="${k}">${n}</button>`).join("")}</div>`;
+}
+function htmlStatEsami(st) {
+  return `<div class="bilancio">
+    <div class="bil-top"><div><div class="bil-et">Media ${st.ponderata ? "ponderata" : ""}</div><div class="bil-num">${dec(st.ponderata ?? st.media)}</div>
+      <div class="bil-sub">${st.n} esam${st.n === 1 ? "e" : "i"}${st.lodi ? ` · ${st.lodi} lod${st.lodi === 1 ? "e" : "i"} ✨` : ""}</div></div><div class="bil-ico">🎓</div></div>
+    <div class="bil-griglia">
+      <div><div class="bil-et">Media aritmetica</div><div class="bil-n">${dec(st.media)}</div></div>
+      <div><div class="bil-et">Crediti</div><div class="bil-n">${st.cfu || "—"}</div></div>
+      <div><div class="bil-et">Base di laurea</div><div class="bil-n">${dec(st.base, 1)}</div><div class="bil-sub">su 110</div></div>
+    </div></div>`;
 }
 
 function modificaVoceDiario(x, dopo) {
+  if (x.tipo === "esame" || x.tipo === "acquisto") return modificaVoceSpeciale(x, dopo);
   const comp = x.tipo === "compleanno", t = TIPI_D[x.tipo];
   let voto = x.voto || 0;
   const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : comp ? "Nuovo compleanno" : "Aggiungi " + t.nome.toLowerCase()} ${xBtn}</h3><form id="fd">
@@ -1038,6 +1192,50 @@ function modificaVoceDiario(x, dopo) {
   $("#cal1", v) && ($("#cal1", v).onclick = () => apriIcsCompleanni([x]));
 }
 
+
+function modificaVoceSpeciale(x, dopo) {
+  const t = TIPI_D[x.tipo], e = x.extra || {}, esame = x.tipo === "esame";
+  const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : esame ? "Nuovo esame" : "Nuovo acquisto"} ${xBtn}</h3><form id="fs">
+    <label class="campo"><span>${esame ? "Materia" : "Cosa"}</span><input type="text" name="titolo" value="${esc(x.titolo || "")}" required placeholder="${esame ? "Es. Analisi 1" : "Es. Maglia Nike"}"></label>
+    ${esame ? `<div class="riga"><label class="campo"><span>Voto</span><select name="voto">${Array.from({ length: 13 }, (_, i) => 18 + i).map((n) => `<option ${(e.voto || 30) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+        <label class="campo"><span>Crediti (CFU)</span><input type="number" name="cfu" inputmode="numeric" min="0" max="30" value="${e.cfu ?? ""}"></label></div>
+      <label class="switch"><span>✨ Con lode</span><input type="checkbox" name="lode" ${e.lode ? "checked" : ""}></label>
+      <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(x.data || "")}"></label>`
+    : `<label class="campo"><span>Categoria</span><select name="categoria">${Object.entries(CATEGORIE_ACQ).map(([k, n]) => `<option value="${k}" ${(e.categoria || "altro") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+      <div class="riga"><label class="campo"><span>🛒 Pagato (€)</span><input type="number" name="prezzo" inputmode="decimal" step="0.01" min="0" value="${e.prezzo ?? ""}"></label>
+        <label class="campo"><span>Il</span><input type="date" name="data" value="${esc(x.data || "")}"></label></div>
+      <label class="switch"><span>💰 L'ho venduto</span><input type="checkbox" id="venduto" ${e.vendita != null ? "checked" : ""}></label>
+      <div class="riga" id="riga-vendita" ${e.vendita != null ? "" : "hidden"}><label class="campo"><span>Venduto a (€)</span><input type="number" name="vendita" inputmode="decimal" step="0.01" min="0" value="${e.vendita ?? ""}"></label>
+        <label class="campo"><span>Il</span><input type="date" name="data_vendita" value="${esc(e.data_vendita || oggiIso())}"></label></div>
+      <div id="anteprima-diff" class="muted small" style="margin:-4px 4px 10px"></div>`}
+    <label class="campo"><span>Note</span><textarea name="commento" placeholder="${esame ? "Es. professore, com'è andata…" : "Es. taglia, dove l'hai comprato, a chi l'hai venduto…"}">${esc(x.commento || "")}</textarea></label>
+    <button class="btn block">Salva</button>
+    ${x.id ? `<button type="button" class="btn danger block" id="del" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
+  const f = $("#fs", v);
+  const diff = () => {
+    if (esame || !$("#venduto", v).checked) { $("#anteprima-diff", v) && ($("#anteprima-diff", v).textContent = ""); return; }
+    const p = parseFloat(f.prezzo.value), ve = parseFloat(f.vendita.value);
+    $("#anteprima-diff", v).innerHTML = !isNaN(p) && !isNaN(ve) ? `Risultato: <b class="${ve - p >= 0 ? "su" : "giu"}">${segno(ve - p)}</b>` : "";
+  };
+  if (!esame) {
+    $("#venduto", v).onchange = (ev) => { $("#riga-vendita", v).hidden = !ev.target.checked; diff(); };
+    f.prezzo.oninput = diff; f.vendita.oninput = diff; diff();
+  }
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(f));
+    const extra = esame ? { voto: +d.voto, lode: !!d.lode, cfu: d.cfu ? +d.cfu : null }
+      : { categoria: d.categoria, prezzo: d.prezzo === "" ? null : +d.prezzo, vendita: $("#venduto", v).checked && d.vendita !== "" ? +d.vendita : null, data_vendita: $("#venduto", v).checked ? d.data_vendita : null };
+    try {
+      await api(x.id ? `/api/diario/${x.id}` : "/api/diario", { method: x.id ? "PUT" : "POST", json: { ...x, titolo: d.titolo, data: d.data || null, commento: d.commento, extra } });
+      v.chiudi(); toast("✅ Salvato"); if (dopo) dopo();
+    } catch (err) { toast("⚠️ " + err.message); }
+  };
+  $("#del", v) && ($("#del", v).onclick = async () => {
+    if (!(await conferma(`Eliminare “${x.titolo}”?`))) return;
+    await api(`/api/diario/${x.id}`, { method: "DELETE" }); v.chiudi(); toast("🗑️ Eliminato"); if (dopo) dopo();
+  });
+}
 
 /* Importa i compleanni dall'app Promemoria (tramite un Comando Rapido che li copia negli appunti) */
 const istruzioniPromemoria = () => `
@@ -1131,7 +1329,7 @@ function apriIcsCompleanni(lista) {
 }
 
 /* ================================================================== CHAT */
-const AIUTO = ["importa i compleanni dai promemoria", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
+const AIUTO = ["importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
   "il 16 dicembre dentista dalle 10 alle 11", "quando è il compleanno di Marco?", "che film ho visto?"];
 const chatStoria = () => { try { return JSON.parse(memo.get("chat") || "[]"); } catch { return []; } };
 const chatSalva = (l) => memo.set("chat", JSON.stringify(l.slice(-150)));
@@ -1183,12 +1381,23 @@ const trova = (lista, testo) => {
   const n = testo.toLowerCase().trim();
   return lista.find((x) => x.titolo.toLowerCase() === n) || lista.find((x) => x.titolo.toLowerCase().includes(n)) || lista.find((x) => n.includes(x.titolo.toLowerCase()));
 };
+function rispostaVendita(x) {
+  const e = x.extra, diff = e.prezzo != null ? e.vendita - e.prezzo : null;
+  return { da: "scrigno", html: `💰 Venduto: <b>${esc(x.titolo)}</b><br>Pagato <b>${euro(e.prezzo)}</b> → venduto <b>${euro(e.vendita)}</b>${diff != null ? `<br>Risultato: <b class="${diff >= 0 ? "su" : "giu"}">${segno(diff)}</b> ${diff > 0 ? "🎉" : diff < 0 ? "😕" : ""}` : ""}`,
+    azioni: [{ t: "scrivi", testo: "bilancio", etichetta: "📊 Fammi il bilancio" }, { t: "apri", hash: "#/diario/acquisto", etichetta: "💶 Acquisti" }] };
+}
 async function rispondi(testo) {
   if (chatAttesa) {
     const a = chatAttesa; chatAttesa = null;
     if (a.motivo === "data_compleanno") testo = `compleanno di ${a.nome} il ${testo}`;
     else if (a.motivo === "nome_compleanno") testo = `compleanno di ${testo} il ${a.giorno}/${a.mese}${a.anno ? "/" + a.anno : ""}`;
     else if (a.motivo === "titolo") testo = `${a.tipo === "libro" ? "ho letto" : a.tipo === "serie" ? "ho visto la serie" : "ho visto il film"} ${testo}`;
+    else if (a.motivo === "prezzo") { const n = testo.match(/\d+(?:[.,]\d{1,2})?/); if (n) testo = `${a.frase} a ${n[0]} euro`; }
+    else if (a.motivo === "prezzo_acquisto") {
+      const n = testo.match(/\d+(?:[.,]\d{1,2})?/);
+      const x = await api("/api/diario", { method: "POST", json: { tipo: "acquisto", titolo: a.nome, data: null, extra: { prezzo: n ? parseFloat(n[0].replace(",", ".")) : null, vendita: a.prezzo, data_vendita: a.data, categoria: a.categoria } } });
+      return rispostaVendita(x);
+    }
   }
   const r = window.ScrignoChat.capisci(testo);
   const giorno = (iso) => { const d = new Date(iso + "T00:00"); return `${GIORNI[d.getDay()]} ${d.getDate()} ${MESI_L[d.getMonth()]}`; };
@@ -1211,6 +1420,27 @@ async function rispondi(testo) {
     azioni.push({ t: "apri", hash: `#/diario/${r.tipo}`, etichetta: `${t.ico} Apri il diario` }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" });
     return { da: "scrigno", html: `${t.ico} Aggiunto ${dove}: <b>${esc(x.titolo)}</b>${x.autore ? " di " + esc(x.autore) : ""}<br><span class="muted">${giorno(x.data)}</span>
       ${x.voto ? `<br><span class="stelle">${stelle(x.voto)}</span>` : ""}${x.commento ? `<br>“${esc(x.commento)}”` : ""}${!x.voto ? "<br>Che voto gli dai?" : ""}`, azioni };
+  }
+  if (r.azione === "esame") {
+    const x = await api("/api/diario", { method: "POST", json: { tipo: "esame", titolo: r.materia, data: r.data, extra: { voto: r.voto, lode: r.lode, cfu: r.cfu } } });
+    const st = statEsami(await api("/api/diario?tipo=esame"));
+    return { da: "scrigno", html: `🎓 Complimenti! Ho salvato <b>${esc(x.titolo)}</b> con <b>${votoTesto(x.extra)}</b>${x.extra.cfu ? ` (${x.extra.cfu} CFU)` : ""}.<br>La tua media ora è <b>${dec(st.ponderata ?? st.media)}</b> su ${st.n} esam${st.n === 1 ? "e" : "i"}.${x.extra.cfu ? "" : "<br><span class='muted'>Per la media ponderata servono i crediti di ogni esame: apri l'esame e aggiungili.</span>"}`,
+      azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
+  }
+  if (r.azione === "acquisto") {
+    const x = await api("/api/diario", { method: "POST", json: { tipo: "acquisto", titolo: r.nome, data: r.data, extra: { prezzo: r.prezzo, categoria: r.categoria } } });
+    return { da: "scrigno", html: `🛒 Segnato: <b>${esc(x.titolo)}</b>, prezzo pagato <b>${euro(r.prezzo)}</b> (${CATEGORIE_ACQ[r.categoria] || ""}).<br>Quando lo vendi scrivimi <i>ho venduto ${esc(x.titolo.toLowerCase())} a …</i> e ti faccio il bilancio.`,
+      azioni: [{ t: "apri", hash: "#/diario/acquisto", etichetta: "💶 Acquisti e bilancio" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
+  }
+  if (r.azione === "vendita") {
+    const acq = (await api("/api/diario?tipo=acquisto")).filter((x) => x.extra?.vendita == null);
+    const x = trova(acq, r.nome);
+    if (!x) {
+      chatAttesa = { motivo: "prezzo_acquisto", nome: r.nome, prezzo: r.prezzo, data: r.data, categoria: r.categoria };
+      return { da: "scrigno", html: `Non trovo “${esc(r.nome)}” tra le cose comprate e non ancora vendute. A quanto l'avevi pagato? Scrivimi solo il prezzo (oppure “non ricordo”).` };
+    }
+    const agg = await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...x, extra: { ...x.extra, vendita: r.prezzo, data_vendita: r.data } } });
+    return rispostaVendita(agg);
   }
   if (r.azione === "commento") {
     const tutte = (await api("/api/diario")).filter((x) => x.tipo !== "compleanno");
@@ -1244,6 +1474,21 @@ async function rispondi(testo) {
       return { da: "scrigno", html: l.length ? `${t.ico} ${t.plurale}: <b>${l.length}</b>. Gli ultimi:<br>${l.slice(0, 6).map((x) => `• <b>${esc(x.titolo)}</b>${x.voto ? " " + stelle(x.voto) : ""}${x.data ? ` <span class="muted">(${dataIt(x.data)})</span>` : ""}`).join("<br>")}` : `Non hai ancora salvato ${t.nome.toLowerCase()}.`,
         azioni: [{ t: "apri", hash: `#/diario/${r.cosa}`, etichetta: `${t.ico} Vedi tutti` }] };
     }
+    if (r.cosa === "bilancio") {
+      const l = await api("/api/diario?tipo=acquisto");
+      if (!l.length) return { da: "scrigno", html: "Non hai ancora segnato acquisti. Scrivimi ad esempio <i>ho comprato una maglia a 40 euro</i>." };
+      const b = bilancio(l);
+      return { da: "scrigno", html: `💶 <b>Bilancio complessivo: <span class="${b.saldo >= 0 ? "su" : "giu"}">${segno(b.saldo)}</span></b><br>Spesi ${euro(b.speso)}, incassati ${euro(b.incassato)}.<br><br>
+        🔁 <b>Solo comprato e rivenduto: <span class="${b.guadagno >= 0 ? "su" : "giu"}">${segno(b.guadagno)}</span></b><br>${b.nRiv} cos${b.nRiv === 1 ? "a" : "e"}: pagat${b.nRiv === 1 ? "a" : "e"} ${euro(b.spesoRiv)}, vendut${b.nRiv === 1 ? "a" : "e"} ${euro(b.incassatoRiv)}.<br><br>
+        📦 Ancora da vendere: ${b.nMag} cos${b.nMag === 1 ? "a" : "e"} (${euro(b.magazzino)}).`, azioni: [{ t: "apri", hash: "#/diario/acquisto", etichetta: "💶 Vedi tutto" }] };
+    }
+    if (r.cosa === "esami") {
+      const l = await api("/api/diario?tipo=esame");
+      if (!l.length) return { da: "scrigno", html: "Non hai ancora segnato esami. Scrivimi ad esempio <i>ho passato l'esame di Analisi 1 con 28</i>." };
+      const st = statEsami(l);
+      return { da: "scrigno", html: `🎓 Esami: <b>${st.n}</b>${st.cfu ? `, ${st.cfu} crediti` : ""}<br>Media aritmetica: <b>${dec(st.media)}</b>${st.ponderata ? `<br>Media ponderata: <b>${dec(st.ponderata)}</b>` : ""}<br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
+        azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }] };
+    }
     if (r.cosa === "visite") {
       const l = (await api("/api/appuntamenti")).slice(0, 5);
       return { da: "scrigno", html: l.length ? `🗓️ Prossimi appuntamenti:<br>${l.map((a) => `• <b>${esc(a.titolo)}</b> — ${giorno(a.inizio.slice(0, 10))}${a.tutto_il_giorno ? "" : " " + oraDa(a.inizio)}`).join("<br>")}` : "Nessun appuntamento in programma." };
@@ -1258,6 +1503,7 @@ async function rispondi(testo) {
     if (r.motivo === "data_compleanno") return { da: "scrigno", html: `Quando è il compleanno${r.nome ? " di <b>" + esc(r.nome) + "</b>" : ""}? Scrivimi ad esempio <i>6 agosto</i>.` };
     if (r.motivo === "nome_compleanno") return { da: "scrigno", html: `Di chi è il compleanno del ${r.giorno} ${MESI_L[r.mese - 1]}?` };
     if (r.motivo === "titolo") return { da: "scrigno", html: `Qual è il titolo?` };
+    if (r.motivo === "prezzo") return { da: "scrigno", html: r.vendita ? "A quanto l'hai venduto?" : "Quanto l'hai pagato?" };
   }
   if (r.azione === "importa_compleanni") return { da: "scrigno", html: "Certo! Posso prendere i compleanni dall'app Promemoria: tocca qui sotto e segui i passaggi.", azioni: [{ t: "importaComp", etichetta: "📥 Importa dai Promemoria" }] };
   if (r.azione === "saluto") return { da: "scrigno", html: r.grazie ? "Di niente! 😊" : `Ciao! 👋 Dimmi pure: un film visto, un libro letto, un compleanno da ricordare o una visita. Ad esempio:`, azioni: r.grazie ? [] : AIUTO.slice(0, 3).map((t) => ({ t: "scrivi", testo: t, etichetta: t })) };
@@ -1324,7 +1570,7 @@ async function render() {
   $$(".velo, .visore").forEach((v) => v.remove());
   const h = decodeURIComponent(location.hash.slice(2));
   const [sez, arg] = [h.split("/")[0], h.split("/").slice(1).join("/")];
-  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home" }[sez] || sez;
+  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home" }[sez] || sez;
   document.body.classList.toggle("in-chat", sez === "chat");
   $$("#tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
   scrollTo(0, 0);
@@ -1335,6 +1581,7 @@ async function render() {
     else if (sez === "agenda") await vistaAgenda();
     else if (sez === "password") await vistaPassword();
     else if (sez === "diario") await vistaDiario(arg);
+    else if (sez === "io") await vistaIo();
     else if (sez === "chat") vistaChat(arg || "");
     else if (sez === "altro") await (LOC ? vistaAltroLocale() : vistaAltroServer());
     else if (sez === "scadenze") await vistaScadenze();

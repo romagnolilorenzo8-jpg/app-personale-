@@ -88,6 +88,8 @@
     // ---------------------------------------------------------------- domande
     const domanda = /\?$/.test(orig) || rx("^(quando|quali|quale|quanti|quante|che|cosa|elenca|mostra|dimmi|fammi vedere|lista|prossimi|prossime|i miei|le mie|tutti i|tutte le)\\b").test(low)
       || /^(compleanni|film|libri|serie|visite|scadenze)( visti| letti| viste)?$/.test(low);
+    if (rx("\\b(bilancio|quanto ho (?:speso|guadagnato|incassato)|guadagno|guadagni|profitto|quanto ci ho guadagnato)\\b").test(low)) return { azione: "domanda", cosa: "bilancio" };
+    if (rx("\\b(la mia media|media (?:dei )?(?:voti|esami)|qual è la (?:mia )?media|quanti (?:crediti|cfu))\\b").test(low)) return { azione: "domanda", cosa: "esami" };
     if (domanda) {
       let m;
       if ((m = orig.match(rx("compleanno (?:di|del|della) (.+?)\\??$"))) || (m = orig.match(rx("quando (?:compie gli anni|è nat[oa]|e' nat[oa]) (.+?)\\??$"))))
@@ -98,6 +100,8 @@
       if (/\blibr[oi]\b|lett[oi]\b/.test(low)) return { azione: "domanda", cosa: "libro" };
       if (/visit|appuntament|impegn|dentist|medic/.test(low)) return { azione: "domanda", cosa: "visite" };
       if (/scadenz|scade/.test(low)) return { azione: "domanda", cosa: "scadenze" };
+      if (/\besam/.test(low)) return { azione: "domanda", cosa: "esami" };
+      if (/acquist|comprat|vendut|spes[oi]\b/.test(low)) return { azione: "domanda", cosa: "bilancio" };
     }
     if (/^(aiuto|help|cosa (sai|puoi) fare|come funzion)/.test(low)) return { azione: "aiuto" };
     if (/importa|promemoria|reminders/.test(low) && /compleann|promemoria/.test(low)) return { azione: "importa_compleanni" };
@@ -117,6 +121,48 @@
       if (!d) return { azione: "chiedi", motivo: "data_compleanno", nome: nome ? capParole(nome) : "" };
       if (!nome) return { azione: "chiedi", motivo: "nome_compleanno", ...d };
       return { azione: "compleanno", nome: capParole(nome), giorno: d.giorno, mese: d.mese, anno: d.anno };
+    }
+
+    // ---------------------------------------------------------------- esami (università / scuola)
+    const votoEsame = low.match(rx("\\b(?:con|preso|presa|voto:?|votazione)?\\s*\\b(1[89]|2\\d|30)\\s*(?:\\/\\s*30|trentesimi)?\\s*(e lode|con lode|cum laude|l\\b)?", "iu"));
+    if (rx("\\b(esame|esami|ho passato|ho superato|ho dato|ho preso .* (?:a|in)\\b|trenta e lode|30 e lode)\\b").test(low) && votoEsame && !/sangue|analisi del|medic|visita/.test(low)) {
+      const lode = !!votoEsame[2] || /trenta e lode/.test(low);
+      const cfu = (low.match(/(\d{1,2})\s*(?:cfu|crediti)/) || [])[1];
+      const quando = dataPassata(low.replace(votoEsame[0], " ").replace(/\d{1,2}\s*(?:cfu|crediti)/, " "), oggi);
+      let materia = orig.replace(new RegExp(votoEsame[0].replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), " ")
+        .replace(/\d{1,2}\s*(?:cfu|crediti)/i, " ");
+      if (quando.re) materia = materia.replace(new RegExp(quando.re.source, "iu"), " ");
+      materia = materia.replace(rx("\\b(?:ho|ho passato|ho superato|ho dato|ho fatto|ho preso|ho sostenuto|passato|superato|l'esame|un esame|esame|esami|di|del|della|dello|in|a|con|il|lo|la|voto|preso|presa|trenta|e lode|lode|oggi|ieri|stamattina|finalmente|che|trentesimi)\\b", "giu"), " ");
+      materia = pulisci(materia.replace(/[,.;:!]+/g, " "));
+      if (materia) {
+        return { azione: "esame", materia: cap(materia), voto: lode ? 30 : +votoEsame[1], lode, cfu: cfu ? +cfu : null, data: quando.data };
+      }
+    }
+
+    // ---------------------------------------------------------------- acquisti e vendite
+    const prezzoRe = /(?:€\s*(\d+(?:[.,]\d{1,2})?)|(\d+(?:[.,]\d{3})*(?:[.,]\d{1,2})?)\s*(?:€|euro\b|eur\b)|\b(?:a|per|da)\s+(\d+(?:[.,]\d{1,2})?)\s*$)/i;
+    const leggiPrezzo = (t) => {
+      const m = t.match(prezzoRe);
+      if (!m) return null;
+      let n = (m[1] || m[2] || m[3]);
+      if (/^\d{1,3}([.]\d{3})+([,]\d{1,2})?$/.test(n)) n = n.replace(/\./g, "");
+      return { v: parseFloat(n.replace(",", ".")), testo: m[0] };
+    };
+    const acquisto = rx("\\b(ho comprato|ho acquistato|ho preso|ho pagato|abbiamo comprato|comprato|acquistato|mi sono comprat[oa])\\b").test(low);
+    const vendita = rx("\\b(ho venduto|ho rivenduto|abbiamo venduto|venduto|rivenduto)\\b").test(low);
+    if (acquisto || vendita) {
+      const pz = leggiPrezzo(orig);
+      if (pz) {
+        const quando = dataPassata(low.replace(pz.testo.toLowerCase(), " "), oggi);
+        let nome = orig.replace(pz.testo, " ");
+        if (quando.re) nome = nome.replace(new RegExp(quando.re.source, "iu"), " ");
+        nome = nome.replace(rx("^.*?\\b(?:ho comprato|ho acquistato|ho preso|ho pagato|abbiamo comprato|mi sono comprat[oa]|comprato|acquistato|ho venduto|ho rivenduto|abbiamo venduto|venduto|rivenduto)\\b", "iu"), " ");
+        nome = nome.replace(rx("\\b(?:a|per|da|al prezzo di|pagat[oaie]|pagandol[oaie]|intanto|anche|finalmente|oggi|ieri|stasera)\\s*$", "iu"), " ");
+        nome = pulisci(nome).replace(/^(?:(?:un|uno|una|il|lo|la|i|gli|le|questo|questa|quel|quella|mio|mia)\s+|un'|l')/i, "");
+        nome = pulisci(nome.replace(rx("\\s+(?:a|per|da|che)$", "iu"), ""));
+        if (nome) return { azione: vendita ? "vendita" : "acquisto", nome: cap(nome), prezzo: pz.v, data: quando.data, categoria: categoriaAcquisto(nome) };
+      }
+      if (vendita || /\b(comprat|acquistat|pagat)/.test(low)) return { azione: "chiedi", motivo: "prezzo", vendita, frase: orig };
     }
 
     // ---------------------------------------------------------------- film, serie, libri
@@ -173,6 +219,16 @@
     return { azione: "boh" };
   }
 
+  function categoriaAcquisto(n) {
+    n = n.toLowerCase();
+    if (/magli|felp|scarp|sneaker|jeans|pantalon|giacc|giubbott|camici|cappell|vestit|gonn|borsa|zaino|cappott|maglion|tuta|calz|occhial|orologi|cintur|piumin|polo\b|t-?shirt|shorts|costume/.test(n)) return "vestiti";
+    if (/\bauto\b|macchina|moto\b|motorino|scooter|bici|monopattino|gomme|pneumatic|cerchi/.test(n)) return "veicoli";
+    if (/iphone|telefono|smartphone|cellulare|\bpc\b|computer|portatile|laptop|ipad|tablet|cuffie|airpods|\btv\b|televisore|console|playstation|ps5|xbox|nintendo|switch|fotocamera|apple watch|smartwatch/.test(n)) return "tecnologia";
+    if (/divano|tavolo|sedia|letto|armadio|lampada|mobile|frigo|lavatrice|aspirapolvere|forno|cucina/.test(n)) return "casa";
+    if (/carte|pokemon|figurin|collezion|vinile|lego|funko/.test(n)) return "collezionismo";
+    return "altro";
+  }
+
   /* Legge un elenco di compleanni incollato (ad esempio esportato dall'app Promemoria con un Comando Rapido).
      Una riga per persona, in qualsiasi di questi formati:
        "Compleanno Marco Rossi | 2027-08-06T09:00:00+02:00"   (titolo | data di scadenza ISO)
@@ -206,7 +262,7 @@
     return out;
   }
 
-  const api = { capisci, leggiCompleanni };
+  const api = { capisci, leggiCompleanni, categoriaAcquisto };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else glob.ScrignoChat = api;
 })(typeof window !== "undefined" ? window : globalThis);
