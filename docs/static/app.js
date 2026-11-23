@@ -208,6 +208,7 @@ function sceltaCartella(titolo, { attuale = null, consentiRadice = false, esclud
 
 /* ================================================================== suggerimenti di cartella */
 const REGOLE = [
+  [/curriculum|\bcv\b|resume|europass/, /^curriculum/], [/fototessera|foto tessera|foto-tessera|passport photo/, /^fototessera/],
   [/bollo/, /^bollo/], [/assicura|polizza|rca\b|quietanza/, /^assicurazione/], [/revision/, /^revisione/],
   [/libretto|carta di circolazione/, /^libretto/], [/tagliando|manutenz|officina|gomme/, /^manutenzione/],
   [/analisi|emocromo|sangue|prelievo|laboratorio/, /^analisi del sangue/],
@@ -491,15 +492,13 @@ function bannerInstalla() {
 }
 
 
-/* Prossime cose da fare: appuntamenti, scadenze dei documenti e compleanni, in ordine di tempo */
+/* Prossime cose da fare: solo gli appuntamenti in arrivo, in ordine di tempo */
 const isoLocale = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 async function prossimeCose(max = 6) {
-  const [appts, scad, comp] = await Promise.all([api("/api/appuntamenti"), api("/api/scadenze"), api("/api/diario?tipo=compleanno")]);
-  const out = [];
-  appts.forEach((a) => { const g = GRUPPI_APP[gruppoDi(a.categoria)]; out.push({ tipo: "app", data: a.inizio.slice(0, 10), ora: a.tutto_il_giorno ? "" : oraDa(a.inizio), titolo: a.titolo, ico: a.icona || g.ico, col: g.col, etichetta: g.nome, rif: a }); });
-  scad.filter((d) => giorniA(d.scadenza) >= -3 && giorniA(d.scadenza) <= 45).forEach((d) => out.push({ tipo: "scad", data: d.scadenza, ora: "", titolo: `Scade: ${senzaEst(d.nome)}`, ico: "⏰", col: "#f59e0b", etichetta: "Scadenza", rif: d }));
-  comp.forEach((x) => { const i = infoComp(x); if (i.g <= 21) out.push({ tipo: "comp", data: isoLocale(i.d), ora: "", titolo: `Compleanno di ${x.titolo}`, ico: "🎂", col: "#ec4899", etichetta: i.anni ? `Compie ${i.anni} anni` : "Compleanno", rif: x }); });
-  return out.sort((a, b) => (a.data + (a.ora || "00:00")).localeCompare(b.data + (b.ora || "00:00"))).slice(0, max);
+  const appts = await api("/api/appuntamenti");
+  return appts.map((a) => { const g = GRUPPI_APP[gruppoDi(a.categoria)];
+    return { tipo: "app", data: a.inizio.slice(0, 10), ora: a.tutto_il_giorno ? "" : oraDa(a.inizio), titolo: a.titolo, ico: a.icona || g.ico, col: g.col, etichetta: g.nome, rif: a }; })
+    .sort((a, b) => (a.data + (a.ora || "00:00")).localeCompare(b.data + (b.ora || "00:00"))).slice(0, max);
 }
 function htmlProssime(lista) {
   if (!lista.length) return `<a class="card vuoto-mini" href="#/agenda">✨ Niente in programma. <b>Aggiungi un appuntamento →</b></a>`;
@@ -1012,6 +1011,16 @@ async function vistaAltroServer() {
 const CAMPI_PROFILO = [["nome", "Nome e cognome", "text"], ["nascita", "Data di nascita", "date"], ["luogo_nascita", "Luogo di nascita", "text"],
   ["cf", "Codice fiscale", "text"], ["indirizzo", "Indirizzo", "text"], ["telefono", "Telefono", "tel"], ["email", "Email", "email"],
   ["sangue", "Gruppo sanguigno", "text"], ["taglie", "Taglie (vestiti, scarpe…)", "text"], ["note", "Altre informazioni", "text"]];
+/* Restituisce la cartella "Fototessera" / "Curriculum"; se non c'è la crea dentro "Documenti personali" */
+async function assicuraCartella(nome, icona) {
+  let c = cartellaPersonale(nome);
+  if (c) return c.id;
+  let dp = S.cartelle.find((x) => x.padre == null && x.nome === "Documenti personali");
+  if (!dp) dp = { id: (await api("/api/cartelle", { method: "POST", json: { nome: "Documenti personali", padre: null, icona: "🪪" } })).id };
+  const r = await api("/api/cartelle", { method: "POST", json: { nome, padre: dp.id, icona } });
+  await caricaCartelle();
+  return r.id;
+}
 const cartellaPersonale = (nome) => S.cartelle.find((c) => c.nome === nome && S.byId[c.padre]?.nome === "Documenti personali") || S.cartelle.find((c) => c.nome === nome);
 async function fotoProfilo() {
   const c = cartellaPersonale("Fototessera");
@@ -1019,10 +1028,10 @@ async function fotoProfilo() {
   const docs = (await api(`/api/documenti?cartella=${c.id}`)).filter((d) => (d.mime || "").startsWith("image/"));
   return docs[0] || null;
 }
-function caricaIn(cartella, { foto = false, frontale = false, dopo } = {}) {
+function caricaIn(cartella, { foto = false, scatta = false, frontale = false, dopo } = {}) {
   const inp = $("#file-input");
   inp.value = ""; inp.accept = foto ? "image/*" : "";
-  foto ? inp.setAttribute("capture", frontale ? "user" : "environment") : inp.removeAttribute("capture");
+  scatta ? inp.setAttribute("capture", frontale ? "user" : "environment") : inp.removeAttribute("capture");
   inp.onchange = async () => { if (inp.files.length) { await caricaFile([...inp.files], { cartella }); if (dopo) dopo(); } };
   inp.click();
 }
@@ -1035,7 +1044,13 @@ function eta(iso) {
 }
 
 async function vistaIo() {
+  await caricaCartelle();
   const cFoto = cartellaPersonale("Fototessera"), cCv = cartellaPersonale("Curriculum");
+  if (!cFoto || !cCv) {
+    if (!cFoto) await assicuraCartella("Fototessera", "📸");
+    if (!cCv) await assicuraCartella("Curriculum", "📄");
+    return vistaIo();
+  }
   const [prof, diario, foto, cv] = await Promise.all([api("/api/profilo"), api("/api/diario"),
     cFoto ? api(`/api/documenti?cartella=${cFoto.id}`) : [], cCv ? api(`/api/documenti?cartella=${cCv.id}`) : []]);
   const fotoImg = foto.filter((d) => (d.mime || "").startsWith("image/"));
@@ -1081,12 +1096,12 @@ async function vistaIo() {
   const sceltaFoto = () => {
     const v = foglio(`<h3>📸 Fototessera ${xBtn}</h3><div class="azioni-grandi">
       <button data-m="selfie"><span>🤳</span>Scatta una foto</button><button data-m="galleria"><span>🖼️</span>Scegli dalle foto</button></div>`);
-    v.addEventListener("click", (e) => { const m = e.target.closest("[data-m]")?.dataset.m; if (!m) return; v.chiudi();
-      caricaIn(cFoto?.id ?? null, { foto: true, frontale: m === "selfie", dopo: ric }); });
+    v.addEventListener("click", async (e) => { const m = e.target.closest("[data-m]")?.dataset.m; if (!m) return; v.chiudi();
+      caricaIn(cFoto?.id ?? await assicuraCartella("Fototessera", "📸"), { foto: true, scatta: m === "selfie", frontale: true, dopo: ric }); });
   };
   $("#cambia-foto").onclick = sceltaFoto;
   $("#nuova-foto").onclick = sceltaFoto;
-  $("#carica-cv").onclick = () => caricaIn(cCv?.id ?? null, { dopo: ric });
+  $("#carica-cv").onclick = async () => caricaIn(cCv?.id ?? await assicuraCartella("Curriculum", "📄"), { dopo: ric });
   if (cv.length) collegaDocs($("#cv"), cv, ric);
   $$("[data-foto]").forEach((b) => (b.onclick = () => apriDoc(fotoImg.find((d) => d.id === +b.dataset.foto), ric)));
 }
