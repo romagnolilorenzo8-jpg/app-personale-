@@ -996,11 +996,12 @@ async function vistaDiario(tipo) {
   app.innerHTML = `<div class="top"><h1>Diario<small>La mia vita: film, libri, serie e compleanni</small></h1></div>
     <div class="segmenti">${Object.entries(TIPI_D).map(([k, v]) => `<a href="#/diario/${k}" class="${k === tipo ? "on" : ""}"><span>${v.ico}</span>${v.nome}<b>${conta(k) || ""}</b></a>`).join("")}</div>
     <a class="chat-invito" href="#/chat"><span>💬</span><span>${t.vuoto}</span></a>
-    ${tipo === "compleanno" && lista.length ? `<button class="btn sec block" id="cal-comp" style="margin:4px 0 12px">📲 Metti tutti i compleanni nel Calendario (ogni anno)</button>` : ""}
+    ${tipo === "compleanno" ? `<div class="riga" style="margin:4px 0 12px"><button class="btn sec" id="imp-comp">📥 Importa dai Promemoria</button>${lista.length ? `<button class="btn sec" id="cal-comp">🔔 Notifiche</button>` : ""}</div>` : ""}
     ${lista.length ? `<div class="lista" id="dl">${lista.map(htmlVoceDiario).join("")}</div>`
       : `<div class="vuoto"><span class="big">${t.ico}</span>Ancora niente qui.<br>Tocca <b>＋</b> oppure scrivilo in chat.</div>`}`;
   $("#dl") && ($("#dl").onclick = (e) => { const v = e.target.closest("[data-dv]"); if (v) modificaVoceDiario(lista.find((x) => x.id === +v.dataset.dv), () => vistaDiario(tipo)); });
-  $("#cal-comp") && ($("#cal-comp").onclick = () => apriIcsCompleanni(lista));
+  $("#cal-comp") && ($("#cal-comp").onclick = () => notificheCompleanni(lista));
+  $("#imp-comp") && ($("#imp-comp").onclick = () => importaCompleanni(() => vistaDiario("compleanno")));
   const b = document.createElement("button"); b.className = "fab"; b.innerHTML = "<span>＋</span>";
   b.onclick = () => modificaVoceDiario({ tipo, data: oggiIso() }, () => vistaDiario(tipo)); app.appendChild(b);
 }
@@ -1037,6 +1038,79 @@ function modificaVoceDiario(x, dopo) {
   $("#cal1", v) && ($("#cal1", v).onclick = () => apriIcsCompleanni([x]));
 }
 
+
+/* Importa i compleanni dall'app Promemoria (tramite un Comando Rapido che li copia negli appunti) */
+const istruzioniPromemoria = () => `
+  ${passo(1, `Apri <b>Comandi Rapidi</b> → <b>+</b> → chiamalo ${cod("Esporta compleanni")}`)}
+  ${passo(2, `Aggiungi l'azione <b>Trova promemoria</b>. Tocca <b>Aggiungi filtro</b> → <b>Elenco</b> → <b>è</b> → scegli la tua lista <b>Compleanni</b>.`)}
+  ${passo(3, `Aggiungi <b>Ripeti con ognuno</b>.`)}
+  ${passo(4, `Dentro la ripetizione aggiungi l'azione <b>Testo</b>. Nel riquadro inserisci la variabile <b>Elemento ripetizione</b>, scrivi <b>&nbsp;|&nbsp;</b> (barra verticale), poi inserisci di nuovo <b>Elemento ripetizione</b>: toccala, scegli <b>Data di scadenza</b> e come formato <b>ISO 8601</b>.`)}
+  ${passo(5, `Dopo <b>Fine ripetizione</b> aggiungi <b>Combina testo</b> con <b>Nuova riga</b>, poi <b>Copia negli appunti</b>.`)}
+  ${passo(6, `Tocca <b>▶︎</b> per avviarlo e consenti l'accesso ai Promemoria. Torna qui e tocca <b>Incolla</b>.`)}`;
+
+function importaCompleanni(dopo) {
+  let righe = [], esistenti = [];
+  const v = foglio(`<h3>📥 Importa compleanni ${xBtn}</h3>
+    <p class="muted small" style="margin-top:-6px">Porta qui i compleanni dall'app <b>Promemoria</b> senza riscriverli.</p>
+    <details class="card"><summary><span class="sum-ico">⚙️</span><span>Come copiarli dai Promemoria<br><span class="small muted">Una volta sola, circa 2 minuti</span></span></summary><div class="dentro">${istruzioniPromemoria()}</div></details>
+    <button class="btn block" id="incolla">📋 Incolla dagli appunti</button>
+    <textarea id="testo-imp" placeholder="…oppure incolla o scrivi qui, uno per riga. Es.&#10;Marco Rossi 6 agosto&#10;Compleanno Giulia | 2027-12-03" style="margin-top:10px;min-height:90px"></textarea>
+    <div id="anteprima-imp"></div>`);
+  const ta = $("#testo-imp", v), prev = $("#anteprima-imp", v);
+  api("/api/diario?tipo=compleanno").then((l) => { esistenti = l; if (ta.value.trim()) disegna(); });
+  const opzG = (g) => `<option value="">–</option>` + Array.from({ length: 31 }, (_, i) => `<option ${g === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("");
+  const opzM = (m) => `<option value="">–</option>` + MESI_L.map((x, i) => `<option value="${i + 1}" ${m === i + 1 ? "selected" : ""}>${x}</option>`).join("");
+  const disegna = () => {
+    righe = window.ScrignoChat.leggiCompleanni(ta.value);
+    if (!righe.length) { prev.innerHTML = ""; return; }
+    prev.innerHTML = `<div class="sezione"><h2>Ho trovato ${righe.length} compleann${righe.length === 1 ? "o" : "i"}</h2></div>
+      <p class="small muted" style="margin:-4px 4px 8px">Controlla nomi e date; dove manca la data sceglila tu.</p>
+      <div class="lista imp">${righe.map((r, i) => {
+        const gia = esistenti.find((x) => x.titolo.toLowerCase() === r.nome.toLowerCase());
+        return `<div class="imp-riga" data-i="${i}"><input type="checkbox" checked data-k="ok">
+          <div style="flex:1;min-width:0"><input type="text" value="${esc(r.nome)}" data-k="nome">${gia ? `<span class="tag">già presente: verrà aggiornato</span>` : ""}</div>
+          <select data-k="giorno">${opzG(r.giorno)}</select><select data-k="mese">${opzM(r.mese)}</select></div>`;
+      }).join("")}</div>
+      <button class="btn block" id="importa" style="margin-top:12px">Importa</button>`;
+    $("#importa", v).onclick = salva;
+  };
+  const salva = async () => {
+    const scelti = $$(".imp-riga", v).map((el) => ({ el, r: righe[+el.dataset.i] })).filter(({ el }) => $("[data-k=ok]", el).checked)
+      .map(({ el, r }) => ({ ...r, nome: $("[data-k=nome]", el).value.trim(), giorno: +$("[data-k=giorno]", el).value || null, mese: +$("[data-k=mese]", el).value || null }));
+    const senza = scelti.filter((x) => !x.nome || !x.giorno || !x.mese);
+    if (senza.length) return toast(`⚠️ Manca la data per: ${senza.map((x) => x.nome || "?").join(", ")}`, 4000);
+    const salvati = [];
+    for (const x of scelti) {
+      const gia = esistenti.find((y) => y.titolo.toLowerCase() === x.nome.toLowerCase());
+      const voce = { tipo: "compleanno", titolo: x.nome, giorno: x.giorno, mese: x.mese, anno: x.anno || gia?.anno || null };
+      salvati.push(gia ? await api(`/api/diario/${gia.id}`, { method: "PUT", json: { ...gia, ...voce } }) : await api("/api/diario", { method: "POST", json: voce }));
+    }
+    v.chiudi();
+    if (dopo) dopo();
+    notificheCompleanni(salvati, true);
+  };
+  ta.oninput = disegna;
+  $("#incolla", v).onclick = async () => {
+    try { ta.value = await navigator.clipboard.readText(); disegna(); if (!righe.length) toast("Negli appunti non ho trovato compleanni"); }
+    catch { ta.focus(); toast("Tieni premuto nel riquadro e scegli “Incolla”", 3500); }
+  };
+}
+
+/* Notifiche dei compleanni: eventi annuali nel Calendario dell'iPhone */
+function notificheCompleanni(lista, importati) {
+  const v = foglio(`<div style="text-align:center"><div style="font-size:54px">${importati ? "✅" : "🔔"}</div>
+    <h3 style="justify-content:center">${importati ? `${lista.length} compleanni importati` : "Notifiche dei compleanni"}</h3></div>
+    <p class="muted" style="margin-top:-6px">Per ricevere la <b>notifica</b> ogni anno, come con Promemoria, aggiungili al <b>Calendario</b>: alle 9 del giorno del compleanno (e la sera prima) l'iPhone ti avvisa.</p>
+    <button class="btn block" id="cal">📲 Aggiungi ${lista.length === 1 ? "al" : `tutti e ${lista.length} al`} Calendario</button>
+    <div class="card small" style="margin-top:12px">
+      ${passo(1, "Tocca il pulsante qui sopra, poi <b>Aggiungi tutti</b> e scegli il calendario.")}
+      ${passo(2, "Controlla nel Calendario che compaiano, ad esempio aprendo il giorno di un compleanno: devono avere la scritta “Ripeti: ogni anno”.")}
+      ${passo(3, "Solo dopo cancellali dall'app <b>Promemoria</b>.")}
+      <p class="muted" style="margin:8px 0 0">Per sicurezza imposta anche: <b>Impostazioni → App → Calendario → Avvisi predefiniti → Eventi di tutto il giorno → Il giorno dell'evento (09:00)</b>.</p></div>
+    <button class="btn sec block" data-chiudi style="margin-top:10px">Lo faccio dopo</button>`);
+  $("#cal", v).onclick = () => { memo.set("comp-cal", String(lista.length)); apriIcsCompleanni(lista); };
+}
+
 /* Compleanni nel Calendario dell'iPhone: evento che si ripete ogni anno, con avviso il giorno prima e il giorno stesso alle 9 */
 function apriIcsCompleanni(lista) {
   const e = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
@@ -1057,7 +1131,7 @@ function apriIcsCompleanni(lista) {
 }
 
 /* ================================================================== CHAT */
-const AIUTO = ["il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
+const AIUTO = ["importa i compleanni dai promemoria", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
   "il 16 dicembre dentista dalle 10 alle 11", "quando è il compleanno di Marco?", "che film ho visto?"];
 const chatStoria = () => { try { return JSON.parse(memo.get("chat") || "[]"); } catch { return []; } };
 const chatSalva = (l) => memo.set("chat", JSON.stringify(l.slice(-150)));
@@ -1097,6 +1171,7 @@ function vistaChat(precompila) {
       if (a.t === "voto") { const cur = (await api("/api/diario")).find((y) => y.id === a.id) || a.voce; const x = await api(`/api/diario/${a.id}`, { method: "PUT", json: { ...cur, voto: a.v } }); b.closest(".msg-az").remove(); aggiungi({ da: "scrigno", html: `Fatto: <b>${esc(x.titolo)}</b> <span class="stelle">${stelle(a.v)}</span>` }); }
       if (a.t === "apri") location.hash = a.hash;
       if (a.t === "calComp") apriIcsCompleanni([a.voce]);
+      if (a.t === "importaComp") importaCompleanni(null);
       if (a.t === "calApp") aggiungiAlCalendario(a.voce);
     } catch (err) { toast("⚠️ " + err.message); }
   };
@@ -1184,6 +1259,7 @@ async function rispondi(testo) {
     if (r.motivo === "nome_compleanno") return { da: "scrigno", html: `Di chi è il compleanno del ${r.giorno} ${MESI_L[r.mese - 1]}?` };
     if (r.motivo === "titolo") return { da: "scrigno", html: `Qual è il titolo?` };
   }
+  if (r.azione === "importa_compleanni") return { da: "scrigno", html: "Certo! Posso prendere i compleanni dall'app Promemoria: tocca qui sotto e segui i passaggi.", azioni: [{ t: "importaComp", etichetta: "📥 Importa dai Promemoria" }] };
   if (r.azione === "saluto") return { da: "scrigno", html: r.grazie ? "Di niente! 😊" : `Ciao! 👋 Dimmi pure: un film visto, un libro letto, un compleanno da ricordare o una visita. Ad esempio:`, azioni: r.grazie ? [] : AIUTO.slice(0, 3).map((t) => ({ t: "scrivi", testo: t, etichetta: t })) };
   return { da: "scrigno", html: `Non ho capito bene 🤔 Prova a scrivere in uno di questi modi:`, azioni: AIUTO.map((t) => ({ t: "scrivi", testo: t, etichetta: t })) };
 }
