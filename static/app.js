@@ -483,8 +483,10 @@ function bannerInstalla() {
 }
 
 async function vistaHome() {
-  const [recenti, appts, scad, info] = await Promise.all([api("/api/documenti?recenti=true"), api("/api/appuntamenti"), api("/api/scadenze"),
-    LOC ? api("/api/impostazioni") : Promise.resolve(null)]);
+  const [recenti, appts, scad, info, comp] = await Promise.all([api("/api/documenti?recenti=true"), api("/api/appuntamenti"), api("/api/scadenze"),
+    LOC ? api("/api/impostazioni") : Promise.resolve(null), api("/api/diario?tipo=compleanno")]);
+  const compVicini = comp.filter((x) => infoComp(x).g <= 30);
+  const compOggi = comp.filter((x) => infoComp(x).g <= 1);
   const scadImm = scad.filter((d) => giorniA(d.scadenza) <= 60);
   const ora = new Date().getHours();
   const saluto = ora < 6 ? "Buonanotte" : ora < 13 ? "Buongiorno" : ora < 18 ? "Buon pomeriggio" : "Buonasera";
@@ -494,6 +496,8 @@ async function vistaHome() {
     <div class="top"><h1>${saluto} 👋<small>${GIORNI[oggi.getDay()]} ${oggi.getDate()} ${MESI_L[oggi.getMonth()]}</small></h1>
       <a class="iconbtn" href="#/altro" aria-label="Impostazioni">⚙️</a></div>
     ${bannerInstalla()}
+    ${compOggi.map((x) => `<a class="avviso festa" href="#/diario/compleanno"><div class="av-ico">🎂</div><div style="flex:1"><b>${infoComp(x).g === 0 ? "Oggi" : "Domani"} è il compleanno di ${esc(x.titolo)}!</b><div class="small">${infoComp(x).anni ? `Compie ${infoComp(x).anni} anni. ` : ""}Ricordati di fargli gli auguri 🎉</div></div></a>`).join("")}
+    <form class="chat-home" id="f-chat"><span>💬</span><input type="text" id="cq" placeholder="Scrivi a Scrigno: “ho visto After”…" enterkeyhint="send"><button aria-label="Invia">➤</button></form>
     <form class="cerca" id="f-cerca"><input type="search" id="q" placeholder="Cerca un documento…" enterkeyhint="search"></form>
     <div class="azioni-home">
       <button data-h="foto"><span class="ah-ico" style="--c:#5b5bf6">📷</span>Fotografa</button>
@@ -506,6 +510,7 @@ async function vistaHome() {
     <div class="sezione"><h2>Prossime visite</h2><a href="#/agenda">Tutte</a></div>
     ${appts.length ? `<div class="lista" id="h-appt">${appts.slice(0, 2).map(htmlAppt).join("")}</div>`
       : `<a class="card vuoto-mini" href="#/agenda">🗓️ Nessuna visita in programma. <b>Aggiungine una →</b></a>`}
+    ${compVicini.length ? `<div class="sezione"><h2>Compleanni in arrivo</h2><a href="#/diario/compleanno">Tutti</a></div><div class="lista" id="h-comp">${compVicini.slice(0, 3).map(htmlVoceDiario).join("")}</div>` : ""}
     ${scadImm.length ? `<div class="sezione"><h2>Scadenze vicine</h2><a href="#/scadenze">Tutte</a></div><div id="h-scad">${htmlDocs(scadImm.slice(0, 3), { mostraCartella: true })}</div>` : ""}
     <div class="sezione"><h2>Le tue cartelle</h2><a href="#" id="nuova-rad">＋ Nuova</a></div>
     ${htmlCartelle(S.figli.root || [])}
@@ -516,6 +521,8 @@ async function vistaHome() {
     </div>
     ${recenti.length ? `<div class="sezione"><h2>Aggiunti di recente</h2></div><div id="recenti">${htmlDocs(recenti.slice(0, 6), { mostraCartella: true })}</div>` : ""}`;
   $("#non-ora") && ($("#non-ora").onclick = () => { sessionStorage.setItem("no-installa", "1"); $(".avviso.install").remove(); });
+  $("#f-chat").onsubmit = (e) => { e.preventDefault(); const t = $("#cq").value.trim(); location.hash = t ? "#/chat/" + encodeURIComponent(t) : "#/chat"; };
+  $("#h-comp") && ($("#h-comp").onclick = (e) => { const v = e.target.closest("[data-dv]"); if (v) modificaVoceDiario(comp.find((x) => x.id === +v.dataset.dv), render); });
   $("#f-cerca").onsubmit = (e) => { e.preventDefault(); const q = $("#q").value.trim(); if (q) location.hash = "#/cerca/" + encodeURIComponent(q); };
   $(".azioni-home").onclick = (e) => {
     const h = e.target.closest("[data-h]")?.dataset.h; if (!h) return;
@@ -852,7 +859,7 @@ async function vistaAltroLocale() {
     <div class="small muted" style="margin-top:6px">${s.persistente ? "✅ iPhone conserverà questi dati." : "ℹ️ Installa Scrigno sulla Home e fai backup regolari: così i dati sono al sicuro."}</div></div>
 
   <div class="sezione"><h2>Sicurezza</h2></div>
-  <div class="lista"><div class="voce" id="cambia"><div class="thumb">🔑</div><div class="corpo"><div class="tit">Cambia password della cassaforte</div></div><div class="dx">›</div></div>
+  <div class="lista"><a class="voce" href="#/password"><div class="thumb">🔐</div><div class="corpo"><div class="tit">Le mie password</div></div><div class="dx">›</div></a><div class="voce" id="cambia"><div class="thumb">🔑</div><div class="corpo"><div class="tit">Cambia password della cassaforte</div></div><div class="dx">›</div></div>
     <div class="voce" id="intro"><div class="thumb">👋</div><div class="corpo"><div class="tit">Rivedi la presentazione</div></div><div class="dx">›</div></div></div>
 
   <div class="sezione"><h2>Server di casa</h2></div>
@@ -914,6 +921,7 @@ async function vistaAltroServer() {
   </div>
   <div class="sezione"><h2>Sicurezza</h2></div>
   <div class="lista">
+    <a class="voce" href="#/password"><div class="thumb">🔐</div><div class="corpo"><div class="tit">Le mie password</div></div><div class="dx">›</div></a>
     <div class="voce" id="cambia"><div class="thumb">🔑</div><div class="corpo"><div class="tit">Cambia password</div><div class="sub">Usata anche per cifrare la cassaforte</div></div><div class="dx">›</div></div>
     <div class="voce" id="rig-api"><div class="thumb">♻️</div><div class="corpo"><div class="tit">Rigenera codice per i Comandi Rapidi</div></div></div>
     <div class="voce" id="rig-cal"><div class="thumb">♻️</div><div class="corpo"><div class="tit">Rigenera link del calendario</div></div></div>
@@ -944,6 +952,242 @@ async function vistaAltroServer() {
   };
 }
 
+/* ================================================================== DIARIO: film, libri, serie, compleanni */
+const TIPI_D = {
+  film: { ico: "🎬", nome: "Film", plurale: "Film visti", verbo: "visto il", vuoto: "Scrivi in chat: “stasera ho visto After”" },
+  libro: { ico: "📚", nome: "Libri", plurale: "Libri letti", verbo: "letto il", vuoto: "Scrivi in chat: “ho letto Il nome della rosa”" },
+  serie: { ico: "📺", nome: "Serie TV", plurale: "Serie viste", verbo: "vista il", vuoto: "Scrivi in chat: “ho finito la serie Stranger Things”" },
+  compleanno: { ico: "🎂", nome: "Compleanni", plurale: "Compleanni", verbo: "", vuoto: "Scrivi in chat: “il 6 agosto è il compleanno di Marco Rossi”" },
+};
+const stelle = (v) => (v ? "★".repeat(v) + "☆".repeat(5 - v) : "");
+function prossimoComp(x) {
+  const o = new Date(oggiIso() + "T00:00");
+  let d = new Date(o.getFullYear(), x.mese - 1, x.giorno);
+  if (d < o) d = new Date(o.getFullYear() + 1, x.mese - 1, x.giorno);
+  return d;
+}
+function infoComp(x) {
+  const d = prossimoComp(x), g = Math.round((d - new Date(oggiIso() + "T00:00")) / 86400000);
+  const anni = x.anno ? d.getFullYear() - x.anno : null;
+  const quando = g === 0 ? "🎉 Oggi!" : g === 1 ? "Domani" : `Tra ${g} giorni`;
+  return { d, g, anni, quando, testo: `${x.giorno} ${MESI_L[x.mese - 1]}${anni ? ` · compie ${anni} anni` : ""}` };
+}
+function htmlVoceDiario(x) {
+  if (x.tipo === "compleanno") {
+    const i = infoComp(x);
+    return `<div class="voce" data-dv="${x.id}"><div class="datebox" style="--c:#ec4899"><div class="m">${MESI[x.mese - 1]}</div><div class="g">${x.giorno}</div></div>
+      <div class="corpo"><div class="tit">🎂 ${esc(x.titolo)}</div><div class="sub">${esc(i.testo)}</div>
+      <div style="margin-top:4px"><span class="tag ${i.g <= 1 ? "danger" : i.g <= 14 ? "warn" : ""}">${i.quando}</span></div></div><div class="dx">›</div></div>`;
+  }
+  const t = TIPI_D[x.tipo];
+  return `<div class="voce" data-dv="${x.id}"><div class="thumb poster" style="--c:${COLORI[(x.titolo.charCodeAt(0) || 0) % COLORI.length]}">${t.ico}</div>
+    <div class="corpo"><div class="tit">${esc(x.titolo)}</div>
+    <div class="sub">${[x.autore ? esc(x.autore) : "", x.stato === "in corso" ? "📖 in corso" : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
+    ${x.voto ? `<div class="stelle">${stelle(x.voto)}</div>` : ""}
+    ${x.commento ? `<div class="commento">“${esc(x.commento)}”</div>` : ""}</div><div class="dx">›</div></div>`;
+}
+
+async function vistaDiario(tipo) {
+  tipo = TIPI_D[tipo] ? tipo : "film";
+  const tutte = await api("/api/diario");
+  const conta = (t) => tutte.filter((x) => x.tipo === t).length;
+  const lista = tutte.filter((x) => x.tipo === tipo);
+  const t = TIPI_D[tipo];
+  app.innerHTML = `<div class="top"><h1>Diario<small>La mia vita: film, libri, serie e compleanni</small></h1></div>
+    <div class="segmenti">${Object.entries(TIPI_D).map(([k, v]) => `<a href="#/diario/${k}" class="${k === tipo ? "on" : ""}"><span>${v.ico}</span>${v.nome}<b>${conta(k) || ""}</b></a>`).join("")}</div>
+    <a class="chat-invito" href="#/chat"><span>💬</span><span>${t.vuoto}</span></a>
+    ${tipo === "compleanno" && lista.length ? `<button class="btn sec block" id="cal-comp" style="margin:4px 0 12px">📲 Metti tutti i compleanni nel Calendario (ogni anno)</button>` : ""}
+    ${lista.length ? `<div class="lista" id="dl">${lista.map(htmlVoceDiario).join("")}</div>`
+      : `<div class="vuoto"><span class="big">${t.ico}</span>Ancora niente qui.<br>Tocca <b>＋</b> oppure scrivilo in chat.</div>`}`;
+  $("#dl") && ($("#dl").onclick = (e) => { const v = e.target.closest("[data-dv]"); if (v) modificaVoceDiario(lista.find((x) => x.id === +v.dataset.dv), () => vistaDiario(tipo)); });
+  $("#cal-comp") && ($("#cal-comp").onclick = () => apriIcsCompleanni(lista));
+  const b = document.createElement("button"); b.className = "fab"; b.innerHTML = "<span>＋</span>";
+  b.onclick = () => modificaVoceDiario({ tipo, data: oggiIso() }, () => vistaDiario(tipo)); app.appendChild(b);
+}
+
+function modificaVoceDiario(x, dopo) {
+  const comp = x.tipo === "compleanno", t = TIPI_D[x.tipo];
+  let voto = x.voto || 0;
+  const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : comp ? "Nuovo compleanno" : "Aggiungi " + t.nome.toLowerCase()} ${xBtn}</h3><form id="fd">
+    <label class="campo"><span>${comp ? "Nome" : "Titolo"}</span><input type="text" name="titolo" value="${esc(x.titolo || "")}" required placeholder="${comp ? "Es. Marco Rossi" : ""}"></label>
+    ${comp ? `<div class="riga"><label class="campo"><span>Giorno</span><select name="giorno">${Array.from({ length: 31 }, (_, i) => `<option ${x.giorno === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label>
+      <label class="campo" style="flex:2"><span>Mese</span><select name="mese">${MESI_L.map((m, i) => `<option value="${i + 1}" ${x.mese === i + 1 ? "selected" : ""}>${m}</option>`).join("")}</select></label>
+      <label class="campo"><span>Anno <i class="muted">(facolt.)</i></span><input type="number" name="anno" inputmode="numeric" min="1900" max="2100" value="${x.anno || ""}"></label></div>`
+    : `${x.tipo === "libro" ? `<label class="campo"><span>Autore</span><input type="text" name="autore" value="${esc(x.autore || "")}"></label>
+        <label class="campo"><span>Stato</span><select name="stato"><option value="">Letto</option><option value="in corso" ${x.stato === "in corso" ? "selected" : ""}>Sto leggendo</option><option value="da leggere" ${x.stato === "da leggere" ? "selected" : ""}>Da leggere</option></select></label>` : ""}
+      <label class="campo"><span>${x.tipo === "libro" ? "Quando" : "Visto il"}</span><input type="date" name="data" value="${esc(x.data || "")}"></label>
+      <div class="campo"><span>Voto</span><div class="stelle-input" id="si">${[1, 2, 3, 4, 5].map((n) => `<button type="button" data-s="${n}">★</button>`).join("")}</div></div>
+      <label class="campo"><span>Commento</span><textarea name="commento" placeholder="Cosa ti è piaciuto? Con chi l'hai visto?">${esc(x.commento || "")}</textarea></label>`}
+    <button class="btn block">Salva</button>
+    ${x.id ? `<button type="button" class="btn danger block" id="del" style="margin-top:8px">🗑️ Elimina</button>` : ""}
+    ${x.id && comp ? `<button type="button" class="btn sec block" id="cal1" style="margin-top:8px">📲 Promemoria ogni anno nel Calendario</button>` : ""}</form>`);
+  const disegnaStelle = () => $$("#si button", v).forEach((b) => b.classList.toggle("on", +b.dataset.s <= voto));
+  if (!comp) { disegnaStelle(); $("#si", v).onclick = (e) => { const s = e.target.dataset.s; if (s) { voto = voto === +s ? 0 : +s; disegnaStelle(); } }; }
+  $("#fd", v).onsubmit = async (e) => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.target));
+    const dati = { ...x, ...d, voto: comp ? null : voto || null, giorno: d.giorno ? +d.giorno : null, mese: d.mese ? +d.mese : null, anno: d.anno ? +d.anno : null };
+    try { await api(x.id ? `/api/diario/${x.id}` : "/api/diario", { method: x.id ? "PUT" : "POST", json: dati }); v.remove(); toast("✅ Salvato"); dopo && dopo(); }
+    catch (err) { toast("⚠️ " + err.message); }
+  };
+  $("#del", v) && ($("#del", v).onclick = async () => {
+    if (!(await conferma(`Eliminare “${x.titolo}”?`))) return;
+    await api(`/api/diario/${x.id}`, { method: "DELETE" }); v.remove(); toast("🗑️ Eliminato"); dopo && dopo();
+  });
+  $("#cal1", v) && ($("#cal1", v).onclick = () => apriIcsCompleanni([x]));
+}
+
+/* Compleanni nel Calendario dell'iPhone: evento che si ripete ogni anno, con avviso il giorno prima e il giorno stesso alle 9 */
+function apriIcsCompleanni(lista) {
+  const e = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  const anno = new Date().getFullYear();
+  const r = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Scrigno//IT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  for (const x of lista) {
+    const g = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    const d0 = new Date(anno, x.mese - 1, x.giorno), d1 = new Date(anno, x.mese - 1, x.giorno + 1);
+    r.push("BEGIN:VEVENT", `UID:compleanno-${x.id}@scrigno`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
+      `SUMMARY:${e("🎂 Compleanno di " + x.titolo)}`, `DTSTART;VALUE=DATE:${g(d0)}`, `DTEND;VALUE=DATE:${g(d1)}`, "RRULE:FREQ=YEARLY",
+      ...(x.anno ? [`DESCRIPTION:${e("Nato/a nel " + x.anno)}`] : []),
+      "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${e("Domani è il compleanno di " + x.titolo)}`, "TRIGGER:-PT15H", "END:VALARM",
+      "BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${e("Oggi è il compleanno di " + x.titolo + " 🎂")}`, "TRIGGER:PT9H", "END:VALARM", "END:VEVENT");
+  }
+  r.push("END:VCALENDAR");
+  const file = new File([r.join("\r\n") + "\r\n"], lista.length === 1 ? `Compleanno ${lista[0].titolo}.ics` : "Compleanni.ics", { type: "text/calendar" });
+  location.href = URL.createObjectURL(file);
+}
+
+/* ================================================================== CHAT */
+const AIUTO = ["il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
+  "il 16 dicembre dentista dalle 10 alle 11", "quando è il compleanno di Marco?", "che film ho visto?"];
+const chatStoria = () => { try { return JSON.parse(memo.get("chat") || "[]"); } catch { return []; } };
+const chatSalva = (l) => memo.set("chat", JSON.stringify(l.slice(-150)));
+let chatAttesa = null;
+
+function htmlMsg(m) {
+  const az = (m.azioni || []).map((a) => `<button class="chip" data-az='${esc(JSON.stringify(a))}'>${esc(a.etichetta)}</button>`).join("");
+  return `<div class="msg ${m.da}"><div class="bolla">${m.html || esc(m.testo)}</div>${az ? `<div class="msg-az">${az}</div>` : ""}</div>`;
+}
+function vistaChat(precompila) {
+  const storia = chatStoria();
+  app.innerHTML = `<div class="top"><h1>Chat<small>Dimmi cosa è successo, al resto penso io</small></h1>
+    ${storia.length ? `<button class="iconbtn" id="pulisci" title="Pulisci">🧹</button>` : ""}</div>
+    <div id="msgs" class="chat">${storia.length ? storia.map(htmlMsg).join("")
+      : htmlMsg({ da: "scrigno", html: `Ciao! 👋 Scrivimi in modo semplice e io lo salvo al posto giusto. Per esempio:`, azioni: AIUTO.map((t) => ({ t: "scrivi", testo: t, etichetta: t })) })}</div>
+    <form class="chat-barra" id="cf"><textarea id="ci" rows="1" placeholder="Scrivi o detta… (es. ho visto After)" enterkeyhint="send"></textarea><button class="invia" aria-label="Invia">➤</button></form>`;
+  const ci = $("#ci"), msgs = $("#msgs");
+  const giu = () => setTimeout(() => scrollTo(0, document.body.scrollHeight), 30);
+  giu();
+  ci.oninput = () => { ci.style.height = "auto"; ci.style.height = Math.min(ci.scrollHeight, 120) + "px"; };
+  ci.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#cf").requestSubmit(); } };
+  const aggiungi = (m) => { const l = chatStoria(); l.push(m); chatSalva(l); msgs.insertAdjacentHTML("beforeend", htmlMsg(m)); giu(); };
+  const invia = async (testo) => {
+    testo = testo.trim(); if (!testo) return;
+    if (msgs.querySelector(".msg.scrigno") && !chatStoria().length) msgs.innerHTML = "";
+    aggiungi({ da: "io", testo });
+    try { aggiungi(await rispondi(testo)); } catch (e) { aggiungi({ da: "scrigno", testo: "⚠️ Non sono riuscito a salvarlo: " + e.message }); }
+  };
+  $("#cf").onsubmit = (e) => { e.preventDefault(); const t = ci.value; ci.value = ""; ci.style.height = "auto"; invia(t); };
+  $("#pulisci") && ($("#pulisci").onclick = async () => { if (await conferma("Cancellare la conversazione?", "Cancella", "Quello che hai salvato resta nel diario.")) { chatSalva([]); vistaChat(); } });
+  msgs.onclick = async (e) => {
+    const b = e.target.closest("[data-az]"); if (!b) return;
+    const a = JSON.parse(b.dataset.az);
+    try {
+      if (a.t === "scrivi") return invia(a.testo);
+      if (a.t === "annulla") { await api(a.url, { method: "DELETE" }); b.closest(".msg-az").remove(); aggiungi({ da: "scrigno", testo: "↩️ Annullato, non l'ho salvato." }); }
+      if (a.t === "voto") { const cur = (await api("/api/diario")).find((y) => y.id === a.id) || a.voce; const x = await api(`/api/diario/${a.id}`, { method: "PUT", json: { ...cur, voto: a.v } }); b.closest(".msg-az").remove(); aggiungi({ da: "scrigno", html: `Fatto: <b>${esc(x.titolo)}</b> <span class="stelle">${stelle(a.v)}</span>` }); }
+      if (a.t === "apri") location.hash = a.hash;
+      if (a.t === "calComp") apriIcsCompleanni([a.voce]);
+      if (a.t === "calApp") aggiungiAlCalendario(a.voce);
+    } catch (err) { toast("⚠️ " + err.message); }
+  };
+  if (precompila) { history.replaceState(null, "", "#/chat"); invia(precompila); }
+  else if (matchMedia("(pointer:fine)").matches) ci.focus();
+}
+
+const trova = (lista, testo) => {
+  const n = testo.toLowerCase().trim();
+  return lista.find((x) => x.titolo.toLowerCase() === n) || lista.find((x) => x.titolo.toLowerCase().includes(n)) || lista.find((x) => n.includes(x.titolo.toLowerCase()));
+};
+async function rispondi(testo) {
+  if (chatAttesa) {
+    const a = chatAttesa; chatAttesa = null;
+    if (a.motivo === "data_compleanno") testo = `compleanno di ${a.nome} il ${testo}`;
+    else if (a.motivo === "nome_compleanno") testo = `compleanno di ${testo} il ${a.giorno}/${a.mese}${a.anno ? "/" + a.anno : ""}`;
+    else if (a.motivo === "titolo") testo = `${a.tipo === "libro" ? "ho letto" : a.tipo === "serie" ? "ho visto la serie" : "ho visto il film"} ${testo}`;
+  }
+  const r = window.ScrignoChat.capisci(testo);
+  const giorno = (iso) => { const d = new Date(iso + "T00:00"); return `${GIORNI[d.getDay()]} ${d.getDate()} ${MESI_L[d.getMonth()]}`; };
+
+  if (r.azione === "compleanno") {
+    const esistenti = await api("/api/diario?tipo=compleanno");
+    const gia = esistenti.find((x) => x.titolo.toLowerCase() === r.nome.toLowerCase());
+    const voce = { tipo: "compleanno", titolo: r.nome, giorno: r.giorno, mese: r.mese, anno: r.anno || gia?.anno || null };
+    const x = gia ? await api(`/api/diario/${gia.id}`, { method: "PUT", json: { ...gia, ...voce } }) : await api("/api/diario", { method: "POST", json: voce });
+    const i = infoComp(x);
+    return { da: "scrigno", html: `🎂 ${gia ? "Ho aggiornato" : "Ho segnato"} il compleanno di <b>${esc(x.titolo)}</b>: <b>${x.giorno} ${MESI_L[x.mese - 1]}</b>${i.anni ? ` (compirà ${i.anni} anni)` : ""}.<br>${i.g === 0 ? "È oggi! 🎉" : `Mancano ${i.g} giorni.`} Te lo ricorderò ogni anno qui in Scrigno; per l'avviso sull'iPhone mettilo nel Calendario:`,
+      azioni: [{ t: "calComp", voce: x, etichetta: "📲 Promemoria annuale nel Calendario" }, ...(gia ? [] : [{ t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }])] };
+  }
+  if (r.azione === "diario") {
+    const x = await api("/api/diario", { method: "POST", json: { tipo: r.tipo, titolo: r.titolo, autore: r.autore, data: r.data, voto: r.voto, commento: r.commento, stato: r.stato } });
+    const t = TIPI_D[r.tipo];
+    const dove = r.tipo === "libro" ? (r.stato === "in corso" ? "ai libri che stai leggendo" : "ai libri letti") : r.tipo === "serie" ? "alle serie viste" : "ai film visti";
+    const azioni = [];
+    if (!x.voto) [1, 2, 3, 4, 5].forEach((n) => azioni.push({ t: "voto", id: x.id, v: n, voce: x, etichetta: "★".repeat(n) }));
+    azioni.push({ t: "apri", hash: `#/diario/${r.tipo}`, etichetta: `${t.ico} Apri il diario` }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" });
+    return { da: "scrigno", html: `${t.ico} Aggiunto ${dove}: <b>${esc(x.titolo)}</b>${x.autore ? " di " + esc(x.autore) : ""}<br><span class="muted">${giorno(x.data)}</span>
+      ${x.voto ? `<br><span class="stelle">${stelle(x.voto)}</span>` : ""}${x.commento ? `<br>“${esc(x.commento)}”` : ""}${!x.voto ? "<br>Che voto gli dai?" : ""}`, azioni };
+  }
+  if (r.azione === "commento") {
+    const tutte = (await api("/api/diario")).filter((x) => x.tipo !== "compleanno");
+    const x = trova(tutte, r.titolo);
+    if (!x) return { da: "scrigno", html: `Non trovo “${esc(r.titolo)}” nel diario. Prova a scrivere ad esempio: <i>ho visto ${esc(r.titolo)}, ${esc(r.commento.toLowerCase())}</i>` };
+    const nuovo = x.commento ? `${x.commento}\n${r.commento}` : r.commento;
+    await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...x, commento: nuovo } });
+    return { da: "scrigno", html: `🗒️ Ho aggiunto il commento a <b>${esc(x.titolo)}</b>: “${esc(r.commento)}”` };
+  }
+  if (r.azione === "appuntamento") {
+    const a = await api("/api/appuntamenti", { method: "POST", json: { titolo: r.titolo, inizio: r.inizio, fine: r.fine, tutto_il_giorno: r.tutto_il_giorno, luogo: r.luogo, categoria: r.categoria, icona: r.icona } });
+    if (comandoCalPronto()) setTimeout(() => eseguiComandoCal(a), 600);
+    return { da: "scrigno", html: `${esc(a.icona)} Ho salvato: <b>${esc(a.titolo)}</b><br>${giorno(a.inizio.slice(0, 10))}${a.tutto_il_giorno ? "" : `, dalle ${oraDa(a.inizio)} alle ${oraDa(a.fine)}`}${a.luogo ? `<br>📍 ${esc(a.luogo)}` : ""}
+      ${comandoCalPronto() ? "<br>Lo aggiungo al Calendario…" : ""}`,
+      azioni: [...(comandoCalPronto() ? [] : [{ t: "calApp", voce: a, etichetta: "📲 Aggiungi al Calendario" }]), { t: "annulla", url: `/api/appuntamenti/${a.id}`, etichetta: "↩️ Annulla" }] };
+  }
+  if (r.azione === "domanda") {
+    if (r.cosa === "compleanno") {
+      const x = trova(await api("/api/diario?tipo=compleanno"), r.nome);
+      if (!x) return { da: "scrigno", html: `Non conosco ancora il compleanno di ${esc(r.nome)}. Dimmelo così: <i>il 6 agosto è il compleanno di ${esc(r.nome)}</i>` };
+      const i = infoComp(x);
+      return { da: "scrigno", html: `🎂 <b>${esc(x.titolo)}</b> compie gli anni il <b>${x.giorno} ${MESI_L[x.mese - 1]}</b>${i.anni ? ` (ne farà ${i.anni})` : ""}. ${i.quando}.` };
+    }
+    if (r.cosa === "compleanni") {
+      const l = (await api("/api/diario?tipo=compleanno")).slice(0, 6);
+      return { da: "scrigno", html: l.length ? `🎂 Prossimi compleanni:<br>${l.map((x) => `• <b>${esc(x.titolo)}</b> — ${x.giorno} ${MESI_L[x.mese - 1]} (${infoComp(x).quando.toLowerCase()})`).join("<br>")}` : "Non hai ancora salvato compleanni." };
+    }
+    if (["film", "libro", "serie"].includes(r.cosa)) {
+      const l = (await api("/api/diario?tipo=" + r.cosa));
+      const t = TIPI_D[r.cosa];
+      return { da: "scrigno", html: l.length ? `${t.ico} ${t.plurale}: <b>${l.length}</b>. Gli ultimi:<br>${l.slice(0, 6).map((x) => `• <b>${esc(x.titolo)}</b>${x.voto ? " " + stelle(x.voto) : ""}${x.data ? ` <span class="muted">(${dataIt(x.data)})</span>` : ""}`).join("<br>")}` : `Non hai ancora salvato ${t.nome.toLowerCase()}.`,
+        azioni: [{ t: "apri", hash: `#/diario/${r.cosa}`, etichetta: `${t.ico} Vedi tutti` }] };
+    }
+    if (r.cosa === "visite") {
+      const l = (await api("/api/appuntamenti")).slice(0, 5);
+      return { da: "scrigno", html: l.length ? `🗓️ Prossimi appuntamenti:<br>${l.map((a) => `• <b>${esc(a.titolo)}</b> — ${giorno(a.inizio.slice(0, 10))}${a.tutto_il_giorno ? "" : " " + oraDa(a.inizio)}`).join("<br>")}` : "Nessun appuntamento in programma." };
+    }
+    if (r.cosa === "scadenze") {
+      const l = (await api("/api/scadenze")).filter((d) => giorniA(d.scadenza) >= -30).slice(0, 5);
+      return { da: "scrigno", html: l.length ? `⏰ Scadenze:<br>${l.map((d) => `• <b>${esc(d.nome)}</b> — ${dataIt(d.scadenza)}`).join("<br>")}` : "Nessuna scadenza impostata." };
+    }
+  }
+  if (r.azione === "chiedi") {
+    chatAttesa = r;
+    if (r.motivo === "data_compleanno") return { da: "scrigno", html: `Quando è il compleanno${r.nome ? " di <b>" + esc(r.nome) + "</b>" : ""}? Scrivimi ad esempio <i>6 agosto</i>.` };
+    if (r.motivo === "nome_compleanno") return { da: "scrigno", html: `Di chi è il compleanno del ${r.giorno} ${MESI_L[r.mese - 1]}?` };
+    if (r.motivo === "titolo") return { da: "scrigno", html: `Qual è il titolo?` };
+  }
+  if (r.azione === "saluto") return { da: "scrigno", html: r.grazie ? "Di niente! 😊" : `Ciao! 👋 Dimmi pure: un film visto, un libro letto, un compleanno da ricordare o una visita. Ad esempio:`, azioni: r.grazie ? [] : AIUTO.slice(0, 3).map((t) => ({ t: "scrivi", testo: t, etichetta: t })) };
+  return { da: "scrigno", html: `Non ho capito bene 🤔 Prova a scrivere in uno di questi modi:`, azioni: AIUTO.map((t) => ({ t: "scrivi", testo: t, etichetta: t })) };
+}
+
 /* ------------------------------------------------------------------ presentazione */
 function benvenuto(forza) {
   if (!forza && memo.get("benvenuto")) return;
@@ -951,6 +1195,7 @@ function benvenuto(forza) {
     ["", "Benvenuto in Scrigno", "La tua app personale per documenti, scadenze, visite e password."],
     ["🗂️", "Tutti i tuoi documenti, in ordine", "Bollo, assicurazioni, analisi, patente, bollette: ogni cosa nella sua cartella, già pronta."],
     ["📷", "Aggiungere è facilissimo", "Fotografa un foglio o scegli un file. Scrigno ti suggerisce dove metterlo e ti ricorda quando scade."],
+    ["💬", "Raccontami la tua giornata", "Nella chat scrivi “stasera ho visto After” o “il 6 agosto è il compleanno di Marco”: salvo tutto io nel tuo diario e ti ricordo i compleanni ogni anno."],
     ["🗓️", "Le visite vanno nel calendario", "Scrivi “il 16 dicembre dentista dalle 10 alle 11”: Scrigno capisce giorno e orario e lo mette nel Calendario dell'iPhone."],
     LOC ? ["🔒", "Tutto resta sul tuo iPhone", "Niente cloud: i documenti sono salvati solo sul telefono. Ogni tanto fai un backup su File (te lo ricordo io)."]
       : ["🔒", "Tutto resta a casa tua", "I documenti sono salvati sul tuo server, le password sono cifrate."],
@@ -1003,7 +1248,8 @@ async function render() {
   $$(".velo, .visore").forEach((v) => v.remove());
   const h = decodeURIComponent(location.hash.slice(2));
   const [sez, arg] = [h.split("/")[0], h.split("/").slice(1).join("/")];
-  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home" }[sez] || sez;
+  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home" }[sez] || sez;
+  document.body.classList.toggle("in-chat", sez === "chat");
   $$("#tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
   scrollTo(0, 0);
   const RACCOLTE = { assicura: "🛡️ Assicurazioni", bollo: "🧾 Bolli", revision: "🔧 Revisioni", salute: "🩺 Salute", document: "🪪 Documenti" };
@@ -1012,6 +1258,8 @@ async function render() {
     else if (sez === "da-smistare") await vistaDaSmistare();
     else if (sez === "agenda") await vistaAgenda();
     else if (sez === "password") await vistaPassword();
+    else if (sez === "diario") await vistaDiario(arg);
+    else if (sez === "chat") vistaChat(arg || "");
     else if (sez === "altro") await (LOC ? vistaAltroLocale() : vistaAltroServer());
     else if (sez === "scadenze") await vistaScadenze();
     else if (sez === "cerca") await vistaElenco("Risultati", `per “${esc(arg)}”`, "/api/documenti?cerca=" + encodeURIComponent(arg));
