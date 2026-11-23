@@ -216,7 +216,7 @@ const REGOLE = [
   [/referto|visita|lettera di dimissione/, /^referti/], [/ecograf|risonanza|\btac\b|radiograf|\brx\b/, /^esami e radiografie/],
   [/ricetta|farmac/, /^ricette/], [/vaccin|green ?pass/, /^vaccini/],
   [/bolletta|enel|\bluce\b|\bgas\b|acqua|\btari\b/, /^bollette/], [/contratto|affitto/, /^contratti/],
-  [/garanzia|scontrino|fattura/, /^garanzie/], [/busta paga|cedolino/, /^buste paga/], [/\b730\b|redditi|\bf24\b|\bcud\b|certificazione unica/, /^dichiarazione/],
+  [/garanzia|scontrino|fattura/, /^garanzie/], [/busta ?paga|buste paga|cedolino|\bbp\b/, /^buste paga/], [/contratto di lavoro|assunzione|contratto/, /^contratt/], [/\b730\b|redditi|\bf24\b|\bcud\b|certificazione unica/, /^dichiarazione/],
   [/carta d.?identit|\bcie\b/, /^carta d/], [/patente/, /^patente/], [/passaporto/, /^passaporto/], [/tessera sanitaria|codice fiscale/, /^tessera sanitaria/],
 ];
 function suggerimenti(testo) {
@@ -577,6 +577,46 @@ async function vistaHome() {
   if (recenti.length) collegaDocs($("#recenti"), recenti, render);
 }
 
+/* ------------------------------------------------------------------ note nelle cartelle (es. appunti su un lavoro) */
+const eCartellaLavori = (c) => c && c.padre == null && /^lavoro/i.test(c.nome);
+function htmlNote(c) {
+  const note = c.note || [];
+  if (!note.length && c.tipo !== "lavoro") return "";
+  return `<div class="sezione"><h2>📝 Note e commenti</h2><a href="#" id="nuova-nota">＋ Nuova</a></div>
+    ${note.length ? `<div class="note-griglia">${note.slice().sort((a, b) => (b.data || "").localeCompare(a.data || "")).map((n) => `<button class="nota" data-nota="${esc(String(n.id))}">
+      ${n.titolo ? `<b>${esc(n.titolo)}</b>` : ""}<p>${esc(n.testo).replace(/\n/g, "<br>")}</p><span>${n.data ? dataIt(n.data.slice(0, 10)) : ""}</span></button>`).join("")}</div>`
+      : `<button class="vuoto-cta" id="prima-nota" style="margin-top:0;padding:20px"><span style="font-size:30px">📝</span><b>Scrivi i tuoi appunti</b><span class="muted small">Orari, colleghi, paga, com'è andata… quello che vuoi ricordare</span></button>`}`;
+}
+function collegaNote(c, dopo) {
+  $("#nuova-nota") && ($("#nuova-nota").onclick = (e) => { e.preventDefault(); modificaNota(c, null, dopo); });
+  $("#prima-nota") && ($("#prima-nota").onclick = () => modificaNota(c, null, dopo));
+  $$("[data-nota]").forEach((b) => (b.onclick = () => modificaNota(c, (c.note || []).find((n) => String(n.id) === b.dataset.nota), dopo)));
+}
+async function salvaNote(c, note) {
+  await api(`/api/cartelle/${c.id}`, { method: "PATCH", json: { note } });
+  await caricaCartelle();
+}
+function modificaNota(c, n, dopo) {
+  const v = foglio(`<h3>📝 ${n ? "Nota" : "Nuova nota"} <span class="muted small" style="font-weight:500">· ${esc(c.nome)}</span> ${xBtn}</h3><form id="fn">
+    <label class="campo"><span>Titolo <i class="muted">(facoltativo)</i></span><input type="text" name="titolo" value="${esc(n?.titolo || "")}" placeholder="Es. Turni, Colleghi, Com'è andata"></label>
+    <label class="campo"><span>Testo</span><textarea name="testo" class="nota-testo" placeholder="Scrivi qui…">${esc(n?.testo || "")}</textarea></label>
+    <button class="btn block">Salva</button>
+    ${n ? `<div class="riga" style="margin-top:8px"><button type="button" class="btn sec" data-cp="${esc(n.testo)}">📋 Copia</button><button type="button" class="btn danger" id="del-nota">🗑️ Elimina</button></div>` : ""}</form>`);
+  setTimeout(() => $("[name=testo]", v).focus(), 80);
+  $("#fn", v).onsubmit = async (e) => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.target));
+    if (!d.testo.trim() && !d.titolo.trim()) return toast("Scrivi qualcosa");
+    const altre = (c.note || []).filter((x) => !n || x.id !== n.id);
+    await salvaNote(c, [...altre, { id: n?.id, titolo: d.titolo.trim(), testo: d.testo, data: n?.data }]);
+    v.chiudi(); toast("📝 Nota salvata"); dopo && dopo();
+  };
+  $("#del-nota", v) && ($("#del-nota", v).onclick = async () => {
+    if (!(await conferma("Eliminare questa nota?"))) return;
+    await salvaNote(c, (c.note || []).filter((x) => x.id !== n.id)); v.chiudi(); toast("🗑️ Nota eliminata"); dopo && dopo();
+  });
+}
+
 async function vistaCartella(id) {
   const c = S.byId[id];
   if (!c) { location.hash = "#/"; return; }
@@ -589,14 +629,28 @@ async function vistaCartella(id) {
       <h1 style="font-size:26px"><span class="icona-titolo">${esc(c.icona)}</span> ${esc(c.nome)}</h1>
       <button class="iconbtn" id="menu" aria-label="Opzioni">⋯</button></div>
     <div class="crumbs"><a href="#/">🏠 Home</a>${perc.map((p) => ` › <a href="#/c/${p.id}">${esc(p.nome)}</a>`).join("")}</div>
-    ${figli.length ? htmlCartelle(figli) : ""}
+    ${c.tipo === "lavoro" ? `<div class="lavoro-testa"><span>💼</span><div><b>Il mio lavoro</b><div class="small muted">Contratto, buste paga e i tuoi appunti, tutto qui.</div></div></div>` : ""}
+    ${eCartellaLavori(c) ? `<button class="btn block" id="nuovo-lavoro" style="margin-bottom:14px">💼 Aggiungi un lavoro</button>` : ""}
+    ${eCartellaLavori(c) && figli.some((f) => f.tipo === "lavoro")
+      ? `<div class="sezione" style="margin-top:6px"><h2>💼 I miei lavori</h2></div>${htmlCartelle(figli.filter((f) => f.tipo === "lavoro"))}
+         ${figli.some((f) => f.tipo !== "lavoro") ? `<div class="sezione"><h2>🏛️ Tasse e altro</h2></div>${htmlCartelle(figli.filter((f) => f.tipo !== "lavoro"))}` : ""}`
+      : figli.length ? htmlCartelle(figli) : ""}
+    ${htmlNote(c)}
     ${docs.length ? `<div class="sezione"><h2>Documenti</h2><span class="muted small">${docs.length}</span></div><div id="docs">${htmlDocs(docs)}</div>` : ""}
-    ${!docs.length ? `<button class="vuoto-cta" id="agg"><span class="big">${figli.length ? "📄" : esc(c.icona)}</span><b>${figli.length ? "Aggiungi un documento qui" : "Questa cartella è vuota"}</b><span class="muted small">Tocca per fotografare o scegliere un file</span></button>` : ""}`;
+    ${!docs.length && c.tipo !== "lavoro" && !eCartellaLavori(c) ? `<button class="vuoto-cta" id="agg"><span class="big">${figli.length ? "📄" : esc(c.icona)}</span><b>${figli.length ? "Aggiungi un documento qui" : "Questa cartella è vuota"}</b><span class="muted small">Tocca per fotografare o scegliere un file</span></button>` : ""}`;
   const ric = () => vistaCartella(id);
   if (docs.length) collegaDocs($("#docs"), docs, ric);
+  collegaNote(c, ric);
+  $("#nuovo-lavoro") && ($("#nuovo-lavoro").onclick = async () => {
+    const nome = await chiedi("Nome del lavoro", "", { placeholder: "Es. Bar Centrale, Amazon, Ripetizioni…", aiuto: "Creo la cartella con dentro Contratto e Buste paga, più lo spazio per le tue note." });
+    if (!nome || !nome.trim()) return;
+    const r = await api("/api/cartelle", { method: "POST", json: { nome: nome.trim(), padre: id, tipo: "lavoro", icona: "💼" } });
+    await caricaCartelle(); toast("💼 Lavoro aggiunto"); location.hash = `#/c/${r.id}`;
+  });
   $("#agg") && ($("#agg").onclick = () => $(".fab").click());
   $("#menu").onclick = () => {
     const v = foglio(`<h3>${esc(c.icona)} ${esc(c.nome)} ${xBtn}</h3><div class="lista">
+      <div class="voce" data-m="nota"><div class="thumb">📝</div><div class="corpo"><div class="tit">Scrivi una nota</div><div class="sub">Appunti e commenti in questa cartella</div></div></div>
       <div class="voce" data-m="sotto"><div class="thumb">📁</div><div class="corpo"><div class="tit">Nuova sottocartella</div></div></div>
       <div class="voce" data-m="rinomina"><div class="thumb">✏️</div><div class="corpo"><div class="tit">Rinomina</div></div></div>
       <div class="voce" data-m="icona"><div class="thumb">😀</div><div class="corpo"><div class="tit">Cambia icona</div><div class="sub">Scegli una emoji</div></div></div>
@@ -605,6 +659,7 @@ async function vistaCartella(id) {
     v.addEventListener("click", async (e) => {
       const m = e.target.closest("[data-m]")?.dataset.m; if (!m) return; v.remove();
       try {
+        if (m === "nota") return modificaNota(c, null, ric);
         if (m === "sotto") { const n = await chiedi(`Nuova cartella dentro “${c.nome}”`, "", { placeholder: "Es. 2026, Polizza, Fatture…" }); if (!n) return; await api("/api/cartelle", { method: "POST", json: { nome: n, padre: id } }); }
         if (m === "rinomina") { const n = await chiedi("Rinomina cartella", c.nome); if (!n) return; await api(`/api/cartelle/${id}`, { method: "PATCH", json: { nome: n } }); }
         if (m === "icona") { const n = await chiedi("Nuova icona", c.icona, { placeholder: "🚗", aiuto: "Apri la tastiera delle emoji (🙂 o 🌐) e scegline una." }); if (!n) return; await api(`/api/cartelle/${id}`, { method: "PATCH", json: { icona: [...n.trim()].slice(0, 2).join("") } }); }
@@ -1611,6 +1666,11 @@ async function rispondi(testo) {
   if (r.azione === "commento") {
     const tutte = (await api("/api/diario")).filter((x) => x.tipo !== "compleanno");
     const x = trova(tutte, r.titolo);
+    const cart = !x && (S.cartelle.find((c) => c.nome.toLowerCase() === r.titolo.toLowerCase()) || S.cartelle.find((c) => c.tipo === "lavoro" && c.nome.toLowerCase().includes(r.titolo.toLowerCase())));
+    if (cart) {
+      await salvaNote(cart, [...(cart.note || []), { titolo: "", testo: r.commento }]);
+      return { da: "scrigno", html: `📝 Ho aggiunto una nota in <b>${esc(cart.nome)}</b>: “${esc(r.commento)}”`, azioni: [{ t: "apri", hash: `#/c/${cart.id}`, etichetta: `${cart.icona} Apri ${cart.nome}` }] };
+    }
     if (!x) return { da: "scrigno", html: `Non trovo “${esc(r.titolo)}” nel diario. Prova a scrivere ad esempio: <i>ho visto ${esc(r.titolo)}, ${esc(r.commento.toLowerCase())}</i>` };
     const nuovo = x.commento ? `${x.commento}\n${r.commento}` : r.commento;
     await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...x, commento: nuovo } });
