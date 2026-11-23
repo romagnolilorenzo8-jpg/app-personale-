@@ -97,6 +97,17 @@ CARTELLE_INIZIALI = [
 ]
 
 
+LAVORI = [('Xmasters', '💼'), ('Benzinaio', '⛽'), ('Inventari', '📦')]
+
+
+def _crea_lavoro(con, nome: str, icona: str | None, padre) -> int:
+    cid = con.execute("INSERT INTO cartelle (nome, padre, icona, ordine, tipo, note) VALUES (?,?,?,0,'lavoro','[]')",
+                      (nome, padre, icona or "💼")).lastrowid
+    con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES ('Contratto', ?, '📝', 0)", (cid,))
+    con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES ('Buste paga', ?, '💶', 1)", (cid,))
+    return cid
+
+
 @contextmanager
 def db():
     con = sqlite3.connect(DB_PATH, timeout=10)
@@ -123,6 +134,11 @@ def init_db():
         con.executescript(SCHEMA)
         if "extra" not in [r[1] for r in con.execute("PRAGMA table_info(diario)")]:
             con.execute("ALTER TABLE diario ADD COLUMN extra TEXT")
+        colonne = [r[1] for r in con.execute("PRAGMA table_info(cartelle)")]
+        if "tipo" not in colonne:
+            con.execute("ALTER TABLE cartelle ADD COLUMN tipo TEXT")
+        if "note" not in colonne:
+            con.execute("ALTER TABLE cartelle ADD COLUMN note TEXT")
         if not imp_get(con, "token_api"):
             imp_set(con, "token_api", secrets.token_urlsafe(24))
             imp_set(con, "token_calendario", secrets.token_urlsafe(24))
@@ -145,6 +161,19 @@ def init_db():
                 if not con.execute("SELECT 1 FROM cartelle WHERE nome=? AND padre=?", (nome, dp_id)).fetchone():
                     con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,-1)", (nome, dp_id, icona))
             imp_set(con, "cartelle_v2", "1")
+        if not imp_get(con, "lavori_v1"):
+            lt = con.execute("SELECT id FROM cartelle WHERE nome='Lavoro e tasse' AND padre IS NULL").fetchone()
+            lt_id = lt["id"] if lt else con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES ('Lavoro e tasse', NULL, '💼', 5)").lastrowid
+            for nome, icona in LAVORI:
+                c = con.execute("SELECT id FROM cartelle WHERE padre=? AND lower(nome)=lower(?)", (lt_id, nome)).fetchone()
+                if not c:
+                    _crea_lavoro(con, nome, icona, lt_id)
+                    continue
+                con.execute("UPDATE cartelle SET tipo='lavoro', note=COALESCE(note, '[]') WHERE id=?", (c["id"],))
+                for sub, ic, o in (("Contratto", "📝", 0), ("Buste paga", "💶", 1)):
+                    if not con.execute("SELECT 1 FROM cartelle WHERE padre=? AND nome=?", (c["id"], sub)).fetchone():
+                        con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,?)", (sub, c["id"], ic, o))
+            imp_set(con, "lavori_v1", "1")
 
 
 def _icona_auto(nome: str) -> str:
@@ -359,12 +388,16 @@ class Cartella(BaseModel):
     padre: int | None = None
     icona: str | None = None
     sposta_padre: bool = False
+    tipo: str | None = None
+    note: list | None = None
 
 
 @app.get("/api/cartelle")
 def cartelle(_=Depends(autorizzato)):
     with db() as con:
         righe = [dict(r) for r in con.execute("SELECT * FROM cartelle ORDER BY ordine, nome")]
+        for r in righe:
+            r["note"] = json.loads(r.get("note") or "[]")
         conteggi = {r["cartella"]: r["n"] for r in
                     con.execute("SELECT cartella, COUNT(*) n FROM documenti GROUP BY cartella")}
     figli: dict = {}
@@ -384,6 +417,9 @@ def cartelle(_=Depends(autorizzato)):
 def crea_cartella(body: Cartella, _=Depends(sessione)):
     if not (body.nome or "").strip():
         raise HTTPException(400, "Nome obbligatorio")
+    if body.tipo == "lavoro":
+        with db() as con:
+            return {"id": _crea_lavoro(con, body.nome.strip(), body.icona, body.padre)}
     with db() as con:
         n = con.execute("SELECT COUNT(*) FROM cartelle WHERE padre IS ?", (body.padre,)).fetchone()[0]
         cur = con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,?)",
@@ -407,6 +443,11 @@ def modifica_cartella(cid: int, body: Cartella, _=Depends(sessione)):
             con.execute("UPDATE cartelle SET nome=? WHERE id=?", (body.nome.strip(), cid))
         if body.icona:
             con.execute("UPDATE cartelle SET icona=? WHERE id=?", (body.icona, cid))
+        if body.note is not None:
+            ora = datetime.now(TZ).isoformat(timespec="seconds")
+            note = [{"id": n.get("id") or secrets.token_hex(6), "titolo": str(n.get("titolo") or "").strip()[:200],
+                     "testo": str(n.get("testo") or "")[:20000], "data": n.get("data") or ora} for n in body.note if isinstance(n, dict)]
+            con.execute("UPDATE cartelle SET note=? WHERE id=?", (json.dumps(note), cid))
         if body.sposta_padre:
             if body.padre is not None and body.padre in _discendenti(con, cid):
                 raise HTTPException(400, "Non puoi spostare una cartella dentro sé stessa")

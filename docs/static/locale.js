@@ -63,6 +63,28 @@
       if (!figli.some((c) => c.nome === nome)) await aggiungi("cartelle", { nome, icona, padre: dp.id, ordine: -1 });
     await kv.set("cartelle_v2", true);
   }
+  /* I miei lavori dentro "Lavoro e tasse": ognuno con Contratto e Buste paga (e le note) */
+  const LAVORI = [["Xmasters", "💼"], ["Benzinaio", "⛽"], ["Inventari", "📦"]];
+  async function creaLavoro(nome, icona, padre) {
+    const id = await aggiungi("cartelle", { nome, icona: icona || "💼", padre, ordine: 0, tipo: "lavoro", note: [] });
+    await aggiungi("cartelle", { nome: "Contratto", icona: "📝", padre: id, ordine: 0 });
+    await aggiungi("cartelle", { nome: "Buste paga", icona: "💶", padre: id, ordine: 1 });
+    return id;
+  }
+  async function cartelleLavori() {
+    if (await kv.get("lavori_v1")) return;
+    const cart = await tutti("cartelle");
+    let lt = cart.find((c) => c.padre == null && c.nome === "Lavoro e tasse");
+    if (!lt) lt = { id: await aggiungi("cartelle", { nome: "Lavoro e tasse", icona: "💼", padre: null, ordine: 5 }) };
+    for (const [nome, icona] of LAVORI) {
+      const c = cart.find((x) => x.padre === lt.id && x.nome.toLowerCase() === nome.toLowerCase());
+      if (!c) { await creaLavoro(nome, icona, lt.id); continue; }
+      if (c.tipo !== "lavoro") { c.tipo = "lavoro"; c.note = c.note || []; await scrivi("cartelle", c); }
+      for (const [sub, ic, o] of [["Contratto", "📝", 0], ["Buste paga", "💶", 1]])
+        if (!cart.some((x) => x.padre === c.id && x.nome === sub)) await aggiungi("cartelle", { nome: sub, icona: ic, padre: c.id, ordine: o });
+    }
+    await kv.set("lavori_v1", true);
+  }
   /* Ripara le cartelle create due volte da una versione precedente (succedeva al primo avvio):
      unisce le cartelle con lo stesso nome allo stesso livello, spostando documenti e sottocartelle
      in quella più vecchia. Non cancella mai documenti. */
@@ -113,6 +135,7 @@
     await seminaCartelle();
     await unisciDoppioni();
     await cartellePersonali();
+    await cartelleLavori();
   }
 
   async function discendenti(id) {
@@ -382,6 +405,7 @@
     if (path === "/api/cartelle" && M === "POST") {
       if (!(B.nome || "").trim()) throw errore(400, "Nome obbligatorio");
       const n = (await tutti("cartelle")).filter((c) => c.padre === (B.padre ?? null)).length;
+      if (B.tipo === "lavoro") return { id: await creaLavoro(B.nome.trim(), B.icona, B.padre ?? null) };
       return { id: await aggiungi("cartelle", { nome: B.nome.trim(), padre: B.padre ?? null, icona: B.icona || iconaAuto(B.nome), ordine: n }) };
     }
     if ((m = path.match(/^\/api\/cartelle\/(\d+)$/))) {
@@ -390,6 +414,7 @@
       if (M === "PATCH") {
         if (B.nome && B.nome.trim()) c.nome = B.nome.trim();
         if (B.icona) c.icona = B.icona;
+        if (Array.isArray(B.note)) c.note = B.note.map((x) => ({ id: x.id || Date.now() + Math.random(), titolo: String(x.titolo || "").trim(), testo: String(x.testo || ""), data: x.data || adesso() }));
         if (B.sposta_padre) {
           if (B.padre != null && (await discendenti(id)).includes(B.padre)) throw errore(400, "Non puoi spostare una cartella dentro sé stessa");
           c.padre = B.padre ?? null;
