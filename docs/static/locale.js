@@ -63,17 +63,55 @@
       if (!figli.some((c) => c.nome === nome)) await aggiungi("cartelle", { nome, icona, padre: dp.id, ordine: -1 });
     await kv.set("cartelle_v2", true);
   }
-  async function inizializza() {
-    if (await kv.get("inizializzato")) return cartellePersonali();
-    const crea = async (nome, icona, figli, padre, ordine) => {
-      const id = await aggiungi("cartelle", { nome, icona, padre, ordine });
-      for (let i = 0; i < figli.length; i++) {
-        const f = figli[i];
-        if (typeof f === "string") await crea(f, iconaAuto(f), [], id, i); else await crea(f[0], f[1], f[2], id, i);
+  /* Ripara le cartelle create due volte da una versione precedente (succedeva al primo avvio):
+     unisce le cartelle con lo stesso nome allo stesso livello, spostando documenti e sottocartelle
+     in quella più vecchia. Non cancella mai documenti. */
+  async function unisciDoppioni() {
+    if (await kv.get("doppioni_riparati")) return;
+    const cart = await tutti("cartelle"), docs = await tutti("documenti");
+    const unisci = async (padre) => {
+      const figli = cart.filter((c) => c.padre === padre && !c._via).sort((a, b) => a.id - b.id);
+      const visti = {};
+      for (const c of figli) {
+        const k = c.nome.trim().toLowerCase();
+        if (!visti[k]) { visti[k] = c; continue; }
+        const tieni = visti[k];
+        for (const sub of cart.filter((x) => x.padre === c.id)) { sub.padre = tieni.id; await scrivi("cartelle", sub); }
+        for (const d of docs.filter((x) => x.cartella === c.id)) { d.cartella = tieni.id; await scrivi("documenti", d); }
+        c._via = true; await togli("cartelle", c.id);
       }
+      for (const c of cart.filter((x) => x.padre === padre && !x._via)) await unisci(c.id);
     };
-    for (let i = 0; i < INIZIALI.length; i++) await crea(...INIZIALI[i], null, i);
-    await kv.set("inizializzato", true);
+    await unisci(null);
+    await kv.set("doppioni_riparati", true);
+  }
+  let _avvio = null;
+  function inizializza() { return (_avvio ||= preparaArchivio()); }   // una sola volta, anche con richieste in parallelo
+  /* Crea le cartelle iniziali in un'unica transazione: se l'app viene chiusa a metà non resta niente
+     di parziale (prima succedeva, e al riavvio le cartelle venivano create due volte). */
+  function seminaCartelle() {
+    return apri().then((d) => new Promise((res, rej) => {
+      const t = d.transaction(["cartelle", "kv"], "readwrite");
+      const cs = t.objectStore("cartelle"), kvs = t.objectStore("kv");
+      const fatto = kvs.get("inizializzato");
+      fatto.onsuccess = () => {
+        if (fatto.result) return;
+        const crea = (nome, icona, figli, padre, ordine) => {
+          const r = cs.add({ nome, icona, padre, ordine });
+          r.onsuccess = () => figli.forEach((f, i) => (typeof f === "string" ? crea(f, iconaAuto(f), [], r.result, i) : crea(f[0], f[1], f[2], r.result, i)));
+        };
+        INIZIALI.forEach((x, i) => crea(x[0], x[1], x[2], null, i));
+        kvs.put(true, "inizializzato");
+        kvs.put(true, "doppioni_riparati");
+      };
+      t.oncomplete = () => res();
+      t.onerror = () => rej(t.error);
+      t.onabort = () => rej(t.error);
+    }));
+  }
+  async function preparaArchivio() {
+    await seminaCartelle();
+    await unisciDoppioni();
     await cartellePersonali();
   }
 
@@ -285,6 +323,7 @@
       return x;
     }
     if (tipo === "esame") {
+      if (e.esito === "idoneo" || e.esito === "non idoneo") return { esito: e.esito, cfu: numero(e.cfu) };
       const votoOk = (v) => v == null || (v >= 18 && v <= 30);
       const moduli = Array.isArray(e.moduli) ? e.moduli.map((m, i) => ({
         nome: String(m.nome || `Modulo ${i + 1}`).trim() || `Modulo ${i + 1}`, cfu: numero(m.cfu) ?? 6, voto: numero(m.voto),

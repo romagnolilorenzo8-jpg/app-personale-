@@ -32,7 +32,8 @@ NUMERI = {
 }
 
 CATEGORIE = [
-    ("salute", "🩺", r"dentist|odontoiatr|igien\w* dentale|medic|\bvisit|analisi|prelievo|esam|"
+    ("universita", "🎓", r"\besame\b(?!\s+(?:del|delle|dell|di controllo))|\bappell|lezion|universit|\bateneo|laurea|\btesi\b|professor|ricevimento|seminari|tirocinio|esercitazion|sessione d|\bcfu\b|\besonero"),
+    ("salute", "🩺", r"dentist|odontoiatr|igien\w* dentale|medic|\bvisit|analisi del|analisi|prelievo|esami|urine|"
                     r"oculist|ortoped|dermatolog|cardiolog|ginecolog|urolog|neurolog|pediatr|"
                     r"fisioterap|osteopat|radiograf|ecograf|risonanza|tac\b|vaccin|ospedal|"
                     r"ambulatori|controllo|dottor|dott\.|psicolog|nutrizionist|farmac|\botorino|"
@@ -41,6 +42,7 @@ CATEGORIE = [
                       r"assicurazion|motorino|scooter|auto\b|macchina|moto\b|officina|patente"),
     ("casa", "🏠", r"bolletta|condominio|idraulic|elettricist|caldaia|affitto|trasloco"),
     ("lavoro", "💼", r"riunione|meeting|colloquio|lavoro|ufficio|commercialist|cliente"),
+    ("personale", "🙋", r"\bcena\b|pranzo|colazione con|aperitiv|\bfesta\b|uscita|palestra|calcetto|partita|allenament|parrucchier|barbier|estetist|viaggio|vacanz|\bvolo\b|concerto|cinema|teatro|matrimonio|battesimo|compleanno|amic|fidanzat|ragazz[ao]\b|mamma|pap[aà]\b|nonn[ao]|zi[ao]\b|cugin|spesa\b"),
 ]
 
 NUM = r"(\d{1,2}|" + "|".join(sorted(NUMERI, key=len, reverse=True)) + r")"

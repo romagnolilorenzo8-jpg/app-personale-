@@ -37,6 +37,15 @@ Istruzioni in **⚙️ Altro → Ricevere file dal menu “Condividi”**. Senza
 
 ---
 
+
+## A-bis. Aprire Scrigno dal computer
+1. Apri **https://romagnolilorenzo8-jpg.github.io/app-personale-/** con Chrome, Edge o Safari. Su schermo grande compare il menu a sinistra.
+2. **Attenzione:** senza server, iPhone e computer **non si sincronizzano**. Ognuno ha il suo archivio.
+3. Per portare sul computer quello che hai sull'iPhone:
+   - sull'iPhone vai su **Altro → Backup → Crea backup** e salvalo su **iCloud Drive**;
+   - sul computer scarica quel file da iCloud.com e apri **Altro → Ripristina da un backup**.
+4. La sincronizzazione automatica tra i due arriverà con il server di casa.
+
 ## B. Sul computer Windows
 
 ### Installare o aggiornare (3 minuti)

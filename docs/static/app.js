@@ -15,7 +15,15 @@ const MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ot
 const MESI_L = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
 const GIORNI = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
 const COLORI = ["#5b5bf6", "#e5484d", "#0ea5a4", "#e8a23a", "#8b5cf6", "#2fa66a", "#ec4899", "#3b82f6", "#64748b"];
-const COL_CAT = { salute: "#e5484d", veicoli: "#3b82f6", casa: "#e8a23a", lavoro: "#0ea5a4", altro: "#8b5cf6" };
+const GRUPPI_APP = {
+  personale: { ico: "🙋", nome: "Personali", col: "#ec4899", cat: ["personale", "casa", "veicoli"] },
+  universita: { ico: "🎓", nome: "Università", col: "#8b5cf6", cat: ["universita"] },
+  lavoro: { ico: "💼", nome: "Lavoro", col: "#0ea5a4", cat: ["lavoro"] },
+  salute: { ico: "🩺", nome: "Visite", col: "#f43f5e", cat: ["salute"] },
+  altro: { ico: "📌", nome: "Altro", col: "#6366f1", cat: ["altro"] },
+};
+const gruppoDi = (cat) => Object.keys(GRUPPI_APP).find((k) => GRUPPI_APP[k].cat.includes(cat)) || "altro";
+const COL_CAT = new Proxy({}, { get: (_, c) => GRUPPI_APP[gruppoDi(c)].col });
 const CMD_CAL = "Scrigno Calendario";
 const CMD_INVIA = "Invia a Scrigno";
 
@@ -482,13 +490,41 @@ function bannerInstalla() {
       <button class="link-btn" id="non-ora">Più tardi</button></div></div>`;
 }
 
+
+/* Prossime cose da fare: appuntamenti, scadenze dei documenti e compleanni, in ordine di tempo */
+const isoLocale = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+async function prossimeCose(max = 6) {
+  const [appts, scad, comp] = await Promise.all([api("/api/appuntamenti"), api("/api/scadenze"), api("/api/diario?tipo=compleanno")]);
+  const out = [];
+  appts.forEach((a) => { const g = GRUPPI_APP[gruppoDi(a.categoria)]; out.push({ tipo: "app", data: a.inizio.slice(0, 10), ora: a.tutto_il_giorno ? "" : oraDa(a.inizio), titolo: a.titolo, ico: a.icona || g.ico, col: g.col, etichetta: g.nome, rif: a }); });
+  scad.filter((d) => giorniA(d.scadenza) >= -3 && giorniA(d.scadenza) <= 45).forEach((d) => out.push({ tipo: "scad", data: d.scadenza, ora: "", titolo: `Scade: ${senzaEst(d.nome)}`, ico: "⏰", col: "#f59e0b", etichetta: "Scadenza", rif: d }));
+  comp.forEach((x) => { const i = infoComp(x); if (i.g <= 21) out.push({ tipo: "comp", data: isoLocale(i.d), ora: "", titolo: `Compleanno di ${x.titolo}`, ico: "🎂", col: "#ec4899", etichetta: i.anni ? `Compie ${i.anni} anni` : "Compleanno", rif: x }); });
+  return out.sort((a, b) => (a.data + (a.ora || "00:00")).localeCompare(b.data + (b.ora || "00:00"))).slice(0, max);
+}
+function htmlProssime(lista) {
+  if (!lista.length) return `<a class="card vuoto-mini" href="#/agenda">✨ Niente in programma. <b>Aggiungi un appuntamento →</b></a>`;
+  return `<div class="lista prossime">${lista.map((x, i) => {
+    const d = new Date(x.data + "T00:00"), g = giorniA(x.data);
+    const quando = g < 0 ? `<span class="tag danger">${-g === 1 ? "Ieri" : `${-g} giorni fa`}</span>` : g === 0 ? `<span class="tag danger">Oggi</span>` : g === 1 ? `<span class="tag warn">Domani</span>` : `<span class="tag">Tra ${g} giorni</span>`;
+    return `<div class="voce" data-pc="${i}"><div class="datebox" style="--c:${x.col}"><div class="m">${MESI[d.getMonth()]}</div><div class="g">${d.getDate()}</div></div>
+      <div class="corpo"><div class="tit">${esc(x.ico)} ${esc(x.titolo)}</div><div class="sub">${GIORNI[d.getDay()]}${x.ora ? " · " + x.ora : ""} · ${esc(x.etichetta)}</div></div>${quando}</div>`;
+  }).join("")}</div>`;
+}
+function collegaProssime(el, lista, ricarica) {
+  el && el.addEventListener("click", (e) => {
+    const v = e.target.closest("[data-pc]"); if (!v) return;
+    const x = lista[+v.dataset.pc];
+    if (x.tipo === "app") apriAppuntamento(x.rif, ricarica);
+    if (x.tipo === "scad") apriDoc(x.rif, ricarica);
+    if (x.tipo === "comp") modificaVoceDiario(x.rif, ricarica);
+  });
+}
+
 async function vistaHome() {
-  const [recenti, appts, scad, info, comp] = await Promise.all([api("/api/documenti?recenti=true"), api("/api/appuntamenti"), api("/api/scadenze"),
-    LOC ? api("/api/impostazioni") : Promise.resolve(null), api("/api/diario?tipo=compleanno")]);
+  const [recenti, info, comp, prossime] = await Promise.all([api("/api/documenti?recenti=true"), LOC ? api("/api/impostazioni") : Promise.resolve(null),
+    api("/api/diario?tipo=compleanno"), prossimeCose(6)]);
   const foto = await fotoProfilo().catch(() => null);
-  const compVicini = comp.filter((x) => infoComp(x).g <= 30);
   const compOggi = comp.filter((x) => infoComp(x).g <= 1);
-  const scadImm = scad.filter((d) => giorniA(d.scadenza) <= 60);
   const ora = new Date().getHours();
   const saluto = ora < 6 ? "Buonanotte" : ora < 13 ? "Buongiorno" : ora < 18 ? "Buon pomeriggio" : "Buonasera";
   const oggi = new Date();
@@ -498,37 +534,39 @@ async function vistaHome() {
       <a class="avatar" href="#/io" aria-label="La mia pagina">${foto ? `<img src="${urlMini(foto)}" alt="">` : "👤"}</a></div>
     ${bannerInstalla()}
     ${compOggi.map((x) => `<a class="avviso festa" href="#/diario/compleanno"><div class="av-ico">🎂</div><div style="flex:1"><b>${infoComp(x).g === 0 ? "Oggi" : "Domani"} è il compleanno di ${esc(x.titolo)}!</b><div class="small">${infoComp(x).anni ? `Compie ${infoComp(x).anni} anni. ` : ""}Ricordati di fargli gli auguri 🎉</div></div></a>`).join("")}
-    <form class="chat-home" id="f-chat"><span>💬</span><input type="text" id="cq" placeholder="Scrivi a Scrigno: “ho visto After”…" enterkeyhint="send"><button aria-label="Invia">➤</button></form>
-    <form class="cerca" id="f-cerca"><input type="search" id="q" placeholder="Cerca un documento…" enterkeyhint="search"></form>
-    <div class="azioni-home">
-      <button data-h="foto"><span class="ah-ico" style="--c:#5b5bf6">📷</span>Fotografa</button>
-      <button data-h="file"><span class="ah-ico" style="--c:#0ea5a4">📄</span>Carica file</button>
-      <button data-h="visita"><span class="ah-ico" style="--c:#e5484d">🗓️</span>Nuova visita</button>
-      <button data-h="pw"><span class="ah-ico" style="--c:#e8a23a">🔑</span>Password</button>
-    </div>
-    ${S.daSmistare ? `<a class="avviso" href="#/da-smistare"><div class="av-ico">📥</div><div style="flex:1"><b>${S.daSmistare} document${S.daSmistare === 1 ? "o" : "i"} da sistemare</b><div class="small muted">Tocca per metterl${S.daSmistare === 1 ? "o" : "i"} nella cartella giusta</div></div><span class="dx">›</span></a>` : ""}
-    ${backupVecchio ? `<a class="avviso" href="#/altro"><div class="av-ico">💾</div><div style="flex:1"><b>Fai un backup</b><div class="small muted">${info.ultimo_backup ? "L'ultimo è del " + dataIt(info.ultimo_backup.slice(0, 10)) : "Non hai ancora salvato una copia"} — serve 1 minuto</div></div><span class="dx">›</span></a>` : ""}
-    <div class="sezione"><h2>Prossime visite</h2><a href="#/agenda">Tutte</a></div>
-    ${appts.length ? `<div class="lista" id="h-appt">${appts.slice(0, 2).map(htmlAppt).join("")}</div>`
-      : `<a class="card vuoto-mini" href="#/agenda">🗓️ Nessuna visita in programma. <b>Aggiungine una →</b></a>`}
-    ${compVicini.length ? `<div class="sezione"><h2>Compleanni in arrivo</h2><a href="#/diario/compleanno">Tutti</a></div><div class="lista" id="h-comp">${compVicini.slice(0, 3).map(htmlVoceDiario).join("")}</div>` : ""}
-    ${scadImm.length ? `<div class="sezione"><h2>Scadenze vicine</h2><a href="#/scadenze">Tutte</a></div><div id="h-scad">${htmlDocs(scadImm.slice(0, 3), { mostraCartella: true })}</div>` : ""}
-    <div class="sezione"><h2>Le tue cartelle</h2><a href="#" id="nuova-rad">＋ Nuova</a></div>
-    ${htmlCartelle(S.figli.root || [])}
-    <div class="sezione"><h2>Raccolte</h2></div>
-    <div class="chips">
-      <a class="chip" href="#/raccolta/assicura">🛡️ Tutte le assicurazioni</a><a class="chip" href="#/raccolta/bollo">🧾 Tutti i bolli</a>
-      <a class="chip" href="#/raccolta/revision">🔧 Revisioni</a><a class="chip" href="#/scadenze">⏰ Scadenze</a><a class="chip" href="#/raccolta/salute">🩺 Salute</a>
-    </div>
-    ${recenti.length ? `<div class="sezione"><h2>Aggiunti di recente</h2></div><div id="recenti">${htmlDocs(recenti.slice(0, 6), { mostraCartella: true })}</div>` : ""}`;
+    <div class="home-griglia">
+      <div class="col">
+        <form class="chat-home" id="f-chat" style="order:1"><span>💬</span><input type="text" id="cq" placeholder="Scrivi a Scrigno: “ho visto After”…" enterkeyhint="send"><button aria-label="Invia">➤</button></form>
+        <form class="cerca" id="f-cerca" style="order:2"><input type="search" id="q" placeholder="Cerca un documento…" enterkeyhint="search"></form>
+        <div class="azioni-home" style="order:3">
+          <button data-h="foto"><span class="ah-ico" style="--c:#8b5cf6">📷</span>Fotografa</button>
+          <button data-h="file"><span class="ah-ico" style="--c:#0ea5a4">📄</span>Carica file</button>
+          <button data-h="app"><span class="ah-ico" style="--c:#f43f5e">🗓️</span>Appuntam.</button>
+          <button data-h="pw"><span class="ah-ico" style="--c:#f59e0b">🔑</span>Password</button>
+        </div>
+        <div style="order:4">
+          ${S.daSmistare ? `<a class="avviso" href="#/da-smistare"><div class="av-ico">📥</div><div style="flex:1"><b>${S.daSmistare} document${S.daSmistare === 1 ? "o" : "i"} da sistemare</b><div class="small muted">Tocca per metterl${S.daSmistare === 1 ? "o" : "i"} nella cartella giusta</div></div><span class="dx">›</span></a>` : ""}
+          ${backupVecchio ? `<a class="avviso" href="#/altro"><div class="av-ico">💾</div><div style="flex:1"><b>Fai un backup</b><div class="small muted">${info.ultimo_backup ? "L'ultimo è del " + dataIt(info.ultimo_backup.slice(0, 10)) : "Non hai ancora salvato una copia"} — serve 1 minuto</div></div><span class="dx">›</span></a>` : ""}
+        </div>
+        <div style="order:6"><div class="sezione"><h2>Le tue cartelle</h2><a href="#" id="nuova-rad">＋ Nuova</a></div>${htmlCartelle(S.figli.root || [])}</div>
+      </div>
+      <div class="col">
+        <div style="order:5"><div class="sezione"><h2>📍 Prossime cose da fare</h2><a href="#/agenda">Tutte</a></div><div id="h-pross">${htmlProssime(prossime)}</div></div>
+        <div style="order:7"><div class="sezione"><h2>Raccolte</h2></div>
+          <div class="chips">
+            <a class="chip" href="#/raccolta/assicura">🛡️ Assicurazioni</a><a class="chip" href="#/raccolta/bollo">🧾 Bolli</a>
+            <a class="chip" href="#/raccolta/revision">🔧 Revisioni</a><a class="chip" href="#/scadenze">⏰ Scadenze</a><a class="chip" href="#/raccolta/salute">🩺 Salute</a>
+          </div></div>
+        ${recenti.length ? `<div style="order:8"><div class="sezione"><h2>Aggiunti di recente</h2></div><div id="recenti">${htmlDocs(recenti.slice(0, 6), { mostraCartella: true })}</div></div>` : ""}
+      </div>
+    </div>`;
   $("#non-ora") && ($("#non-ora").onclick = () => { sessionStorage.setItem("no-installa", "1"); $(".avviso.install").remove(); });
   $("#f-chat").onsubmit = (e) => { e.preventDefault(); const t = $("#cq").value.trim(); location.hash = t ? "#/chat/" + encodeURIComponent(t) : "#/chat"; };
-  $("#h-comp") && ($("#h-comp").onclick = (e) => { const v = e.target.closest("[data-dv]"); if (v) modificaVoceDiario(comp.find((x) => x.id === +v.dataset.dv), render); });
   $("#f-cerca").onsubmit = (e) => { e.preventDefault(); const q = $("#q").value.trim(); if (q) location.hash = "#/cerca/" + encodeURIComponent(q); };
   $(".azioni-home").onclick = (e) => {
     const h = e.target.closest("[data-h]")?.dataset.h; if (!h) return;
     if (h === "foto" || h === "file") scegliFile({ foto: h === "foto", dopo: render });
-    if (h === "visita") location.hash = "#/agenda";
+    if (h === "app") location.hash = "#/agenda";
     if (h === "pw") location.hash = "#/password";
   };
   $("#nuova-rad").onclick = async (e) => {
@@ -536,9 +574,8 @@ async function vistaHome() {
     const nome = await chiedi("Nuova cartella principale", "", { placeholder: "Es. Animali, Scuola, Viaggi…" }); if (!nome) return;
     await api("/api/cartelle", { method: "POST", json: { nome, padre: null } }); await caricaCartelle(); render();
   };
-  $("#h-appt") && ($("#h-appt").onclick = (e) => { const v = e.target.closest("[data-app]"); if (v) apriAppuntamento(appts.find((a) => a.id === +v.dataset.app), render); });
+  collegaProssime($("#h-pross"), prossime, render);
   if (recenti.length) collegaDocs($("#recenti"), recenti, render);
-  if (scadImm.length) collegaDocs($("#h-scad"), scadImm, render);
 }
 
 async function vistaCartella(id) {
@@ -613,7 +650,10 @@ async function vistaScadenze() {
 
 /* ------------------------------------------------------------------ agenda */
 function formAppuntamento(a) {
+  const g = gruppoDi(a.categoria);
   return `<label class="campo"><span>Cosa</span><input type="text" id="a-tit" value="${esc(a.titolo)}"></label>
+    <div class="campo"><span>Tipo</span><div class="scelta-gruppo" id="a-gruppo">${Object.entries(GRUPPI_APP).map(([k, v]) =>
+      `<button type="button" data-g="${k}" class="${k === g ? "on" : ""}" style="--c:${v.col}"><span>${v.ico}</span>${v.nome}</button>`).join("")}</div></div>
     <label class="campo"><span>Giorno</span><input type="date" id="a-data" value="${esc((a.inizio || "").slice(0, 10))}"></label>
     <label class="switch"><span>Tutto il giorno</span><input type="checkbox" id="a-tutto" ${a.tutto_il_giorno ? "checked" : ""}></label>
     <div class="riga" id="a-ore" ${a.tutto_il_giorno ? "hidden" : ""}>
@@ -624,11 +664,14 @@ function formAppuntamento(a) {
 }
 function leggiForm(el, base) {
   const tutto = $("#a-tutto", el).checked, g = $("#a-data", el).value;
-  return { ...base, titolo: $("#a-tit", el).value.trim(), tutto_il_giorno: tutto,
+  const gr = $("#a-gruppo .on", el)?.dataset.g || gruppoDi(base.categoria);
+  const categoria = GRUPPI_APP[gr].cat.includes(base.categoria) ? base.categoria : gr;
+  return { ...base, categoria, icona: gr === gruppoDi(base.categoria) && base.icona ? base.icona : GRUPPI_APP[gr].ico, titolo: $("#a-tit", el).value.trim(), tutto_il_giorno: tutto,
     inizio: tutto ? g : `${g}T${$("#a-da", el).value || "09:00"}`, fine: tutto ? g : `${g}T${$("#a-a", el).value || "10:00"}`,
     luogo: $("#a-luogo", el).value.trim(), note: $("#a-note", el).value.trim() };
 }
 function collegaForm(el) {
+  $("#a-gruppo", el).onclick = (e) => { const b = e.target.closest("[data-g]"); if (!b) return; $$("#a-gruppo button", el).forEach((x) => x.classList.toggle("on", x === b)); };
   $("#a-tutto", el).onchange = (e) => ($("#a-ore", el).hidden = e.target.checked);
   $("#a-da", el).onchange = () => {
     const [h, m] = $("#a-da", el).value.split(":").map(Number), [h2, m2] = $("#a-a", el).value.split(":").map(Number);
@@ -640,27 +683,38 @@ function htmlAppt(a) {
   const quando = a.tutto_il_giorno ? "Tutto il giorno" : `${oraDa(a.inizio)} – ${oraDa(a.fine)}`;
   const g = giorniA(a.inizio.slice(0, 10));
   const rel = g === 0 ? `<span class="tag danger">Oggi</span>` : g === 1 ? `<span class="tag warn">Domani</span>` : g > 0 && g <= 7 ? `<span class="tag warn">Tra ${g} giorni</span>` : "";
-  return `<div class="voce" data-app="${a.id}"><div class="datebox" style="--c:${COL_CAT[a.categoria] || COL_CAT.altro}"><div class="m">${MESI[d.getMonth()]}</div><div class="g">${d.getDate()}</div></div>
-    <div class="corpo"><div class="tit">${esc(a.icona)} ${esc(a.titolo)}</div><div class="sub">${GIORNI[d.getDay()]} · ${quando}${a.luogo ? " · " + esc(a.luogo) : ""}</div>${rel ? `<div style="margin-top:4px">${rel}</div>` : ""}</div><div class="dx">›</div></div>`;
+  const gr = GRUPPI_APP[gruppoDi(a.categoria)];
+  return `<div class="voce" data-app="${a.id}"><div class="datebox" style="--c:${gr.col}"><div class="m">${MESI[d.getMonth()]}</div><div class="g">${d.getDate()}</div></div>
+    <div class="corpo"><div class="tit">${esc(a.icona || gr.ico)} ${esc(a.titolo)}</div><div class="sub">${GIORNI[d.getDay()]} · ${quando}${a.luogo ? " · " + esc(a.luogo) : ""}</div>
+    <div style="margin-top:4px"><span class="tag gruppo" style="--c:${gr.col}">${gr.ico} ${gr.nome}</span> ${rel}</div></div><div class="dx">›</div></div>`;
 }
 
 async function vistaAgenda() {
-  const appts = await api("/api/appuntamenti");
+  const [tutti, prossime] = await Promise.all([api("/api/appuntamenti"), prossimeCose(5)]);
+  const filtro = memo.get("filtro-app") || "tutti";
+  const appts = filtro === "tutti" ? tutti : tutti.filter((a) => gruppoDi(a.categoria) === filtro);
+  const conta = (k) => tutti.filter((a) => gruppoDi(a.categoria) === k).length;
   const perMese = {};
   appts.forEach((a) => (perMese[a.inizio.slice(0, 7)] ||= []).push(a));
-  app.innerHTML = `<div class="top"><h1>Visite<small>Scrivi o detta: al calendario ci penso io</small></h1></div>
-    <div class="scrivi">
-      <div class="scrivi-tit">✍️ Nuova visita o appuntamento</div>
-      <textarea id="testo" rows="2" placeholder="Es. Il 16 dicembre controllo dal dentista dalle 10 alle 11"></textarea>
+  app.innerHTML = `<div class="top"><h1>Appuntamenti<small>Scrivi o detta: al calendario ci penso io</small></h1></div>
+    <div class="sezione" style="margin-top:0"><h2>📍 Prossime cose da fare</h2></div>
+    <div id="a-pross">${htmlProssime(prossime)}</div>
+    <div class="scrivi" style="margin-top:18px">
+      <div class="scrivi-tit">✍️ Nuovo appuntamento</div>
+      <textarea id="testo" rows="2" placeholder="Es. Il 16 dicembre dentista dalle 10 alle 11"></textarea>
       <div class="small muted" style="margin:2px 4px 8px">🎙️ Puoi anche dettare: tocca il microfono sulla tastiera.</div>
       <div class="esempi" id="esempi"><span class="small muted">Prova:</span>
-        <button>Domani alle 15 analisi del sangue</button><button>Lunedì oculista alle 9:30</button><button>Il 3 marzo revisione motorino</button></div>
+        <button>Lunedì lezione di analisi dalle 14 alle 16</button><button>Venerdì riunione di lavoro alle 10</button><button>Il 3 marzo dentista alle 9</button><button>Sabato cena con Giulia alle 20</button></div>
       <div id="prev"></div>
     </div>
     ${!comandoCalPronto() ? `<button class="avviso" id="collega" style="margin-top:14px;width:100%;text-align:left"><div class="av-ico">📲</div>
-      <div style="flex:1"><b>Collega il Calendario dell'iPhone</b><div class="small muted">Una volta sola: poi le visite finiscono da sole nel calendario.</div></div><span class="dx">›</span></button>` : ""}
+      <div style="flex:1"><b>Collega il Calendario dell'iPhone</b><div class="small muted">Una volta sola: poi gli appuntamenti finiscono da soli nel calendario.</div></div><span class="dx">›</span></button>` : ""}
+    <div class="filtri-gruppi">${[["tutti", "✨", "Tutti", tutti.length], ...Object.entries(GRUPPI_APP).map(([k, v]) => [k, v.ico, v.nome, conta(k)])]
+      .map(([k, ico, nome, n]) => `<button class="chip ${filtro === k ? "on" : ""}" data-fg="${k}">${ico} ${nome}${n ? ` <b>${n}</b>` : ""}</button>`).join("")}</div>
     <div id="elenco">${appts.length ? Object.entries(perMese).map(([k, l]) => `<div class="mese">${MESI_L[+k.slice(5) - 1]} ${k.slice(0, 4)}</div><div class="lista">${l.map(htmlAppt).join("")}</div>`).join("")
-      : `<div class="vuoto"><span class="big">🗓️</span>Nessuna visita in programma.</div>`}</div>`;
+      : `<div class="vuoto"><span class="big">🗓️</span>Nessun appuntamento${filtro === "tutti" ? "" : " in questa categoria"}.</div>`}</div>`;
+  collegaProssime($("#a-pross"), prossime, vistaAgenda);
+  $$("[data-fg]").forEach((b) => (b.onclick = () => { memo.set("filtro-app", b.dataset.fg); vistaAgenda(); }));
   $("#collega") && ($("#collega").onclick = () => configuraCalendario());
   const ta = $("#testo"), prev = $("#prev");
   let timer, ultimo;
@@ -670,7 +724,7 @@ async function vistaAgenda() {
     const r = await api("/api/appuntamenti/analizza", { method: "POST", json: { testo: t } });
     if (ta.value.trim() !== t) return;
     ultimo = r;
-    const capito = r.data ? `✨ Ho capito: <b>${esc(r.titolo)}</b>, ${GIORNI[new Date(r.data + "T00:00").getDay()]} ${dataIt(r.data)}${r.tutto_il_giorno ? "" : `, dalle ${r.ora_inizio} alle ${r.ora_fine}`}. Controlla e salva.`
+    const capito = r.data ? `✨ Ho capito: <b>${esc(r.titolo)}</b> (${GRUPPI_APP[gruppoDi(r.categoria)].nome.toLowerCase()}), ${GIORNI[new Date(r.data + "T00:00").getDay()]} ${dataIt(r.data)}${r.tutto_il_giorno ? "" : `, dalle ${r.ora_inizio} alle ${r.ora_fine}`}. Controlla e salva.`
       : "🤔 Non ho trovato il giorno. Scrivilo (es. “il 16 dicembre”, “domani”, “lunedì”) oppure sceglilo qui sotto.";
     prev.innerHTML = `<div class="anteprima"><div class="capito">${capito}</div>${formAppuntamento({ ...r, inizio: r.inizio || oggiIso() })}
       <button class="btn block" id="salva">🗓️ Salva${comandoCalPronto() ? " e aggiungi al Calendario" : ""}</button></div>`;
@@ -688,13 +742,13 @@ async function vistaAgenda() {
   };
   ta.oninput = () => { clearTimeout(timer); timer = setTimeout(analizza, 300); };
   $("#esempi").onclick = (e) => { if (e.target.tagName === "BUTTON") { ta.value = e.target.textContent; analizza(); } };
-  $("#elenco").onclick = (e) => { const v = e.target.closest("[data-app]"); if (v) apriAppuntamento(appts.find((a) => a.id === +v.dataset.app), vistaAgenda); };
+  $("#elenco").onclick = (e) => { const v = e.target.closest("[data-app]"); if (v) apriAppuntamento(tutti.find((a) => a.id === +v.dataset.app), vistaAgenda); };
 }
 
 function dopoSalvataggio(a) {
   if (comandoCalPronto()) { toast("✅ Salvato. Lo aggiungo al Calendario…"); vistaAgenda(); setTimeout(() => eseguiComandoCal(a), 400); return; }
   foglio(`<div style="text-align:center;padding:6px 0 4px"><div style="font-size:54px">✅</div>
-    <h3 style="justify-content:center">Visita salvata</h3>
+    <h3 style="justify-content:center">Appuntamento salvato</h3>
     <p class="muted" style="margin-top:-8px">${esc(a.icona)} <b>${esc(a.titolo)}</b><br>${dataIt(a.inizio)}${a.tutto_il_giorno ? "" : ` · ${oraDa(a.inizio)}–${oraDa(a.fine)}`}</p></div>
     <button class="btn block" id="cal">📲 Aggiungi al Calendario dell'iPhone</button>
     <div style="height:8px"></div><button class="btn sec block" data-chiudi>Fatto</button>`, { onClose: vistaAgenda });
@@ -702,10 +756,10 @@ function dopoSalvataggio(a) {
 }
 
 function apriAppuntamento(a, ricarica) {
-  const v = foglio(`<h3>${esc(a.icona)} Visita ${xBtn}</h3>${formAppuntamento(a)}
+  const v = foglio(`<h3>${esc(a.icona)} Appuntamento ${xBtn}</h3>${formAppuntamento(a)}
     <button class="btn block" id="salva">Salva modifiche</button>
     <div class="azioni"><button class="btn sec" id="cal">📲 Al Calendario</button><button class="btn danger" id="elimina">🗑️ Elimina</button></div>
-    <p class="small muted" style="margin:10px 4px 0">Se modifichi o elimini una visita già nel Calendario dell'iPhone, ricordati di cambiarla anche lì.</p>`);
+    <p class="small muted" style="margin:10px 4px 0">Se modifichi o elimini un appuntamento già nel Calendario dell'iPhone, ricordati di cambiarla anche lì.</p>`);
   collegaForm(v);
   $("#salva", v).onclick = async () => {
     try { await api(`/api/appuntamenti/${a.id}`, { method: "PUT", json: leggiForm(v, { categoria: a.categoria, icona: a.icona }) }); v.remove(); toast("✅ Salvato"); ricarica(); }
@@ -1065,6 +1119,7 @@ function bilancio(lista) {
    il voto finale è la media dei moduli pesata sui crediti, e conta solo quando tutti i moduli sono superati. */
 function esameCalcolato(e) {
   e = e || {};
+  if (e.esito) return { voto: null, cfu: e.cfu || 0, completo: e.esito === "idoneo", fatti: e.esito === "idoneo" ? 1 : 0, totali: 1, lode: false, moduli: null, idoneita: true, esito: e.esito };
   if (e.moduli && e.moduli.length) {
     const cfu = e.moduli.reduce((a, m) => a + (m.cfu || 6), 0);
     const fatti = e.moduli.filter((m) => m.voto).length, completo = fatti === e.moduli.length;
@@ -1075,11 +1130,13 @@ function esameCalcolato(e) {
 }
 const votoBreve = (v) => (v == null ? "⏳" : Number.isInteger(v) ? String(v) : dec(v, 1));
 function statEsami(lista) {
-  const tutti = lista.map((x) => esameCalcolato(x.extra)), v = tutti.filter((e) => e.completo);
-  const cfu = v.reduce((a, e) => a + e.cfu, 0);
+  const tutti = lista.map((x) => esameCalcolato(x.extra)), v = tutti.filter((e) => e.completo && !e.idoneita);
+  const idonei = tutti.filter((e) => e.idoneita && e.completo);
+  const cfu = v.reduce((a, e) => a + e.cfu, 0) + idonei.reduce((a, e) => a + e.cfu, 0);
+  const cfuVoto = v.reduce((a, e) => a + e.cfu, 0);
   const media = v.length ? v.reduce((a, e) => a + e.voto, 0) / v.length : null;
-  const ponderata = cfu ? v.reduce((a, e) => a + e.voto * e.cfu, 0) / cfu : null;
-  return { n: v.length, inCorso: tutti.length - v.length, media, ponderata, cfu, base: ponderata ? (ponderata * 110) / 30 : null, lodi: v.filter((e) => e.lode).length };
+  const ponderata = cfuVoto ? v.reduce((a, e) => a + e.voto * e.cfu, 0) / cfuVoto : null;
+  return { n: v.length, idonei: idonei.length, inCorso: tutti.filter((e) => !e.completo && !e.idoneita).length, nonIdonei: tutti.filter((e) => e.idoneita && !e.completo).length, media, ponderata, cfu, base: ponderata ? (ponderata * 110) / 30 : null, lodi: v.filter((e) => e.lode).length };
 }
 const dec = (n, c = 2) => (n == null ? "—" : n.toLocaleString("it-IT", { minimumFractionDigits: c, maximumFractionDigits: c }));
 const stelle = (v) => (v ? "★".repeat(v) + "☆".repeat(5 - v) : "");
@@ -1104,6 +1161,9 @@ function htmlVoceDiario(x) {
   }
   if (x.tipo === "esame") {
     const c = esameCalcolato(x.extra);
+    if (c.idoneita) return `<div class="voce" data-dv="${x.id}"><div class="voto-esame ${c.completo ? "idoneo" : "non-idoneo"}">${c.completo ? "✓" : "✗"}</div>
+      <div class="corpo"><div class="tit">${esc(x.titolo)}</div><div class="sub">${[c.completo ? "Idoneo" : "Non idoneo", c.cfu ? `${c.cfu} CFU` : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
+      ${x.commento ? `<div class="commento">“${esc(x.commento)}”</div>` : ""}</div><div class="dx">›</div></div>`;
     const dettaglio = c.moduli ? c.moduli.map((m) => `<span class="mod ${m.voto ? "ok" : ""}">${esc(m.nome)}: <b>${m.voto ? (m.lode ? "30L" : m.voto) : "—"}</b> <i>${m.cfu || 6} CFU</i></span>`).join("") : "";
     return `<div class="voce" data-dv="${x.id}"><div class="voto-esame ${c.lode ? "lode" : ""} ${c.completo ? "" : "attesa"}">${votoBreve(c.voto)}${c.lode ? "<small>L</small>" : ""}</div>
       <div class="corpo"><div class="tit">${esc(x.titolo)}</div><div class="sub">${[`${c.cfu} CFU`, c.moduli ? (c.completo ? `${c.totali} moduli` : `in corso: ${c.fatti}/${c.totali} moduli`) : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
@@ -1139,7 +1199,7 @@ async function vistaDiario(tipo) {
   app.innerHTML = `<div class="top"><h1>Diario<small>La mia vita: film, libri, serie e compleanni</small></h1></div>
     <div class="segmenti">${Object.entries(TIPI_D).map(([k, v]) => `<a href="#/diario/${k}" class="${k === tipo ? "on" : ""}"><span>${v.ico}</span>${v.nome}<b>${conta(k) || ""}</b></a>`).join("")}</div>
     ${tipo === "acquisto" && tuttiAcq.length ? htmlBilancio(bilancio(tuttiAcq), filtro) : ""}
-    ${tipo === "esame" && lista.length && statEsami(lista).n ? htmlStatEsami(statEsami(lista)) : ""}
+    ${tipo === "esame" && lista.length && (statEsami(lista).n || statEsami(lista).idonei) ? htmlStatEsami(statEsami(lista)) : ""}
     <a class="chat-invito" href="#/chat"><span>💬</span><span>${t.vuoto}</span></a>
     ${tipo === "compleanno" ? `<div class="riga" style="margin:4px 0 12px"><button class="btn sec" id="imp-comp">📥 Importa dai Promemoria</button>${lista.length ? `<button class="btn sec" id="cal-comp">🔔 Notifiche</button>` : ""}</div>` : ""}
     ${lista.length ? `<div class="lista" id="dl">${lista.map(htmlVoceDiario).join("")}</div>`
@@ -1165,7 +1225,7 @@ function htmlBilancio(b, filtro) {
 function htmlStatEsami(st) {
   return `<div class="bilancio">
     <div class="bil-top"><div><div class="bil-et">Media ${st.ponderata ? "ponderata" : ""}</div><div class="bil-num">${dec(st.ponderata ?? st.media)}</div>
-      <div class="bil-sub">${st.n} esam${st.n === 1 ? "e" : "i"} superat${st.n === 1 ? "o" : "i"}${st.lodi ? ` · ${st.lodi} lod${st.lodi === 1 ? "e" : "i"} ✨` : ""}${st.inCorso ? ` · ${st.inCorso} in corso` : ""}</div></div><div class="bil-ico">🎓</div></div>
+      <div class="bil-sub">${st.n} esam${st.n === 1 ? "e" : "i"} superat${st.n === 1 ? "o" : "i"}${st.lodi ? ` · ${st.lodi} lod${st.lodi === 1 ? "e" : "i"} ✨` : ""}${st.inCorso ? ` · ${st.inCorso} in corso` : ""}${st.idonei ? ` · ${st.idonei} idoneit${st.idonei === 1 ? "à" : "à"} ✓` : ""}</div></div><div class="bil-ico">🎓</div></div>
     <div class="bil-griglia">
       <div><div class="bil-et">Media aritmetica</div><div class="bil-n">${dec(st.media)}</div></div>
       <div><div class="bil-et">Crediti</div><div class="bil-n">${st.cfu || "—"}</div></div>
@@ -1211,11 +1271,17 @@ function modificaVoceSpeciale(x, dopo) {
   const t = TIPI_D[x.tipo], e = x.extra || {}, esame = x.tipo === "esame";
   const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : esame ? "Nuovo esame" : "Nuovo acquisto"} ${xBtn}</h3><form id="fs">
     <label class="campo"><span>${esame ? "Materia" : "Cosa"}</span><input type="text" name="titolo" value="${esc(x.titolo || "")}" required placeholder="${esame ? "Es. Analisi 1" : "Es. Maglia Nike"}"></label>
-    ${esame ? `<label class="switch"><span>🧩 Diviso in moduli <i class="muted small">(es. 12 CFU = 2 × 6)</i></span><input type="checkbox" id="usa-moduli" ${e.moduli?.length ? "checked" : ""}></label>
-      <div id="classico" ${e.moduli?.length ? "hidden" : ""}><div class="riga"><label class="campo"><span>Voto</span><select name="voto">${Array.from({ length: 13 }, (_, i) => 18 + i).map((n) => `<option ${(e.voto || 30) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+    ${esame ? `<div class="campo"><span>Valutazione</span><div class="scelta-gruppo tre" id="valutazione">
+        <button type="button" data-val="voto" class="${!e.moduli?.length && !e.esito ? "on" : ""}"><span>🔢</span>Voto</button>
+        <button type="button" data-val="moduli" class="${e.moduli?.length ? "on" : ""}"><span>🧩</span>A moduli</button>
+        <button type="button" data-val="idoneita" class="${e.esito ? "on" : ""}"><span>✅</span>Idoneità</button></div></div>
+      <div id="blocco-idoneita" ${e.esito ? "" : "hidden"}><div class="riga"><label class="campo"><span>Esito</span><select name="esito"><option value="idoneo">✅ Idoneo</option><option value="non idoneo" ${e.esito === "non idoneo" ? "selected" : ""}>❌ Non idoneo</option></select></label>
+        <label class="campo"><span>Crediti (CFU)</span><input type="number" name="cfu_id" inputmode="numeric" min="0" max="30" value="${e.esito ? e.cfu ?? "" : ""}" placeholder="es. 3"></label></div>
+        <p class="small muted" style="margin:-4px 4px 12px">Le idoneità (inglese, obblighi formativi…) contano nei crediti ma non nella media.</p></div>
+      <div id="classico" ${e.moduli?.length || e.esito ? "hidden" : ""}><div class="riga"><label class="campo"><span>Voto</span><select name="voto">${Array.from({ length: 13 }, (_, i) => 18 + i).map((n) => `<option ${(e.voto || 30) === n ? "selected" : ""}>${n}</option>`).join("")}</select></label>
         <label class="campo"><span>Crediti (CFU)</span><input type="number" name="cfu" inputmode="numeric" min="1" max="30" value="${e.cfu ?? 6}"></label></div>
         <label class="switch"><span>✨ Con lode</span><input type="checkbox" name="lode" ${e.lode ? "checked" : ""}></label></div>
-      <div id="blocco-moduli" ${e.moduli?.length ? "" : "hidden"}><div id="lista-moduli"></div>
+      <div id="blocco-moduli" ${e.moduli?.length && !e.esito ? "" : "hidden"}><div id="lista-moduli"></div>
         <button type="button" class="link-btn" id="agg-modulo">＋ Aggiungi modulo</button><div id="tot-moduli" class="totale-moduli"></div></div>
       <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(x.data || "")}"></label>`
     : `<label class="campo"><span>Categoria</span><select name="categoria">${Object.entries(CATEGORIE_ACQ).map(([k, n]) => `<option value="${k}" ${(e.categoria || "altro") === k ? "selected" : ""}>${n}</option>`).join("")}</select></label>
@@ -1251,9 +1317,11 @@ function modificaVoceSpeciale(x, dopo) {
     totale();
   };
   if (esame) {
-    $("#usa-moduli", v).onchange = (ev) => {
-      const on = ev.target.checked;
-      $("#classico", v).hidden = on; $("#blocco-moduli", v).hidden = !on;
+    $("#valutazione", v).onclick = (ev) => {
+      const b = ev.target.closest("[data-val]"); if (!b) return;
+      $$("#valutazione button", v).forEach((x) => x.classList.toggle("on", x === b));
+      const val = b.dataset.val, on = val === "moduli";
+      $("#classico", v).hidden = val !== "voto"; $("#blocco-moduli", v).hidden = !on; $("#blocco-idoneita", v).hidden = val !== "idoneita";
       if (on && !moduli.length) {
         const c = +f.cfu.value || 12, n = c > 6 && c % 6 === 0 ? c / 6 : 2;
         moduli = Array.from({ length: n }, (_, i) => ({ nome: `Modulo ${i + 1}`, cfu: 6 }));
@@ -1273,7 +1341,8 @@ function modificaVoceSpeciale(x, dopo) {
   f.onsubmit = async (ev) => {
     ev.preventDefault();
     const d = Object.fromEntries(new FormData(f));
-    const extra = esame ? ($("#usa-moduli", v).checked ? { moduli: leggiModuli() } : { voto: +d.voto, lode: !!d.lode, cfu: d.cfu ? +d.cfu : 6 })
+    const val = esame ? $("#valutazione .on", v)?.dataset.val || "voto" : null;
+    const extra = esame ? (val === "moduli" ? { moduli: leggiModuli() } : val === "idoneita" ? { esito: d.esito, cfu: d.cfu_id === "" ? null : +d.cfu_id } : { voto: +d.voto, lode: !!d.lode, cfu: d.cfu ? +d.cfu : 6 })
       : { categoria: d.categoria, prezzo: d.prezzo === "" ? null : +d.prezzo, vendita: $("#venduto", v).checked && d.vendita !== "" ? +d.vendita : null, data_vendita: $("#venduto", v).checked ? d.data_vendita : null };
     try {
       await api(x.id ? `/api/diario/${x.id}` : "/api/diario", { method: x.id ? "PUT" : "POST", json: { ...x, titolo: d.titolo, data: d.data || null, commento: d.commento, extra } });
@@ -1483,6 +1552,14 @@ async function rispondi(testo) {
       return { da: "scrigno", html: `🎓 Ho aggiunto <b>${esc(salvato.titolo)}</b> (${r.cfu} CFU)${n > 1 ? `, diviso in ${n} moduli da ${r.cfu / n} CFU` : ""}.<br>Quando passi un modulo scrivimi ad esempio <i>primo modulo di ${esc(salvato.titolo.toLowerCase())} con 27</i>.`,
         azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, { t: "annulla", url: `/api/diario/${salvato.id}`, etichetta: "↩️ Annulla" }] };
     }
+    if (r.esito) {
+      salvato = await salva({ data: r.data, extra: { esito: r.esito, cfu: r.cfu ?? x?.extra?.cfu ?? null } });
+      const st = statEsami(await api("/api/diario?tipo=esame"));
+      return { da: "scrigno", html: r.esito === "idoneo"
+          ? `✅ <b>${esc(salvato.titolo)}</b>: idoneo!${salvato.extra.cfu ? ` (${salvato.extra.cfu} CFU)` : ""} 🎉<br><span class="muted">Le idoneità contano nei crediti (ora ${st.cfu}) ma non nella media.</span>`
+          : `❌ <b>${esc(salvato.titolo)}</b>: non idoneo, per questa volta. Lo trovi negli esami: quando lo ripassi scrivimi <i>${esc(salvato.titolo.toLowerCase())} idoneo</i>.`,
+        azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, ...(nuovo ? [{ t: "annulla", url: `/api/diario/${salvato.id}`, etichetta: "↩️ Annulla" }] : [])] };
+    }
     const mod = r.modulo || (x?.extra?.moduli && x.extra.moduli.filter((m) => !m.voto).length === 1 ? x.extra.moduli.findIndex((m) => !m.voto) + 1 : null);
     if (mod) {
       let moduli = x?.extra?.moduli?.length ? x.extra.moduli.map((m) => ({ ...m })) : creaModuli(r.cfu || x?.extra?.cfu || 12, mod);
@@ -1527,7 +1604,7 @@ async function rispondi(testo) {
   if (r.azione === "appuntamento") {
     const a = await api("/api/appuntamenti", { method: "POST", json: { titolo: r.titolo, inizio: r.inizio, fine: r.fine, tutto_il_giorno: r.tutto_il_giorno, luogo: r.luogo, categoria: r.categoria, icona: r.icona } });
     if (comandoCalPronto()) setTimeout(() => eseguiComandoCal(a), 600);
-    return { da: "scrigno", html: `${esc(a.icona)} Ho salvato: <b>${esc(a.titolo)}</b><br>${giorno(a.inizio.slice(0, 10))}${a.tutto_il_giorno ? "" : `, dalle ${oraDa(a.inizio)} alle ${oraDa(a.fine)}`}${a.luogo ? `<br>📍 ${esc(a.luogo)}` : ""}
+    return { da: "scrigno", html: `${esc(a.icona)} Ho salvato in <b>${GRUPPI_APP[gruppoDi(a.categoria)].nome}</b>: <b>${esc(a.titolo)}</b><br>${giorno(a.inizio.slice(0, 10))}${a.tutto_il_giorno ? "" : `, dalle ${oraDa(a.inizio)} alle ${oraDa(a.fine)}`}${a.luogo ? `<br>📍 ${esc(a.luogo)}` : ""}
       ${comandoCalPronto() ? "<br>Lo aggiungo al Calendario…" : ""}`,
       azioni: [...(comandoCalPronto() ? [] : [{ t: "calApp", voce: a, etichetta: "📲 Aggiungi al Calendario" }]), { t: "annulla", url: `/api/appuntamenti/${a.id}`, etichetta: "↩️ Annulla" }] };
   }
@@ -1560,7 +1637,7 @@ async function rispondi(testo) {
       const l = await api("/api/diario?tipo=esame");
       if (!l.length) return { da: "scrigno", html: "Non hai ancora segnato esami. Scrivimi ad esempio <i>ho passato l'esame di Analisi 1 con 28</i>." };
       const st = statEsami(l);
-      return { da: "scrigno", html: `🎓 Esami superati: <b>${st.n}</b>, ${st.cfu} crediti${st.inCorso ? ` (+${st.inCorso} in corso)` : ""}<br>Media ponderata: <b>${dec(st.ponderata)}</b><br>Media aritmetica: <b>${dec(st.media)}</b><br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
+      return { da: "scrigno", html: `🎓 Esami superati: <b>${st.n}</b>${st.idonei ? ` + ${st.idonei} idoneità` : ""}, ${st.cfu} crediti${st.inCorso ? ` (+${st.inCorso} in corso)` : ""}<br>Media ponderata: <b>${dec(st.ponderata)}</b><br>Media aritmetica: <b>${dec(st.media)}</b><br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
         azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }] };
     }
     if (r.cosa === "visite") {
@@ -1592,7 +1669,7 @@ function benvenuto(forza) {
     ["🗂️", "Tutti i tuoi documenti, in ordine", "Bollo, assicurazioni, analisi, patente, bollette: ogni cosa nella sua cartella, già pronta."],
     ["📷", "Aggiungere è facilissimo", "Fotografa un foglio o scegli un file. Scrigno ti suggerisce dove metterlo e ti ricorda quando scade."],
     ["💬", "Raccontami la tua giornata", "Nella chat scrivi “stasera ho visto After” o “il 6 agosto è il compleanno di Marco”: salvo tutto io nel tuo diario e ti ricordo i compleanni ogni anno."],
-    ["🗓️", "Le visite vanno nel calendario", "Scrivi “il 16 dicembre dentista dalle 10 alle 11”: Scrigno capisce giorno e orario e lo mette nel Calendario dell'iPhone."],
+    ["🗓️", "Appuntamenti nel calendario", "Scrivi “il 16 dicembre dentista dalle 10 alle 11”: Scrigno capisce giorno e orario e lo mette nel Calendario dell'iPhone."],
     LOC ? ["🔒", "Tutto resta sul tuo iPhone", "Niente cloud: i documenti sono salvati solo sul telefono. Ogni tanto fai un backup su File (te lo ricordo io)."]
       : ["🔒", "Tutto resta a casa tua", "I documenti sono salvati sul tuo server, le password sono cifrate."],
   ];

@@ -1000,6 +1000,8 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
             x["data_vendita"] = None
         return x
     if tipo == "esame":
+        if e.get("esito") in ("idoneo", "non idoneo"):
+            return {"esito": e["esito"], "cfu": _numero(e.get("cfu"))}
         moduli = []
         for i, m in enumerate(e.get("moduli") or []):
             v = _numero(m.get("voto"))
