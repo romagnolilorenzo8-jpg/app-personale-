@@ -337,3 +337,11 @@ body.in-chat #app { padding-bottom: calc(170px + var(--safe-b)); }
 .stelle-input button.on { color: #f5a524; }
 .campo > span { display: block; }
 select { -webkit-appearance: none; appearance: none; }
+
+.imp { padding: 4px 0; }
+.imp-riga { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--line); }
+.imp-riga:first-child { border-top: 0; }
+.imp-riga input[type=checkbox] { width: 22px; height: 22px; flex: none; accent-color: var(--accent); }
+.imp-riga input[type=text] { min-height: 38px; padding: 7px 10px; }
+.imp-riga select { width: auto; min-height: 38px; padding: 6px 8px; flex: none; font-size: 14px; }
+.imp-riga .tag { margin-top: 4px; }

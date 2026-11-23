@@ -31,3 +31,20 @@ console.log(JSON.stringify({json.dumps(list(CASI))}.map((f) => capisci(f, '2026-
     out = json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout)
     errori = [f"{f!r}: {k} = {r.get(k)!r}, atteso {v!r}" for (f, att), r in zip(CASI.items(), out) for k, v in att.items() if r.get(k) != v]
     assert not errori, "\n".join(errori)
+
+
+def test_importa_compleanni_dai_promemoria():
+    testo = "\n".join([
+        "Compleanno Marco Rossi | 2027-08-06T09:00:00+02:00",
+        "🎂 Giulia | 2026-12-03T00:00:00+01:00",
+        "Compleanno di Luca Bianchi (1990) | 2027-02-14T09:00:00+01:00",
+        "Compleanno Anna |",
+        "Sara 12 marzo",
+        "Paolo Verdi;5/11/1985",
+    ])
+    js = f"""const {{ leggiCompleanni }} = require({json.dumps(str(R / 'server/static/chat.js'))});
+console.log(JSON.stringify(leggiCompleanni({json.dumps(testo)})));"""
+    out = json.loads(subprocess.run(["node", "-e", js], capture_output=True, text=True, check=True).stdout)
+    assert [(x["nome"], x["giorno"], x["mese"], x["anno"]) for x in out] == [
+        ("Marco Rossi", 6, 8, None), ("Giulia", 3, 12, None), ("Luca Bianchi", 14, 2, 1990),
+        ("Anna", None, None, None), ("Sara", 12, 3, None), ("Paolo Verdi", 5, 11, 1985)]

@@ -100,6 +100,7 @@
       if (/scadenz|scade/.test(low)) return { azione: "domanda", cosa: "scadenze" };
     }
     if (/^(aiuto|help|cosa (sai|puoi) fare|come funzion)/.test(low)) return { azione: "aiuto" };
+    if (/importa|promemoria|reminders/.test(low) && /compleann|promemoria/.test(low)) return { azione: "importa_compleanni" };
     if (/^(ciao|buongiorno|buonasera|buonanotte|salve|hey|ehi|grazie)\b/.test(low) && low.split(/\s+/).length <= 4) return { azione: "saluto", grazie: low.startsWith("grazie") };
 
     // ---------------------------------------------------------------- commento a qualcosa di già salvato
@@ -172,7 +173,40 @@
     return { azione: "boh" };
   }
 
-  const api = { capisci };
+  /* Legge un elenco di compleanni incollato (ad esempio esportato dall'app Promemoria con un Comando Rapido).
+     Una riga per persona, in qualsiasi di questi formati:
+       "Compleanno Marco Rossi | 2027-08-06T09:00:00+02:00"   (titolo | data di scadenza ISO)
+       "Marco Rossi 6 agosto"   "Compleanno di Giulia 12/03"   "Luca - 03/02/1990"  */
+  function leggiCompleanni(testo) {
+    const out = [];
+    for (let riga of String(testo || "").split(/\r?\n/)) {
+      riga = riga.trim();
+      if (!riga) continue;
+      const parti = riga.split(/\s*[|\t;]\s*/);
+      let titolo = parti[0], resto = parti.slice(1).join(" ");
+      let giorno = null, mese = null, anno = null, m;
+      // data ISO di scadenza (dai Promemoria): conta solo giorno e mese, l'anno è quello del prossimo avviso
+      if ((m = riga.match(/(\d{4})-(\d{2})-(\d{2})/))) { giorno = +m[3]; mese = +m[2]; titolo = titolo.replace(m[0], " "); }
+      else {
+        const d = dataCompleanno((titolo + " " + resto).toLowerCase(), new Date());
+        if (d) {
+          giorno = d.giorno; mese = d.mese; anno = d.anno;
+          titolo = titolo.replace(new RegExp(d.re.source, "iu"), " ");
+        }
+      }
+      // anno di nascita scritto nel titolo, ad esempio "Marco Rossi (1990)" o "nato nel 1990"
+      if (!anno && (m = titolo.match(/\(?\b(?:nat[oa] nel |del )?(19\d{2}|20[0-2]\d)\b\)?/))) { anno = +m[1]; titolo = titolo.replace(m[0], " "); }
+      let nome = titolo.replace(/[🎂🎉🎁🥳🎈]/gu, " ")
+        .replace(rx("\\b(?:compleanno|compie gli anni|auguri|fare gli auguri|buon compleanno)\\b(?:\\s+(?:a|ad|di|del|della|dello|al|alla)\\b)?", "giu"), " ")
+        .replace(rx("^\\s*(?:di|a|del|della)\\s+", "iu"), " ");
+      nome = pulisci(nome.replace(/[()\[\],.:!-]+/g, " "));
+      if (!nome) continue;
+      out.push({ nome: capParole(nome), giorno, mese, anno, riga });
+    }
+    return out;
+  }
+
+  const api = { capisci, leggiCompleanni };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else glob.ScrignoChat = api;
 })(typeof window !== "undefined" ? window : globalThis);
