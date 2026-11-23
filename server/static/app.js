@@ -677,14 +677,25 @@ async function vistaCartella(id) {
       ? `<div class="sezione" style="margin-top:6px"><h2>💼 I miei lavori</h2></div>${htmlCartelle(figli.filter((f) => f.tipo === "lavoro"))}
          ${figli.some((f) => f.tipo !== "lavoro") ? `<div class="sezione"><h2>🏛️ Tasse e altro</h2></div>${htmlCartelle(figli.filter((f) => f.tipo !== "lavoro"))}` : ""}`
       : eCartellaCase(c) ? htmlCase(figli)
+      : c.tipo === "lavoro" && figli.some((f) => f.tipo === "lavoro")
+      ? `${figli.some((f) => f.tipo !== "lavoro") ? htmlCartelle(figli.filter((f) => f.tipo !== "lavoro")) : ""}
+         <div class="sezione"><h2>📦 Incarichi e sedi</h2></div>${htmlCartelle(figli.filter((f) => f.tipo === "lavoro"))}`
       : figli.length ? htmlCartelle(figli) : ""}
     ${htmlNote(c)}
+    ${c.tipo === "lavoro" ? `<button class="btn sec block" id="nuovo-incarico" style="margin-top:16px">➕ Aggiungi un incarico o una sede</button>` : ""}
     ${docs.length ? `<div class="sezione"><h2>Documenti</h2><span class="muted small">${docs.length}</span></div><div id="docs">${htmlDocs(docs)}</div>` : ""}
     ${!docs.length && !CON_MODELLO.includes(c.tipo) && !eCartellaLavori(c) && !eCartellaCase(c) ? `<button class="vuoto-cta" id="agg"><span class="big">${figli.length ? "📄" : esc(c.icona)}</span><b>${figli.length ? "Aggiungi un documento qui" : "Questa cartella è vuota"}</b><span class="muted small">Tocca per fotografare o scegliere un file</span></button>` : ""}`;
   const ric = () => vistaCartella(id);
   if (docs.length) collegaDocs($("#docs"), docs, ric);
   collegaNote(c, ric);
   $("#nuova-casa") && ($("#nuova-casa").onclick = () => nuovaCasa(id));
+  $("#nuovo-incarico") && ($("#nuovo-incarico").onclick = async () => {
+    const nome = await chiedi(`Nuovo incarico in “${c.nome}”`, "", { placeholder: "Es. Inventario Coop Ancona",
+      aiuto: "Creo una cartella con dentro Contratto, Buste paga e lo spazio per le note." });
+    if (!nome || !nome.trim()) return;
+    const r = await api("/api/cartelle", { method: "POST", json: { nome: nome.trim(), padre: id, tipo: "lavoro", icona: c.icona || "💼" } });
+    await caricaCartelle(); toast("✅ Incarico aggiunto"); location.hash = `#/c/${r.id}`;
+  });
   $("#cambia-tipo") && ($("#cambia-tipo").onclick = async () => {
     const nuovo = c.tipo === "affitto" ? "proprieta" : "affitto";
     if (!(await conferma(nuovo === "proprieta" ? "Segnare questa casa come di tua proprietà?" : "Segnare questa casa come in affitto?", "Conferma",

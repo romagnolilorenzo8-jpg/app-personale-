@@ -183,6 +183,18 @@ def init_db():
                     if not con.execute("SELECT 1 FROM cartelle WHERE padre=? AND nome=?", (c["id"], sub)).fetchone():
                         con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,?)", (sub, c["id"], ic, o))
             imp_set(con, "lavori_v1", "1")
+        if not imp_get(con, "inventari_v1"):
+            inv = con.execute("SELECT id FROM cartelle WHERE tipo='lavoro' AND lower(nome)='inventari'").fetchone()
+            if inv:
+                for nome in ['Inventario NaturaSì Senigallia', 'Inventario Leroy Merlin Baraccola']:
+                    if not con.execute("SELECT 1 FROM cartelle WHERE padre=? AND lower(nome)=lower(?)", (inv["id"], nome)).fetchone():
+                        _crea_da_modello(con, nome, "📦", inv["id"], "lavoro")
+                for c in con.execute("SELECT id FROM cartelle WHERE padre=? AND nome IN ('Contratto', 'Buste paga')", (inv["id"],)).fetchall():
+                    vuota = not con.execute("SELECT 1 FROM documenti WHERE cartella=?", (c["id"],)).fetchone() and \
+                        not con.execute("SELECT 1 FROM cartelle WHERE padre=?", (c["id"],)).fetchone()
+                    if vuota:
+                        con.execute("DELETE FROM cartelle WHERE id=?", (c["id"],))
+            imp_set(con, "inventari_v1", "1")
 
 
 def _icona_auto(nome: str) -> str:
