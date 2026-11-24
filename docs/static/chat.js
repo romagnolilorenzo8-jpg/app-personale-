@@ -90,6 +90,7 @@
       || /^(compleanni|film|libri|serie|visite|scadenze)( visti| letti| viste)?$/.test(low);
     if (rx("\\b(bilancio|quanto ho (?:speso|guadagnato|incassato)|guadagno|guadagni|profitto|quanto ci ho guadagnato)\\b").test(low)) return { azione: "domanda", cosa: "bilancio" };
     if (rx("\\b(la mia media|media (?:dei )?(?:voti|esami)|qual è la (?:mia )?media|quanti (?:crediti|cfu))\\b").test(low)) return { azione: "domanda", cosa: "esami" };
+    if (rx("\\b(come va|com'è|progressi|andamento|record|massimal[ei]|quanto sollevo)\\b").test(low) && /palestra|forza|massimal|allenam|panca|squat|stacco|esercizi/.test(low)) return { azione: "domanda", cosa: "palestra" };
     if (domanda) {
       let m;
       if ((m = orig.match(rx("compleanno (?:di|del|della) (.+?)\\??$"))) || (m = orig.match(rx("quando (?:compie gli anni|è nat[oa]|e' nat[oa]) (.+?)\\??$"))))
@@ -100,6 +101,7 @@
       if (/\blibr[oi]\b|lett[oi]\b/.test(low)) return { azione: "domanda", cosa: "libro" };
       if (/visit|appuntament|impegn|dentist|medic/.test(low)) return { azione: "domanda", cosa: "visite" };
       if (/scadenz|scade/.test(low)) return { azione: "domanda", cosa: "scadenze" };
+      if (/palestra|allenament|massimal|forza|esercizi/.test(low)) return { azione: "domanda", cosa: "palestra" };
       if (/\besam/.test(low)) return { azione: "domanda", cosa: "esami" };
       if (/acquist|comprat|vendut|spes[oi]\b/.test(low)) return { azione: "domanda", cosa: "bilancio" };
     }
@@ -121,6 +123,33 @@
       if (!d) return { azione: "chiedi", motivo: "data_compleanno", nome: nome ? capParole(nome) : "" };
       if (!nome) return { azione: "chiedi", motivo: "nome_compleanno", ...d };
       return { azione: "compleanno", nome: capParole(nome), giorno: d.giorno, mese: d.mese, anno: d.anno };
+    }
+
+    // ---------------------------------------------------------------- palestra: peso corporeo ed esercizi
+    const KG = /(\d+(?:[.,]\d+)?)\s*(?:kg|chili|chilogrammi|kili|kilo|chilo)\b/i;
+    const mPeso = low.match(rx("^(?:oggi\\s+|stamattina\\s+)?(?:peso|pesavo|il mio peso è|il mio peso|sono)\\s+(?:di\\s+)?(\\d+(?:[.,]\\d+)?)\\s*(?:kg|chili|kili)?\\s*$", "iu"))
+      || low.match(rx("^(?:oggi\\s+)?(?:mi sono pesat[oa]|ho pesato)\\s*:?\\s*(\\d+(?:[.,]\\d+)?)\\s*(?:kg|chili)?", "iu"));
+    if (mPeso && +mPeso[1].replace(",", ".") >= 25 && +mPeso[1].replace(",", ".") <= 300) return { azione: "peso", peso: +mPeso[1].replace(",", "."), data: iso(oggi) };
+    const mAlt = low.match(rx("^(?:sono alto|sono alta|altezza|la mia altezza è|alto|alta)\\s+(\\d(?:[.,]\\d{1,2})?|\\d{3})\\s*(?:m|cm|metri)?\\s*$", "iu"));
+    if (mAlt) { let h = +mAlt[1].replace(",", "."); if (h < 3) h = Math.round(h * 100); if (h >= 100 && h <= 230) return { azione: "altezza", altezza: h }; }
+    const kgM = orig.match(KG);
+    const repM = orig.match(/(\d+)\s*(?:ripetizioni|ripetizione|rip\b|reps?\b|volte)/i) || orig.match(/\bserie\s+da\s+(\d+)\b/i) || orig.match(/\b(?:x|per)\s*(\d+)\b(?!\s*(?:kg|chili|euro|€|cfu))/i)
+      || orig.match(/(\d+)\s*x\s*\d+(?:[.,]\d+)?\s*(?:kg|chili)/i);
+    const serM = orig.match(/(\d+)\s*(?:serie|set)\b/i) || orig.match(/\b(\d+)\s*x\s*(\d+)\b(?!\s*(?:kg|chili))/i);
+    const corpoLibero = rx("\\b(trazioni|piegamenti|flessioni|dip|dips|addominali|crunch|plank|burpees?|squat a corpo libero|pull-?ups?|push-?ups?)\\b").test(low);
+    if ((kgM && repM) || (corpoLibero && (repM || /\d+/.test(low)))) {
+      const numSolo = !repM && orig.match(/\b(\d+)\b/);
+      let reps = repM ? +repM[1] : numSolo ? +numSolo[1] : 0, serie = null;
+      if (serM && serM[2]) { serie = +serM[1]; reps = +serM[2]; } else if (serM) serie = +serM[1];
+      const kg = kgM ? +kgM[1].replace(",", ".") : 0;
+      const quando = dataPassata(low, oggi);
+      let nome = orig;
+      nome = nome.replace(/\d+(?:[.,]\d+)?\s*(?:kg|chili|chilogrammi|kili|kilo|chilo|ripetizioni|ripetizione|rip|reps?|volte|serie|set)?\b/gi, " ")
+        .replace(/\b(?:serie\s+da|da\s*$|x)\b/gi, " ");
+      if (quando.re) nome = nome.replace(new RegExp(quando.re.source, "iu"), " ");
+      nome = nome.replace(rx("\\b(?:ho fatto|ho sollevato|ho alzato|fatto|oggi|ieri|in palestra|palestra|allenamento|esercizio|con|per|un|una|il|lo|la|al|alla|serie|ripetizioni|carico)\\b", "giu"), " ");
+      nome = pulisci(pulisci(nome.replace(/[,.;:!×]+/g, " ").replace(/\s+x\s+|\s+x$/gi, " ")).replace(/\s+(?:da|di|con|a)$/i, ""));
+      if (nome && reps > 0 && reps <= 200) return { azione: "allenamento", esercizio: cap(nome.toLowerCase()), kg, reps, serie, data: quando.data };
     }
 
     // ---------------------------------------------------------------- esami (università / scuola)

@@ -523,8 +523,9 @@ function collegaProssime(el, lista, ricarica) {
 }
 
 async function vistaHome() {
-  const [recenti, info, comp, prossime] = await Promise.all([api("/api/documenti?recenti=true"), LOC ? api("/api/impostazioni") : Promise.resolve(null),
-    api("/api/diario?tipo=compleanno"), prossimeCose(6)]);
+  const [recenti, info, comp, prossime, allen, pesi] = await Promise.all([api("/api/documenti?recenti=true"), LOC ? api("/api/impostazioni") : Promise.resolve(null),
+    api("/api/diario?tipo=compleanno"), prossimeCose(6), api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=peso")]);
+  const ultimoEs = raggruppaEsercizi(allen)[0], pesoOra = ultimoPeso(pesi);
   const foto = await fotoProfilo().catch(() => null);
   const compOggi = comp.filter((x) => infoComp(x).g <= 1);
   const ora = new Date().getHours();
@@ -546,6 +547,9 @@ async function vistaHome() {
           <button data-h="app"><span class="ah-ico"><svg class="ico"><use href="#i-appunt"/></svg></span>Appuntam.</button>
           <button data-h="pw"><span class="ah-ico"><svg class="ico"><use href="#i-chiave"/></svg></span>Password</button>
         </div>
+        <a class="palestra-card" href="#/palestra" style="order:4"><span class="pc-ico">🏋️</span><div style="flex:1;min-width:0"><b>Palestra</b>
+          <div class="small muted">${ultimoEs ? `Ultimo: ${esc(ultimoEs.nome)} ${ultimoEs.ultima.extra.kg ? kgTesto(ultimoEs.ultima.extra.kg) + " × " + ultimoEs.ultima.extra.reps : ultimoEs.ultima.extra.reps + " rip."} · ${dataIt(ultimoEs.ultima.data).replace(/ \d{4}$/, "")}` : "Registra carichi e ripetizioni e guarda i tuoi progressi"}</div></div>
+          ${pesoOra ? `<span class="pc-peso">${kgTesto(pesoOra.extra.peso)}</span>` : ""}<span class="dx">›</span></a>
         <div style="order:4">
           ${S.daSmistare ? `<a class="avviso" href="#/da-smistare"><div class="av-ico">📥</div><div style="flex:1"><b>${S.daSmistare} document${S.daSmistare === 1 ? "o" : "i"} da sistemare</b><div class="small muted">Tocca per metterl${S.daSmistare === 1 ? "o" : "i"} nella cartella giusta</div></div><span class="dx">›</span></a>` : ""}
           ${backupVecchio ? `<a class="avviso" href="#/altro"><div class="av-ico">💾</div><div style="flex:1"><b>Fai un backup</b><div class="small muted">${info.ultimo_backup ? "L'ultimo è del " + dataIt(info.ultimo_backup.slice(0, 10)) : "Non hai ancora salvato una copia"} — serve 1 minuto</div></div><span class="dx">›</span></a>` : ""}
@@ -1319,6 +1323,167 @@ async function vistaIo() {
   $$("[data-foto]").forEach((b) => (b.onclick = () => apriDoc(fotoImg.find((d) => d.id === +b.dataset.foto), ric)));
 }
 
+
+/* ================================================================== PALESTRA */
+/* Forza stimata = massimale stimato (formula di Epley): il peso che potresti sollevare una volta sola.
+   carico × (1 + ripetizioni / 30). Rende confrontabili serie con carichi e ripetizioni diversi.
+   Esercizi a corpo libero (carico 0): si segue il numero di ripetizioni. */
+const forzaStimata = (kg, reps) => (kg > 0 ? (reps <= 1 ? kg : kg * (1 + reps / 30)) : reps);
+const kgTesto = (n) => (n == null ? "—" : (Math.round(n * 10) / 10).toLocaleString("it-IT") + " kg");
+const valoreForza = (kg, n) => (kg > 0 ? kgTesto(n) : `${Math.round(n)} rip.`);
+const chiaveEs = (n) => n.trim().toLowerCase();
+function raggruppaEsercizi(allen) {
+  const m = new Map();
+  allen.slice().sort((a, b) => (a.data || "").localeCompare(b.data || "") || (a.creato || "").localeCompare(b.creato || "") || a.id - b.id)
+    .forEach((x) => { const k = chiaveEs(x.titolo); if (!m.has(k)) m.set(k, { nome: x.titolo, voci: [] }); m.get(k).voci.push(x); });
+  for (const g of m.values()) {
+    g.corpoLibero = g.voci.every((x) => !x.extra?.kg);
+    g.forze = g.voci.map((x) => forzaStimata(x.extra?.kg || 0, x.extra?.reps || 0));
+    g.ultima = g.voci[g.voci.length - 1]; g.record = Math.max(...g.forze);
+    g.progresso = g.forze[0] ? (g.forze[g.forze.length - 1] / g.forze[0] - 1) * 100 : 0;
+  }
+  return [...m.values()].sort((a, b) => (b.ultima.data || "").localeCompare(a.ultima.data || ""));
+}
+function bmi(peso, altezza) {
+  if (!peso || !altezza) return null;
+  const v = peso / Math.pow(altezza / 100, 2);
+  return { v, etichetta: v < 18.5 ? "sottopeso" : v < 25 ? "normopeso" : v < 30 ? "sovrappeso" : "obesità" };
+}
+const ultimoPeso = (pesi) => pesi.slice().sort((a, b) => (b.data || "").localeCompare(a.data || "") || b.id - a.id)[0];
+function scintilla(valori) {   // minigrafico della tendenza, nel colore della serie 1
+  if (valori.length < 2) return "";
+  const w = 84, h = 28, lo = Math.min(...valori), hi = Math.max(...valori), r = hi - lo || 1;
+  const pts = valori.map((v, i) => `${(i / (valori.length - 1)) * (w - 4) + 2},${h - 3 - ((v - lo) / r) * (h - 6)}`);
+  return `<svg class="scintilla" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts.join(" ")}"/><circle cx="${pts[pts.length - 1].split(",")[0]}" cy="${pts[pts.length - 1].split(",")[1]}" r="3"/></svg>`;
+}
+function intervalloY(valori) {   // asse con valori "tondi" (es. 70 · 80 · 90 · 100 · 110)
+  const lo0 = Math.min(...valori), hi0 = Math.max(...valori), pad = (hi0 - lo0) * 0.15 || Math.max(2, hi0 * 0.08);
+  const grezzo = (hi0 - lo0 + 2 * pad) / 4, mag = Math.pow(10, Math.floor(Math.log10(grezzo || 1)));
+  const passo = [1, 2, 2.5, 5, 10].map((k) => k * mag).find((k) => k >= grezzo) || 10 * mag;
+  const lo = Math.max(0, Math.floor((lo0 - pad) / passo) * passo), hi = Math.ceil((hi0 + pad) / passo) * passo;
+  const tickY = []; for (let v = lo; v <= hi + passo / 2; v += passo) tickY.push(Math.round(v * 100) / 100);
+  return { yMin: lo, yMax: hi, tickY };
+}
+
+async function vistaPalestra() {
+  const [allen, pesi, prof] = await Promise.all([api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=peso"), api("/api/profilo")]);
+  const esercizi = raggruppaEsercizi(allen), pAtt = ultimoPeso(pesi), alt = +prof.altezza || null, b = bmi(pAtt?.extra?.peso, alt);
+  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/" aria-label="Indietro">‹</a><h1 style="font-size:28px">🏋️ <span class="grad">Palestra</span><small>Carichi, ripetizioni e progressi</small></h1></div>
+    <div class="bilancio corpo">
+      <div class="bil-griglia" style="margin-top:0">
+        <button class="corpo-dato" id="agg-peso"><div class="bil-et">Peso</div><div class="bil-n">${pAtt ? kgTesto(pAtt.extra.peso) : "—"}</div><div class="bil-sub">${pAtt ? dataIt(pAtt.data) : "tocca per inserirlo"}</div></button>
+        <button class="corpo-dato" id="agg-alt"><div class="bil-et">Altezza</div><div class="bil-n">${alt ? alt + " cm" : "—"}</div><div class="bil-sub">${alt ? "" : "tocca per inserirla"}</div></button>
+        <div class="corpo-dato"><div class="bil-et">BMI</div><div class="bil-n">${b ? dec(b.v, 1) : "—"}</div><div class="bil-sub">${b ? b.etichetta : "serve peso e altezza"}</div></div>
+      </div></div>
+    ${pesi.length >= 2 ? `<div class="grafico-card"><div class="g-tit">Il mio peso</div><div id="g-peso"></div></div>` : ""}
+    <button class="btn block" id="nuovo-es" style="margin:4px 0 6px">➕ Registra un esercizio</button>
+    <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “panca piana 80 kg per 8”</span></a>
+    ${esercizi.length ? `<div class="sezione"><h2>I miei esercizi</h2><span class="muted small">${esercizi.length}</span></div>
+      <div class="esercizi">${esercizi.map((g, i) => { const u = g.ultima.extra || {};
+        return `<a class="esercizio" href="#/palestra/${encodeURIComponent(g.nome)}">
+          <div class="es-testa"><b>${esc(g.nome)}</b>${g.voci.length > 1 ? `<span class="tag ${g.progresso >= 0 ? "ok" : "danger"}">${g.progresso >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(g.progresso))}%</span>` : ""}</div>
+          <div class="es-ultima">${u.kg ? `${kgTesto(u.kg)} × ${u.reps}` : `${u.reps} ripetizioni`}${u.serie ? ` · ${u.serie} serie` : ""}</div>
+          <div class="es-piede"><span class="muted small">${g.corpoLibero ? "Record" : "Forza stimata"}: <b>${valoreForza(u.kg, g.corpoLibero ? g.record : g.forze[g.forze.length - 1])}</b><br>${dataIt(g.ultima.data)}</span>${scintilla(g.forze)}</div></a>`; }).join("")}</div>`
+      : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio ancora.<br>Tocca <b>Registra un esercizio</b> o scrivilo in chat.</div>`}`;
+  const ric = () => vistaPalestra();
+  $("#nuovo-es").onclick = () => registraEsercizio(null, ric);
+  $("#agg-peso").onclick = () => aggiornaCorpo(prof, pAtt, ric);
+  $("#agg-alt").onclick = () => aggiornaCorpo(prof, pAtt, ric);
+  if ($("#g-peso")) {
+    const ord = pesi.slice().sort((a, b) => (a.data || "").localeCompare(b.data || ""));
+    const vals = ord.map((x) => x.extra.peso);
+    window.Grafici.linea($("#g-peso"), { categorie: ord.map((x) => dataIt(x.data).replace(/ \d{4}$/, "")), serie: [{ nome: "Peso", slot: 1, tipo: "linea", punti: true, valori: vals }],
+      ...intervalloY(vals), formato: (v) => kgTesto(v).replace(" kg", ""), titoloTabella: "Vedi i pesi in tabella" });
+  }
+}
+
+async function vistaEsercizio(nome) {
+  const allen = await api("/api/diario?tipo=allenamento");
+  const g = raggruppaEsercizi(allen).find((x) => chiaveEs(x.nome) === chiaveEs(nome));
+  if (!g) { location.hash = "#/palestra"; return; }
+  const ultimaF = g.forze[g.forze.length - 1], lib = g.corpoLibero;
+  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:26px">${esc(g.nome)}<small>${g.voci.length} registrazion${g.voci.length === 1 ? "e" : "i"}</small></h1></div>
+    <div class="bilancio">
+      <div class="bil-top"><div><div class="bil-et">${lib ? "Ripetizioni (ultima volta)" : "Forza stimata (ultima volta)"}</div><div class="bil-num">${valoreForza(g.ultima.extra.kg, ultimaF)}</div>
+        <div class="bil-sub">${lib ? "esercizio a corpo libero" : "il peso che potresti sollevare una volta sola"}</div></div><div class="bil-ico">🏋️</div></div>
+      <div class="bil-griglia">
+        <div><div class="bil-et">Record</div><div class="bil-n">${valoreForza(lib ? 0 : 1, g.record)}</div></div>
+        <div><div class="bil-et">Progresso</div><div class="bil-n ${g.progresso >= 0 ? "su" : "giu"}">${g.voci.length > 1 ? (g.progresso >= 0 ? "+" : "") + dec(g.progresso, 0) + "%" : "—"}</div><div class="bil-sub">dalla prima volta</div></div>
+      </div></div>
+    ${g.voci.length >= 2 ? `<div class="grafico-card"><div class="g-tit">${lib ? "Ripetizioni nel tempo" : "Forza stimata nel tempo"}</div><div id="g-forza"></div>
+      ${lib ? "" : `<p class="small muted" style="margin:6px 4px 2px">Calcolo: carico × (1 + ripetizioni ÷ 30). Esempio: 80 kg × 8 ≈ 101 kg, cioè più forte di 100 kg × 1. Così il grafico è proporzionato anche se cambi peso e ripetizioni.</p>`}</div>` : ""}
+    <button class="btn block" id="agg-serie" style="margin:4px 0 4px">➕ Aggiungi ${esc(g.nome)}</button>
+    <div class="sezione"><h2>Storico</h2></div>
+    <div class="lista" id="storico">${g.voci.slice().reverse().map((x) => { const e = x.extra || {}, f = forzaStimata(e.kg || 0, e.reps || 0);
+      return `<div class="voce" data-al="${x.id}"><div class="datebox" style="--c:var(--accent)"><div class="m">${MESI[new Date(x.data + "T00:00").getMonth()]}</div><div class="g">${new Date(x.data + "T00:00").getDate()}</div></div>
+        <div class="corpo"><div class="tit">${e.kg ? `${kgTesto(e.kg)} × ${e.reps}` : `${e.reps} ripetizioni`}${e.serie ? ` <span class="muted small">· ${e.serie} serie</span>` : ""}</div>
+        <div class="sub">${lib ? "" : `Forza stimata ${kgTesto(f)}`}${f === g.record && g.voci.length > 1 ? " · 🏆 record" : ""}${x.commento ? " · " + esc(x.commento) : ""}</div></div><div class="dx">›</div></div>`; }).join("")}</div>`;
+  const ric = () => vistaEsercizio(g.nome);
+  $("#agg-serie").onclick = () => registraEsercizio(g.nome, ric);
+  $("#storico").onclick = (e) => { const v = e.target.closest("[data-al]"); if (v) registraEsercizio(g.nome, ric, g.voci.find((x) => x.id === +v.dataset.al)); };
+  if ($("#g-forza")) {
+    const vals = g.forze.map((v) => Math.round(v * 10) / 10);
+    window.Grafici.linea($("#g-forza"), { categorie: g.voci.map((x) => dataIt(x.data).replace(/ \d{4}$/, "")),
+      etichette: g.voci.map((x) => `${dataIt(x.data)} · ${x.extra.kg ? `${kgTesto(x.extra.kg)} × ${x.extra.reps}` : `${x.extra.reps} rip.`}`),
+      serie: [{ nome: lib ? "Ripetizioni" : "Forza stimata", slot: 1, tipo: "linea", punti: true, valori: vals }], ...intervalloY(vals),
+      formato: (v) => (lib ? String(Math.round(v)) : kgTesto(v).replace(" kg", "")), titoloTabella: "Vedi i numeri in tabella" });
+  }
+}
+
+async function registraEsercizio(nome, dopo, voce) {
+  const nomi = raggruppaEsercizi(await api("/api/diario?tipo=allenamento")).map((g) => g.nome);
+  const e = voce?.extra || {};
+  const v = foglio(`<h3>🏋️ ${voce ? "Modifica" : "Registra un esercizio"} ${xBtn}</h3><form id="fe">
+    <label class="campo"><span>Esercizio</span><input type="text" name="titolo" list="nomi-es" value="${esc(nome || "")}" required placeholder="Es. Panca piana, Squat, Trazioni"></label>
+    <datalist id="nomi-es">${nomi.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
+    ${!nome && nomi.length ? `<div class="pronti" style="margin:-4px 0 12px">${nomi.slice(0, 8).map((n) => `<button type="button" class="chip" data-n="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : ""}
+    <div class="riga"><label class="campo"><span>Carico (kg)</span><input type="number" name="kg" inputmode="decimal" step="0.5" min="0" value="${e.kg ?? ""}" placeholder="0 = corpo libero"></label>
+      <label class="campo"><span>Ripetizioni</span><input type="number" name="reps" inputmode="numeric" min="1" max="200" value="${e.reps ?? ""}" required></label>
+      <label class="campo"><span>Serie</span><input type="number" name="serie" inputmode="numeric" min="1" max="30" value="${e.serie ?? ""}" placeholder="facolt."></label></div>
+    <div class="anteprima-forza" id="ant-forza"></div>
+    <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || oggiIso())}"></label>
+    <label class="campo"><span>Note <i class="muted">(facoltativo)</i></span><input type="text" name="commento" value="${esc(voce?.commento || "")}" placeholder="Es. con fermo al petto, presa stretta…"></label>
+    <button class="btn block">Salva</button>
+    ${voce ? `<button type="button" class="btn danger block" id="del-es" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
+  const f = $("#fe", v);
+  const anteprima = () => {
+    const kg = parseFloat(f.kg.value) || 0, r = parseInt(f.reps.value, 10);
+    $("#ant-forza", v).innerHTML = r > 0 ? (kg > 0 ? `💪 Forza stimata: <b>${kgTesto(forzaStimata(kg, r))}</b> <span class="muted">(il peso che potresti sollevare una volta)</span>` : `💪 Esercizio a corpo libero: conto le ripetizioni`) : "";
+  };
+  f.kg.oninput = anteprima; f.reps.oninput = anteprima; anteprima();
+  $$(".pronti [data-n]", v).forEach((b) => (b.onclick = () => { f.titolo.value = b.dataset.n; f.kg.focus(); }));
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const d = Object.fromEntries(new FormData(f));
+    const esistente = nomi.find((n) => chiaveEs(n) === chiaveEs(d.titolo));
+    const dati = { tipo: "allenamento", titolo: esistente || d.titolo.trim(), data: d.data || oggiIso(), commento: d.commento, extra: { kg: d.kg === "" ? 0 : +d.kg, reps: +d.reps, serie: d.serie ? +d.serie : null } };
+    try { await api(voce ? `/api/diario/${voce.id}` : "/api/diario", { method: voce ? "PUT" : "POST", json: voce ? { ...voce, ...dati } : dati }); v.chiudi(); toast("💪 Salvato"); if (dopo) dopo(); }
+    catch (err) { toast("⚠️ " + err.message); }
+  };
+  $("#del-es", v) && ($("#del-es", v).onclick = async () => {
+    if (!(await conferma("Eliminare questa registrazione?"))) return;
+    await api(`/api/diario/${voce.id}`, { method: "DELETE" }); v.chiudi(); toast("🗑️ Eliminata"); if (dopo) dopo();
+  });
+}
+
+function aggiornaCorpo(prof, pAtt, dopo) {
+  const v = foglio(`<h3>⚖️ Peso e altezza ${xBtn}</h3><form id="fc">
+    <div class="riga"><label class="campo"><span>Peso di oggi (kg)</span><input type="number" name="peso" inputmode="decimal" step="0.1" min="20" max="400" value="" placeholder="${pAtt ? pAtt.extra.peso : "es. 72,5"}"></label>
+      <label class="campo"><span>Altezza (cm)</span><input type="number" name="altezza" inputmode="numeric" min="100" max="230" value="${esc(prof.altezza || "")}" placeholder="es. 178"></label></div>
+    <p class="small muted" style="margin:-4px 4px 12px">Ogni peso che inserisci viene salvato con la data, così vedi l'andamento nel grafico.</p>
+    <button class="btn block">Salva</button></form>`);
+  setTimeout(() => $("[name=peso]", v).focus(), 80);
+  $("#fc", v).onsubmit = async (e) => {
+    e.preventDefault();
+    const d = Object.fromEntries(new FormData(e.target));
+    try {
+      if (d.peso) await api("/api/diario", { method: "POST", json: { tipo: "peso", titolo: "Peso", data: oggiIso(), extra: { peso: +d.peso } } });
+      if (d.altezza && d.altezza !== String(prof.altezza || "")) await api("/api/profilo", { method: "PUT", json: { ...prof, altezza: d.altezza } });
+      v.chiudi(); toast("✅ Salvato"); if (dopo) dopo();
+    } catch (err) { toast("⚠️ " + err.message); }
+  };
+}
+
 /* ================================================================== DIARIO: film, libri, serie, compleanni */
 const TIPI_D = {
   film: { ico: "🎬", nome: "Film", plurale: "Film visti", verbo: "visto il", vuoto: "Scrivi in chat: “stasera ho visto After”" },
@@ -1773,7 +1938,7 @@ function apriIcsCompleanni(lista) {
 }
 
 /* ================================================================== CHAT */
-const AIUTO = ["importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "esame di Fisica da 12 cfu", "primo modulo di Fisica con 27", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
+const AIUTO = ["panca piana 80 kg per 8", "oggi peso 72,5 kg", "importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "esame di Fisica da 12 cfu", "primo modulo di Fisica con 27", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
   "il 16 dicembre dentista dalle 10 alle 11", "quando è il compleanno di Marco?", "che film ho visto?"];
 const chatStoria = () => { try { return JSON.parse(memo.get("chat") || "[]"); } catch { return []; } };
 const chatSalva = (l) => memo.set("chat", JSON.stringify(l.slice(-150)));
@@ -1905,6 +2070,24 @@ async function rispondi(testo) {
     return { da: "scrigno", html: `🎓 ${nuovo ? "Complimenti! Ho salvato" : "Ho aggiornato"} <b>${esc(salvato.titolo)}</b> con <b>${votoTesto(salvato.extra)}</b> (${salvato.extra.cfu} CFU${r.cfu ? "" : ", se sono di più cambialo nell'esame"}).<br>La tua media ora è <b>${dec(st.ponderata)}</b> su ${st.n} esam${st.n === 1 ? "e" : "i"}.`,
       azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }, ...(nuovo ? [{ t: "annulla", url: `/api/diario/${salvato.id}`, etichetta: "↩️ Annulla" }] : [])] };
   }
+  if (r.azione === "allenamento") {
+    const prima = raggruppaEsercizi(await api("/api/diario?tipo=allenamento")).find((g) => chiaveEs(g.nome) === chiaveEs(r.esercizio));
+    const x = await api("/api/diario", { method: "POST", json: { tipo: "allenamento", titolo: prima ? prima.nome : r.esercizio, data: r.data, extra: { kg: r.kg, reps: r.reps, serie: r.serie } } });
+    const f = forzaStimata(r.kg, r.reps), record = prima && f > prima.record;
+    return { da: "scrigno", html: `💪 Segnato: <b>${esc(x.titolo)}</b> — ${r.kg ? `${kgTesto(r.kg)} × ${r.reps}` : `${r.reps} ripetizioni`}${r.serie ? ` (${r.serie} serie)` : ""}<br>` +
+      (r.kg ? `Forza stimata: <b>${kgTesto(f)}</b>` : "") + (record ? `<br>🏆 <b>Nuovo record!</b> Prima era ${valoreForza(r.kg, prima.record)}.` : prima ? `<br><span class="muted">Il tuo record resta ${valoreForza(r.kg, prima.record)}.</span>` : ""),
+      azioni: [{ t: "apri", hash: `#/palestra/${encodeURIComponent(x.titolo)}`, etichetta: "📈 Vedi il grafico" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
+  }
+  if (r.azione === "peso") {
+    const x = await api("/api/diario", { method: "POST", json: { tipo: "peso", titolo: "Peso", data: r.data, extra: { peso: r.peso } } });
+    const prof = await api("/api/profilo"), b = bmi(r.peso, +prof.altezza);
+    return { da: "scrigno", html: `⚖️ Peso segnato: <b>${kgTesto(r.peso)}</b>${b ? `<br>BMI ${dec(b.v, 1)} (${b.etichetta})` : "<br><span class='muted'>Dimmi anche la tua altezza (es. “sono alto 1,78”) e calcolo il BMI.</span>"}`,
+      azioni: [{ t: "apri", hash: "#/palestra", etichetta: "🏋️ Palestra" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
+  }
+  if (r.azione === "altezza") {
+    const prof = await api("/api/profilo"); await api("/api/profilo", { method: "PUT", json: { ...prof, altezza: String(r.altezza) } });
+    return { da: "scrigno", html: `📏 Altezza salvata: <b>${r.altezza} cm</b>.`, azioni: [{ t: "apri", hash: "#/palestra", etichetta: "🏋️ Palestra" }] };
+  }
   if (r.azione === "acquisto") {
     const x = await api("/api/diario", { method: "POST", json: { tipo: "acquisto", titolo: r.nome, data: r.data, extra: { prezzo: r.prezzo, categoria: r.categoria } } });
     return { da: "scrigno", html: `🛒 Segnato: <b>${esc(x.titolo)}</b>, prezzo pagato <b>${euro(r.prezzo)}</b> (${CATEGORIE_ACQ[r.categoria] || ""}).<br>Quando lo vendi scrivimi <i>ho venduto ${esc(x.titolo.toLowerCase())} a …</i> e ti faccio il bilancio.`,
@@ -1974,6 +2157,12 @@ async function rispondi(testo) {
       const st = statEsami(l);
       return { da: "scrigno", html: `🎓 Esami superati: <b>${st.n}</b>${st.idonei ? ` + ${st.idonei} idoneità` : ""}, ${st.cfu} crediti${st.inCorso ? ` (+${st.inCorso} in corso)` : ""}<br>Media ponderata: <b>${dec(st.ponderata)}</b><br>Media aritmetica: <b>${dec(st.media)}</b><br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
         azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }] };
+    }
+    if (r.cosa === "palestra") {
+      const es = raggruppaEsercizi(await api("/api/diario?tipo=allenamento"));
+      if (!es.length) return { da: "scrigno", html: "Non hai ancora segnato esercizi. Scrivimi ad esempio <i>panca piana 80 kg per 8</i>." };
+      return { da: "scrigno", html: `🏋️ I tuoi esercizi:<br>${es.slice(0, 6).map((g) => `• <b>${esc(g.nome)}</b>: ${valoreForza(g.ultima.extra.kg, g.forze[g.forze.length - 1])}${g.voci.length > 1 ? ` (${g.progresso >= 0 ? "+" : ""}${Math.round(g.progresso)}% dalla prima volta)` : ""}`).join("<br>")}`,
+        azioni: [{ t: "apri", hash: "#/palestra", etichetta: "🏋️ Apri Palestra" }] };
     }
     if (r.cosa === "visite") {
       const l = (await api("/api/appuntamenti")).slice(0, 5);
@@ -2072,7 +2261,7 @@ async function renderPagina() {
   $$(".velo, .visore").forEach((v) => v.remove());
   const h = decodeURIComponent(location.hash.slice(2));
   const [sez, arg] = [h.split("/")[0], h.split("/").slice(1).join("/")];
-  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home" }[sez] || sez;
+  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home", palestra: "home" }[sez] || sez;
   document.body.classList.toggle("in-chat", sez === "chat");
   $$("#tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
   scrollTo(0, 0);
@@ -2084,6 +2273,7 @@ async function renderPagina() {
     else if (sez === "password") await vistaPassword();
     else if (sez === "diario") await vistaDiario(arg);
     else if (sez === "io") await vistaIo();
+    else if (sez === "palestra") await (arg ? vistaEsercizio(arg) : vistaPalestra());
     else if (sez === "chat") vistaChat(arg || "");
     else if (sez === "altro") await (LOC ? vistaAltroLocale() : vistaAltroServer());
     else if (sez === "scadenze") await vistaScadenze();

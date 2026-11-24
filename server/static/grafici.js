@@ -136,11 +136,13 @@
         crea("circle", { cx: lx, cy: ly, r: 4, class: `g-punto s${s.slot}` }, svg);
         crea("text", { x: lx + 8, y: ly + 4, class: "g-etichetta" }, svg).textContent = formato(ult);   // etichetta solo in fondo
       }
+      if (s.tipo === "linea" && s.punti) pts.slice(0, -1).forEach(([px, py]) => crea("circle", { cx: px, cy: py, r: 4, class: `g-punto s${s.slot}` }, svg));
       if (s.tipo === "punti") pts.forEach(([px, py]) => crea("circle", { cx: px, cy: py, r: 4.5, class: `g-punto s${s.slot}` }, svg));
     });
     const passoEtich = Math.ceil(n / Math.max(1, Math.floor(pw / 46)));
     categorie.forEach((c, i) => {
-      if (i % passoEtich === 0 || i === n - 1)
+      const vicinoUltima = i !== n - 1 && x(n - 1) - x(i) < 58;   // non sovrapporre la penultima etichetta all'ultima
+      if ((i % passoEtich === 0 || i === n - 1) && !vicinoUltima)
         crea("text", { x: x(i), y: H - 6, class: "g-tacca", "text-anchor": i === 0 && n > 1 ? "start" : i === n - 1 && n > 1 ? "end" : "middle" }, svg).textContent = c;
     });
     let att = -1;

@@ -379,7 +379,7 @@
   }
 
   /* ------------------------------------------------------------ diario */
-  const TIPI = ["film", "libro", "serie", "compleanno", "esame", "acquisto"];
+  const TIPI = ["film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso"];
   const numero = (v) => (v === "" || v == null || isNaN(+v) ? null : Math.round(+v * 100) / 100);
   function normExtra(tipo, e) {
     e = e || {};
@@ -402,6 +402,17 @@
       const voto = numero(e.voto);
       if (voto == null || !votoOk(voto)) throw errore(400, "Il voto deve essere tra 18 e 30");
       return { voto, lode: !!e.lode && voto === 30, cfu: numero(e.cfu) ?? 6 };
+    }
+    if (tipo === "allenamento") {
+      const kg = numero(e.kg) ?? 0, reps = numero(e.reps);
+      if (!reps || reps < 1) throw errore(400, "Indica le ripetizioni");
+      if (kg < 0 || kg > 1000) throw errore(400, "Carico non valido");
+      return { kg, reps: Math.round(reps), serie: numero(e.serie) ? Math.round(numero(e.serie)) : null };
+    }
+    if (tipo === "peso") {
+      const peso = numero(e.peso);
+      if (!peso || peso < 20 || peso > 400) throw errore(400, "Peso non valido");
+      return { peso };
     }
     if (["film", "libro", "serie"].includes(tipo)) {
       const cop = typeof e.copertina === "string" && e.copertina.length < 400000 ? e.copertina : null;

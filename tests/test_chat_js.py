@@ -33,6 +33,13 @@ CASI = {
     "la seconda parte di chimica con 25": {"materia": "Chimica", "voto": 25, "modulo": 2},
     "il 12 gennaio esame di chimica": {"azione": "appuntamento"},
     "esami del sangue il 3 dicembre alle 8": {"azione": "appuntamento"},
+    "panca piana 80 kg per 8": {"azione": "allenamento", "esercizio": "Panca piana", "kg": 80, "reps": 8},
+    "squat 100 kg 5 ripetizioni": {"azione": "allenamento", "esercizio": "Squat", "kg": 100, "reps": 5},
+    "ho fatto stacco da terra 120kg x 3": {"esercizio": "Stacco da terra", "kg": 120, "reps": 3},
+    "lat machine 4 serie da 10 con 50 kg": {"esercizio": "Lat machine", "kg": 50, "reps": 10, "serie": 4},
+    "ieri trazioni 8 ripetizioni": {"esercizio": "Trazioni", "kg": 0, "reps": 8, "data": "2026-11-22"},
+    "oggi peso 72,5 kg": {"azione": "peso", "peso": 72.5},
+    "sono alto 1,78": {"azione": "altezza", "altezza": 178},
 }
 
 
