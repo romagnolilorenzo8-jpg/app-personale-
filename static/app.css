@@ -781,3 +781,25 @@ a, .link-btn { color: var(--accent); }
 .tema i::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 25% 30%, rgba(255, 255, 255, .45), transparent 45%); }
 .tema.on { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
 @media (prefers-reduced-motion: reduce) { ::view-transition-old(root), ::view-transition-new(root) { animation: none; } }
+
+/* --- palestra */
+.palestra-card { display: flex; align-items: center; gap: 12px; padding: 14px; margin-top: 12px; border-radius: 20px; color: var(--text);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--t1) 22%, var(--card)), color-mix(in srgb, var(--t3) 16%, var(--card))); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.pc-ico { font-size: 30px; width: 50px; height: 50px; border-radius: 16px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 18%, transparent); flex: none; }
+.pc-peso { font-weight: 800; font-size: 15px; background: var(--card2); border-radius: 12px; padding: 6px 10px; flex: none; }
+.bilancio.corpo { padding: 14px; }
+.corpo-dato { border: 1px solid rgba(255, 255, 255, .14); background: rgba(255, 255, 255, .1); border-radius: 16px; padding: 10px 12px; text-align: left; color: #fff; font: inherit; cursor: pointer; }
+div.corpo-dato { cursor: default; }
+.bilancio.corpo .bil-griglia { grid-template-columns: repeat(3, 1fr); }
+.esercizi { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.esercizio { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); color: var(--text);
+  -webkit-backdrop-filter: var(--vetro); backdrop-filter: var(--vetro); animation: entra .45s cubic-bezier(.2, .8, .2, 1) both; }
+.es-testa { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.es-testa b { font-size: 16px; }
+.es-ultima { font-size: 20px; font-weight: 800; letter-spacing: -.01em; }
+.es-piede { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+.scintilla { width: 84px; height: 28px; flex: none; }
+.scintilla polyline { fill: none; stroke: var(--s1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.scintilla circle { fill: var(--s1); }
+.anteprima-forza { font-size: 14px; margin: -4px 4px 12px; min-height: 20px; }
+.bilancio.corpo .bil-n { font-size: 18px; white-space: nowrap; }
