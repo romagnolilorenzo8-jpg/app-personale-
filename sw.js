@@ -1,5 +1,5 @@
 // Fa funzionare Scrigno anche senza connessione (generato da tools/crea_versione_iphone.py)
-const CACHE = "scrigno-d5352c4f2a";
+const CACHE = "scrigno-58a9cc46b6";
 const FILE = ["./", "index.html", "manifest.webmanifest", "static/app.css", "static/app.js", "static/chat.js", "static/icona-180.png", "static/icona-192.png", "static/icona-512.png", "static/icona.svg", "static/locale.js", "static/nlp.js"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILE))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((k) => Promise.all(k.filter((x) => x !== CACHE).map((x) => caches.delete(x)))).then(() => self.clients.claim())));
