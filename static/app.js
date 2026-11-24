@@ -35,15 +35,18 @@ const memo = { get: (k) => { try { return localStorage.getItem("scrigno-" + k); 
 /* Le pagine già viste si aprono subito: le risposte restano valide 20 secondi
    e vengono cancellate a ogni modifica (salvataggio, spostamento, eliminazione…). */
 const memoria = new Map();
-const svuotaMemoria = () => memoria.clear();
+let giroMemoria = 0;   // cambia a ogni modifica: una lettura partita prima non rimette in memoria dati vecchi
+const svuotaMemoria = () => { memoria.clear(); giroMemoria++; };
 async function api(url, opts = {}) {
-  if (LOC) return window.LOCALE.api(url, opts);
   const get = !opts.method || opts.method.toUpperCase() === "GET";
-  if (get) { const c = memoria.get(url); if (c && Date.now() - c.t < 20000) return c.v; }
-  else svuotaMemoria();
-  const dati = await apiRete(url, opts);
-  if (get && !/cassaforte|impostazioni/.test(url)) memoria.set(url, { t: Date.now(), v: dati });
-  return dati;
+  if (get && !opts.fresco) { const c = memoria.get(url); if (c && Date.now() - c.t < 20000) return structuredClone(c.v); }
+  if (!get) svuotaMemoria();
+  const giro = giroMemoria;
+  try {
+    const dati = LOC ? await window.LOCALE.api(url, opts) : await apiRete(url, opts);
+    if (get && giro === giroMemoria && !/cassaforte|impostazioni/.test(url)) memoria.set(url, { t: Date.now(), v: structuredClone(dati) });
+    return dati;
+  } finally { if (!get) svuotaMemoria(); }
 }
 async function apiRete(url, opts) {
   const o = { credentials: "same-origin", ...opts, headers: { ...(opts.headers || {}) } };
@@ -296,7 +299,7 @@ async function caricaFile(files, { cartella = null, scadenza = null, nome = null
   };
   if (LOC) {
     $("#pb", v).style.width = "60%";
-    try { await window.LOCALE.carica(files, { cartella, scadenza, nome }); await fine(true); }
+    try { svuotaMemoria(); await window.LOCALE.carica(files, { cartella, scadenza, nome }); svuotaMemoria(); await fine(true); }
     catch (e) { await fine(false, e.name === "QuotaExceededError" ? "Spazio esaurito sul telefono" : e.message); }
     return;
   }
@@ -1140,7 +1143,7 @@ async function vistaAltroLocale() {
   $("#file-backup").onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
     if (!(await conferma("Ripristinare questo backup?", "Ripristina", "Tutto quello che c'è ora in Scrigno su questo iPhone verrà sostituito dal contenuto del backup."))) return;
-    try { const r = await window.LOCALE.ripristina(f); await caricaCartelle(); toast(`♻️ Ripristinati ${r.documenti} documenti e ${r.appuntamenti} visite`); location.hash = "#/"; }
+    try { svuotaMemoria(); const r = await window.LOCALE.ripristina(f); await caricaCartelle(); toast(`♻️ Ripristinati ${r.documenti} documenti e ${r.appuntamenti} visite`); location.hash = "#/"; }
     catch (err) { toast("⚠️ " + err.message); }
   };
   $("#cambia").onclick = () => cambiaPassword("Cambia password della cassaforte");
@@ -1332,13 +1335,20 @@ const forzaStimata = (kg, reps) => (kg > 0 ? (reps <= 1 ? kg : kg * (1 + reps / 
 const kgTesto = (n) => (n == null ? "—" : (Math.round(n * 10) / 10).toLocaleString("it-IT") + " kg");
 const valoreForza = (kg, n) => (kg > 0 ? kgTesto(n) : `${Math.round(n)} rip.`);
 const chiaveEs = (n) => n.trim().toLowerCase();
+const serieDi = (e = {}) => (Array.isArray(e.set) && e.set.length ? e.set : [{ kg: e.kg || 0, reps: e.reps || 0 }]);
+const kgCorto = (n) => (Math.round(n * 10) / 10).toLocaleString("it-IT");
+function testoSerie(e = {}) {   // "20×12 · 30×10 · 40×8 kg" oppure "80 kg × 8 · 3 serie"
+  const s = serieDi(e);
+  if (s.length > 1) return s.every((x) => !x.kg) ? s.map((x) => x.reps).join(" · ") + " ripetizioni" : s.map((x) => (x.kg ? `${kgCorto(x.kg)}×${x.reps}` : `${x.reps} rip.`)).join(" · ") + (s.some((x) => x.kg) ? " kg" : "");
+  return (e.kg ? `${kgTesto(e.kg)} × ${e.reps}` : `${e.reps} ripetizioni`) + (e.serie > 1 ? ` · ${e.serie} serie` : "");
+}
 function raggruppaEsercizi(allen) {
   const m = new Map();
   allen.slice().sort((a, b) => (a.data || "").localeCompare(b.data || "") || (a.creato || "").localeCompare(b.creato || "") || a.id - b.id)
     .forEach((x) => { const k = chiaveEs(x.titolo); if (!m.has(k)) m.set(k, { nome: x.titolo, voci: [] }); m.get(k).voci.push(x); });
   for (const g of m.values()) {
     g.corpoLibero = g.voci.every((x) => !x.extra?.kg);
-    g.forze = g.voci.map((x) => forzaStimata(x.extra?.kg || 0, x.extra?.reps || 0));
+    g.forze = g.voci.map((x) => Math.max(...serieDi(x.extra).map((s) => forzaStimata(s.kg || 0, s.reps || 0))));
     g.ultima = g.voci[g.voci.length - 1]; g.record = Math.max(...g.forze);
     g.progresso = g.forze[0] ? (g.forze[g.forze.length - 1] / g.forze[0] - 1) * 100 : 0;
   }
@@ -1382,7 +1392,7 @@ async function vistaPalestra() {
       <div class="esercizi">${esercizi.map((g, i) => { const u = g.ultima.extra || {};
         return `<a class="esercizio" href="#/palestra/${encodeURIComponent(g.nome)}">
           <div class="es-testa"><b>${esc(g.nome)}</b>${g.voci.length > 1 ? `<span class="tag ${g.progresso >= 0 ? "ok" : "danger"}">${g.progresso >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(g.progresso))}%</span>` : ""}</div>
-          <div class="es-ultima">${u.kg ? `${kgTesto(u.kg)} × ${u.reps}` : `${u.reps} ripetizioni`}${u.serie ? ` · ${u.serie} serie` : ""}</div>
+          <div class="es-ultima">${testoSerie(u)}</div>
           <div class="es-piede"><span class="muted small">${g.corpoLibero ? "Record" : "Forza stimata"}: <b>${valoreForza(u.kg, g.corpoLibero ? g.record : g.forze[g.forze.length - 1])}</b><br>${dataIt(g.ultima.data)}</span>${scintilla(g.forze)}</div></a>`; }).join("")}</div>`
       : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio ancora.<br>Tocca <b>Registra un esercizio</b> o scrivilo in chat.</div>`}`;
   const ric = () => vistaPalestra();
@@ -1414,9 +1424,9 @@ async function vistaEsercizio(nome) {
       ${lib ? "" : `<p class="small muted" style="margin:6px 4px 2px">Calcolo: carico × (1 + ripetizioni ÷ 30). Esempio: 80 kg × 8 ≈ 101 kg, cioè più forte di 100 kg × 1. Così il grafico è proporzionato anche se cambi peso e ripetizioni.</p>`}</div>` : ""}
     <button class="btn block" id="agg-serie" style="margin:4px 0 4px">➕ Aggiungi ${esc(g.nome)}</button>
     <div class="sezione"><h2>Storico</h2></div>
-    <div class="lista" id="storico">${g.voci.slice().reverse().map((x) => { const e = x.extra || {}, f = forzaStimata(e.kg || 0, e.reps || 0);
+    <div class="lista" id="storico">${g.voci.slice().reverse().map((x) => { const e = x.extra || {}, f = Math.max(...serieDi(e).map((s) => forzaStimata(s.kg || 0, s.reps || 0)));
       return `<div class="voce" data-al="${x.id}"><div class="datebox" style="--c:var(--accent)"><div class="m">${MESI[new Date(x.data + "T00:00").getMonth()]}</div><div class="g">${new Date(x.data + "T00:00").getDate()}</div></div>
-        <div class="corpo"><div class="tit">${e.kg ? `${kgTesto(e.kg)} × ${e.reps}` : `${e.reps} ripetizioni`}${e.serie ? ` <span class="muted small">· ${e.serie} serie</span>` : ""}</div>
+        <div class="corpo"><div class="tit">${testoSerie(e)}</div>
         <div class="sub">${lib ? "" : `Forza stimata ${kgTesto(f)}`}${f === g.record && g.voci.length > 1 ? " · 🏆 record" : ""}${x.commento ? " · " + esc(x.commento) : ""}</div></div><div class="dx">›</div></div>`; }).join("")}</div>`;
   const ric = () => vistaEsercizio(g.nome);
   $("#agg-serie").onclick = () => registraEsercizio(g.nome, ric);
@@ -1424,7 +1434,7 @@ async function vistaEsercizio(nome) {
   if ($("#g-forza")) {
     const vals = g.forze.map((v) => Math.round(v * 10) / 10);
     window.Grafici.linea($("#g-forza"), { categorie: g.voci.map((x) => dataIt(x.data).replace(/ \d{4}$/, "")),
-      etichette: g.voci.map((x) => `${dataIt(x.data)} · ${x.extra.kg ? `${kgTesto(x.extra.kg)} × ${x.extra.reps}` : `${x.extra.reps} rip.`}`),
+      etichette: g.voci.map((x) => `${dataIt(x.data)} · ${testoSerie(x.extra)}`),
       serie: [{ nome: lib ? "Ripetizioni" : "Forza stimata", slot: 1, tipo: "linea", punti: true, valori: vals }], ...intervalloY(vals),
       formato: (v) => (lib ? String(Math.round(v)) : kgTesto(v).replace(" kg", "")), titoloTabella: "Vedi i numeri in tabella" });
   }
@@ -1437,26 +1447,46 @@ async function registraEsercizio(nome, dopo, voce) {
     <label class="campo"><span>Esercizio</span><input type="text" name="titolo" list="nomi-es" value="${esc(nome || "")}" required placeholder="Es. Panca piana, Squat, Trazioni"></label>
     <datalist id="nomi-es">${nomi.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
     ${!nome && nomi.length ? `<div class="pronti" style="margin:-4px 0 12px">${nomi.slice(0, 8).map((n) => `<button type="button" class="chip" data-n="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : ""}
-    <div class="riga"><label class="campo"><span>Carico (kg)</span><input type="number" name="kg" inputmode="decimal" step="0.5" min="0" value="${e.kg ?? ""}" placeholder="0 = corpo libero"></label>
-      <label class="campo"><span>Ripetizioni</span><input type="number" name="reps" inputmode="numeric" min="1" max="200" value="${e.reps ?? ""}" required></label>
-      <label class="campo"><span>Serie</span><input type="number" name="serie" inputmode="numeric" min="1" max="30" value="${e.serie ?? ""}" placeholder="facolt."></label></div>
+    <div class="serie-intest"><span></span><span>Carico (kg)</span><span>Ripetizioni</span><span></span></div>
+    <div id="righe-serie"></div>
+    <button type="button" class="btn sec block" id="piu-serie" style="margin:2px 0 10px">➕ Aggiungi serie</button>
     <div class="anteprima-forza" id="ant-forza"></div>
     <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || oggiIso())}"></label>
     <label class="campo"><span>Note <i class="muted">(facoltativo)</i></span><input type="text" name="commento" value="${esc(voce?.commento || "")}" placeholder="Es. con fermo al petto, presa stretta…"></label>
     <button class="btn block">Salva</button>
     ${voce ? `<button type="button" class="btn danger block" id="del-es" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
-  const f = $("#fe", v);
+  const f = $("#fe", v), box = $("#righe-serie", v);
+  const leggi = () => $$(".riga-serie", box).map((r) => ({ kg: parseFloat($("[name=kg]", r).value) || 0, reps: parseInt($("[name=reps]", r).value, 10) || 0 }));
   const anteprima = () => {
-    const kg = parseFloat(f.kg.value) || 0, r = parseInt(f.reps.value, 10);
-    $("#ant-forza", v).innerHTML = r > 0 ? (kg > 0 ? `💪 Forza stimata: <b>${kgTesto(forzaStimata(kg, r))}</b> <span class="muted">(il peso che potresti sollevare una volta)</span>` : `💪 Esercizio a corpo libero: conto le ripetizioni`) : "";
+    const s = leggi().filter((x) => x.reps > 0);
+    $$(".riga-serie", box).forEach((r, i) => { $(".n-serie", r).textContent = i + 1; $(".togli", r).hidden = $$(".riga-serie", box).length < 2; });
+    if (!s.length) { $("#ant-forza", v).innerHTML = ""; return; }
+    const best = s.reduce((a, x) => (forzaStimata(x.kg, x.reps) > forzaStimata(a.kg, a.reps) ? x : a));
+    $("#ant-forza", v).innerHTML = best.kg > 0 ? `💪 Forza stimata: <b>${kgTesto(forzaStimata(best.kg, best.reps))}</b> <span class="muted">(${s.length > 1 ? `dalla serie migliore, ${kgCorto(best.kg)} kg × ${best.reps}` : "il peso che potresti sollevare una volta"})</span>` : `💪 Esercizio a corpo libero: conto le ripetizioni`;
   };
-  f.kg.oninput = anteprima; f.reps.oninput = anteprima; anteprima();
-  $$(".pronti [data-n]", v).forEach((b) => (b.onclick = () => { f.titolo.value = b.dataset.n; f.kg.focus(); }));
+  const riga = (s = {}) => {
+    box.insertAdjacentHTML("beforeend", `<div class="riga-serie"><span class="n-serie"></span>
+      <input type="number" name="kg" inputmode="decimal" step="0.5" min="0" value="${s.kg ?? ""}" placeholder="0 = corpo libero" aria-label="Carico in kg">
+      <input type="number" name="reps" inputmode="numeric" min="1" max="200" value="${s.reps || ""}" required aria-label="Ripetizioni">
+      <button type="button" class="togli" aria-label="Togli serie">✕</button></div>`);
+    const r = box.lastElementChild;
+    $(".togli", r).onclick = () => { r.remove(); anteprima(); };
+    $$("input", r).forEach((i) => (i.oninput = anteprima));
+    return r;
+  };
+  const iniziali = voce ? (Array.isArray(e.set) && e.set.length ? e.set : Array.from({ length: Math.min(e.serie || 1, 20) }, () => ({ kg: e.kg, reps: e.reps }))) : [{}];
+  iniziali.forEach((s) => riga(s)); anteprima();
+  $("#piu-serie", v).onclick = () => { const s = leggi(), u = s[s.length - 1] || {}; const r = riga({ kg: u.kg || "", reps: u.reps || "" }); anteprima(); $("[name=kg]", r).focus(); $("[name=kg]", r).select?.(); };
+  $$(".pronti [data-n]", v).forEach((b) => (b.onclick = () => { f.titolo.value = b.dataset.n; $("[name=kg]", box).focus(); }));
   f.onsubmit = async (ev) => {
     ev.preventDefault();
-    const d = Object.fromEntries(new FormData(f));
+    const d = { titolo: f.titolo.value, data: f.data.value, commento: f.commento.value };
+    const set = leggi().filter((x) => x.reps > 0);
+    if (!set.length) { toast("⚠️ Indica le ripetizioni"); return; }
     const esistente = nomi.find((n) => chiaveEs(n) === chiaveEs(d.titolo));
-    const dati = { tipo: "allenamento", titolo: esistente || d.titolo.trim(), data: d.data || oggiIso(), commento: d.commento, extra: { kg: d.kg === "" ? 0 : +d.kg, reps: +d.reps, serie: d.serie ? +d.serie : null } };
+    const best = set.reduce((a, x) => (forzaStimata(x.kg, x.reps) > forzaStimata(a.kg, a.reps) ? x : a));
+    const dati = { tipo: "allenamento", titolo: esistente || d.titolo.trim(), data: d.data || oggiIso(), commento: d.commento,
+      extra: set.length > 1 ? { kg: best.kg, reps: best.reps, serie: set.length, set } : { kg: best.kg, reps: best.reps, serie: null } };
     try { await api(voce ? `/api/diario/${voce.id}` : "/api/diario", { method: voce ? "PUT" : "POST", json: voce ? { ...voce, ...dati } : dati }); v.chiudi(); toast("💪 Salvato"); if (dopo) dopo(); }
     catch (err) { toast("⚠️ " + err.message); }
   };
@@ -1624,7 +1654,7 @@ async function cercaCopertineMancanti(lista, dopo) {
       const c = await window.Copertine.cerca(x.tipo, x.titolo, x.autore);
       if (c === null) continue;   // servizio non raggiungibile: riproverò la prossima volta
       // rileggo la voce aggiornata, così non cancello un commento o un voto aggiunto nel frattempo
-      const ora = (await api(`/api/diario?tipo=${x.tipo}`)).find((y) => y.id === x.id);
+      const ora = (await api(`/api/diario?tipo=${x.tipo}`, { fresco: true })).find((y) => y.id === x.id);
       if (!ora || ora.extra?.copertina) continue;
       await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...ora, extra: { ...(ora.extra || {}), copertina: c[0]?.url || null, copertina_cercata: true } } });
       if (c[0]) trovate++;
@@ -2072,9 +2102,9 @@ async function rispondi(testo) {
   }
   if (r.azione === "allenamento") {
     const prima = raggruppaEsercizi(await api("/api/diario?tipo=allenamento")).find((g) => chiaveEs(g.nome) === chiaveEs(r.esercizio));
-    const x = await api("/api/diario", { method: "POST", json: { tipo: "allenamento", titolo: prima ? prima.nome : r.esercizio, data: r.data, extra: { kg: r.kg, reps: r.reps, serie: r.serie } } });
+    const x = await api("/api/diario", { method: "POST", json: { tipo: "allenamento", titolo: prima ? prima.nome : r.esercizio, data: r.data, extra: { kg: r.kg, reps: r.reps, serie: r.serie, set: r.set || undefined } } });
     const f = forzaStimata(r.kg, r.reps), record = prima && f > prima.record;
-    return { da: "scrigno", html: `💪 Segnato: <b>${esc(x.titolo)}</b> — ${r.kg ? `${kgTesto(r.kg)} × ${r.reps}` : `${r.reps} ripetizioni`}${r.serie ? ` (${r.serie} serie)` : ""}<br>` +
+    return { da: "scrigno", html: `💪 Segnato: <b>${esc(x.titolo)}</b> — ${testoSerie(x.extra)}<br>` +
       (r.kg ? `Forza stimata: <b>${kgTesto(f)}</b>` : "") + (record ? `<br>🏆 <b>Nuovo record!</b> Prima era ${valoreForza(r.kg, prima.record)}.` : prima ? `<br><span class="muted">Il tuo record resta ${valoreForza(r.kg, prima.record)}.</span>` : ""),
       azioni: [{ t: "apri", hash: `#/palestra/${encodeURIComponent(x.titolo)}`, etichetta: "📈 Vedi il grafico" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
   }
@@ -2240,21 +2270,7 @@ function mostraAccesso() {
 
 /* ------------------------------------------------------------------ navigazione */
 /* Passaggio animato tra le pagine (View Transitions, dove il browser le supporta) */
-let ultimaProfondita = 0;
-function render() {
-  const h = location.hash.slice(2), prof = h ? h.split("/").filter(Boolean).length : 0;
-  document.documentElement.dataset.dir = prof < ultimaProfondita ? "indietro" : "avanti";
-  ultimaProfondita = prof;
-  const lento = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (document.startViewTransition && !lento && S.stato?.accesso && !$(".velo")) {
-    try {
-      const vt = document.startViewTransition(() => renderPagina());
-      vt.ready.catch(() => {}); vt.finished.catch(() => {});   // se un'altra pagina parte prima, la transizione viene saltata: va bene così
-      return vt.updateCallbackDone.catch(() => {});
-    } catch (e) { /* si continua senza animazione */ }
-  }
-  return renderPagina();
-}
+function render() { return renderPagina(); }
 async function renderPagina() {
   if (!S.stato?.accesso) return;
   $("#tabbar").hidden = false;
