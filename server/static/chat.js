@@ -141,7 +141,16 @@
       const numSolo = !repM && orig.match(/\b(\d+)\b/);
       let reps = repM ? +repM[1] : numSolo ? +numSolo[1] : 0, serie = null;
       if (serM && serM[2]) { serie = +serM[1]; reps = +serM[2]; } else if (serM) serie = +serM[1];
-      const kg = kgM ? +kgM[1].replace(",", ".") : 0;
+      let kg = kgM ? +kgM[1].replace(",", ".") : 0;
+      // più serie con pesi diversi nella stessa frase
+      const coppie = [...orig.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:kg|chili|kili|kilo|chilo)\s*(?:x|×|per|da)\s*(\d+)\b/gi)]
+        .map((m) => ({ kg: +m[1].replace(",", "."), reps: +m[2] }));
+      let set = null;
+      if (coppie.length >= 2) {
+        set = coppie; serie = coppie.length;
+        const best = coppie.reduce((a, s) => (s.kg * (1 + s.reps / 30) > a.kg * (1 + a.reps / 30) ? s : a));
+        kg = best.kg; reps = best.reps;
+      }
       const quando = dataPassata(low, oggi);
       let nome = orig;
       nome = nome.replace(/\d+(?:[.,]\d+)?\s*(?:kg|chili|chilogrammi|kili|kilo|chilo|ripetizioni|ripetizione|rip|reps?|volte|serie|set)?\b/gi, " ")
@@ -149,7 +158,7 @@
       if (quando.re) nome = nome.replace(new RegExp(quando.re.source, "iu"), " ");
       nome = nome.replace(rx("\\b(?:ho fatto|ho sollevato|ho alzato|fatto|oggi|ieri|in palestra|palestra|allenamento|esercizio|con|per|un|una|il|lo|la|al|alla|serie|ripetizioni|carico)\\b", "giu"), " ");
       nome = pulisci(pulisci(nome.replace(/[,.;:!×]+/g, " ").replace(/\s+x\s+|\s+x$/gi, " ")).replace(/\s+(?:da|di|con|a)$/i, ""));
-      if (nome && reps > 0 && reps <= 200) return { azione: "allenamento", esercizio: cap(nome.toLowerCase()), kg, reps, serie, data: quando.data };
+      if (nome && reps > 0 && reps <= 200) return { azione: "allenamento", esercizio: cap(nome.toLowerCase()), kg, reps, serie, set, data: quando.data };
     }
 
     // ---------------------------------------------------------------- esami (università / scuola)

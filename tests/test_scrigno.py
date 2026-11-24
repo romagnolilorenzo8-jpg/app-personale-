@@ -62,6 +62,11 @@ def test_flusso_completo():
     ics = anon.get(f"/calendario/{cal}.ics").text
     assert "BEGIN:VEVENT" in ics and "Dentista" in ics
     assert anon.get("/calendario/sbagliato.ics").status_code == 404
+    # palestra: piu serie con pesi diversi nello stesso allenamento
+    x = c.post("/api/diario", json={"tipo": "allenamento", "titolo": "Adductor machine", "data": "2026-11-20",
+                                    "extra": {"set": [{"kg": 20, "reps": 12}, {"kg": 30, "reps": 10}, {"kg": 40, "reps": 8}]}}).json()
+    assert x["extra"] == {"kg": 40, "reps": 8, "serie": 3, "set": [{"kg": 20, "reps": 12}, {"kg": 30, "reps": 10}, {"kg": 40, "reps": 8}]}
+    assert c.post("/api/diario", json={"tipo": "allenamento", "titolo": "X", "extra": {"set": [{"kg": 20, "reps": 0}]}}).status_code == 400
 
 
 def test_condivisione_testo_link_e_backup():

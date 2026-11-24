@@ -1107,13 +1107,22 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
             raise HTTPException(400, "Il voto deve essere tra 18 e 30")
         return {"voto": voto, "lode": bool(e.get("lode")) and voto == 30, "cfu": _numero(e.get("cfu")) or 6}
     if tipo == "allenamento":
-        kg, reps = _numero(e.get("kg")) or 0, _numero(e.get("reps"))
-        if not reps or reps < 1:
+        # piu serie nello stesso allenamento: set = [{kg, reps}, ...]; kg/reps = la serie migliore
+        grezzi = e.get("set") if isinstance(e.get("set"), list) and e.get("set") else [{"kg": e.get("kg"), "reps": e.get("reps")}]
+        st = []
+        for s in grezzi[:50]:
+            s = s if isinstance(s, dict) else {}
+            st.append({"kg": _numero(s.get("kg")) or 0, "reps": round(_numero(s.get("reps")) or 0)})
+        if any(s["reps"] < 1 for s in st):
             raise HTTPException(400, "Indica le ripetizioni")
-        if not 0 <= kg <= 1000:
+        if any(not 0 <= s["kg"] <= 1000 for s in st):
             raise HTTPException(400, "Carico non valido")
+        forza = lambda s: (s["kg"] if s["reps"] <= 1 else s["kg"] * (1 + s["reps"] / 30)) if s["kg"] > 0 else s["reps"]
+        best = max(st, key=forza)
+        if len(st) > 1:
+            return {"kg": best["kg"], "reps": best["reps"], "serie": len(st), "set": st}
         serie = _numero(e.get("serie"))
-        return {"kg": kg, "reps": round(reps), "serie": round(serie) if serie else None}
+        return {"kg": best["kg"], "reps": best["reps"], "serie": round(serie) if serie else None}
     if tipo == "peso":
         peso = _numero(e.get("peso"))
         if not peso or not 20 <= peso <= 400:

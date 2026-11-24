@@ -404,10 +404,15 @@
       return { voto, lode: !!e.lode && voto === 30, cfu: numero(e.cfu) ?? 6 };
     }
     if (tipo === "allenamento") {
-      const kg = numero(e.kg) ?? 0, reps = numero(e.reps);
-      if (!reps || reps < 1) throw errore(400, "Indica le ripetizioni");
-      if (kg < 0 || kg > 1000) throw errore(400, "Carico non valido");
-      return { kg, reps: Math.round(reps), serie: numero(e.serie) ? Math.round(numero(e.serie)) : null };
+      // più serie nello stesso allenamento: set = [{kg, reps}, …]; kg/reps = la serie migliore
+      const grezzi = Array.isArray(e.set) && e.set.length ? e.set : [{ kg: e.kg, reps: e.reps }];
+      const set = grezzi.slice(0, 50).map((s) => ({ kg: numero(s?.kg) ?? 0, reps: Math.round(numero(s?.reps) || 0) }));
+      if (set.some((s) => !s.reps || s.reps < 1)) throw errore(400, "Indica le ripetizioni");
+      if (set.some((s) => s.kg < 0 || s.kg > 1000)) throw errore(400, "Carico non valido");
+      const f = (s) => (s.kg > 0 ? (s.reps <= 1 ? s.kg : s.kg * (1 + s.reps / 30)) : s.reps);
+      const best = set.reduce((a, s) => (f(s) > f(a) ? s : a), set[0]);
+      if (set.length > 1) return { kg: best.kg, reps: best.reps, serie: set.length, set };
+      return { kg: best.kg, reps: best.reps, serie: numero(e.serie) ? Math.round(numero(e.serie)) : null };
     }
     if (tipo === "peso") {
       const peso = numero(e.peso);

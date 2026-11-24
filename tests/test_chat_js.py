@@ -34,6 +34,8 @@ CASI = {
     "il 12 gennaio esame di chimica": {"azione": "appuntamento"},
     "esami del sangue il 3 dicembre alle 8": {"azione": "appuntamento"},
     "panca piana 80 kg per 8": {"azione": "allenamento", "esercizio": "Panca piana", "kg": 80, "reps": 8},
+    "adductor machine 20 kg x 12, 30 kg x 10, 40 kg x 8": {"azione": "allenamento", "esercizio": "Adductor machine", "kg": 40, "reps": 8, "serie": 3,
+        "set": [{"kg": 20, "reps": 12}, {"kg": 30, "reps": 10}, {"kg": 40, "reps": 8}]},
     "squat 100 kg 5 ripetizioni": {"azione": "allenamento", "esercizio": "Squat", "kg": 100, "reps": 5},
     "ho fatto stacco da terra 120kg x 3": {"esercizio": "Stacco da terra", "kg": 120, "reps": 3},
     "lat machine 4 serie da 10 con 50 kg": {"esercizio": "Lat machine", "kg": 50, "reps": 10, "serie": 4},
