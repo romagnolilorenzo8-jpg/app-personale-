@@ -335,6 +335,7 @@ addEventListener("drop", (e) => {
 function fab(cartella, dopo) {
   const b = document.createElement("button"); b.className = "fab"; b.innerHTML = "<span>＋</span>"; b.setAttribute("aria-label", "Aggiungi");
   b.onclick = () => {
+    b.classList.add("aperto"); setTimeout(() => b.classList.remove("aperto"), 600);
     const v = foglio(`<h3>Aggiungi ${cartella != null ? `in ${esc(S.byId[cartella].nome)}` : ""} ${xBtn}</h3><div class="azioni-grandi">
       <button data-m="foto"><span>📷</span>Fotografa un documento</button>
       <button data-m="file"><span>📄</span>Scegli un file o una foto</button>
@@ -540,10 +541,10 @@ async function vistaHome() {
         <form class="chat-home" id="f-chat" style="order:1"><span>💬</span><input type="text" id="cq" placeholder="Scrivi a Scrigno: “ho visto After”…" enterkeyhint="send"><button aria-label="Invia">➤</button></form>
         <form class="cerca" id="f-cerca" style="order:2"><input type="search" id="q" placeholder="Cerca un documento…" enterkeyhint="search"></form>
         <div class="azioni-home" style="order:3">
-          <button data-h="foto"><span class="ah-ico" style="--c:#8b5cf6">📷</span>Fotografa</button>
-          <button data-h="file"><span class="ah-ico" style="--c:#0ea5a4">📄</span>Carica file</button>
-          <button data-h="app"><span class="ah-ico" style="--c:#f43f5e">🗓️</span>Appuntam.</button>
-          <button data-h="pw"><span class="ah-ico" style="--c:#f59e0b">🔑</span>Password</button>
+          <button data-h="foto"><span class="ah-ico"><svg class="ico"><use href="#i-foto"/></svg></span>Fotografa</button>
+          <button data-h="file"><span class="ah-ico"><svg class="ico"><use href="#i-carica"/></svg></span>Carica file</button>
+          <button data-h="app"><span class="ah-ico"><svg class="ico"><use href="#i-appunt"/></svg></span>Appuntam.</button>
+          <button data-h="pw"><span class="ah-ico"><svg class="ico"><use href="#i-chiave"/></svg></span>Password</button>
         </div>
         <div style="order:4">
           ${S.daSmistare ? `<a class="avviso" href="#/da-smistare"><div class="av-ico">📥</div><div style="flex:1"><b>${S.daSmistare} document${S.daSmistare === 1 ? "o" : "i"} da sistemare</b><div class="small muted">Tocca per metterl${S.daSmistare === 1 ? "o" : "i"} nella cartella giusta</div></div><span class="dx">›</span></a>` : ""}
@@ -1026,6 +1027,35 @@ function modificaVoce(v) {
 }
 
 /* ------------------------------------------------------------------ altro / impostazioni */
+/* ------------------------------------------------------------------ Aspetto: temi e modo chiaro/scuro */
+const TEMI = [["aurora", "Aurora", "linear-gradient(135deg,#8b5cf6,#d946ef 52%,#6366f1)"], ["oceano", "Oceano", "linear-gradient(135deg,#0ea5e9,#14b8a6 52%,#6366f1)"],
+  ["tramonto", "Tramonto", "linear-gradient(135deg,#f97316,#ec4899 52%,#e11d48)"], ["foresta", "Foresta", "linear-gradient(135deg,#10b981,#22c55e 52%,#0d9488)"],
+  ["oro", "Oro", "linear-gradient(135deg,#f59e0b,#eab308 52%,#d97706)"]];
+function applicaAspetto(tema, modo) {
+  const d = document.documentElement;
+  if (tema) { d.dataset.tema = tema; memo.set("tema", tema); }
+  if (modo !== undefined) { if (modo) d.dataset.modo = modo; else delete d.dataset.modo; memo.set("modo", modo || null); }
+  const bg = getComputedStyle(d).getPropertyValue("--bg").trim();
+  $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", bg));
+}
+const htmlAspetto = () => {
+  const tema = document.documentElement.dataset.tema || "aurora", modo = document.documentElement.dataset.modo || "";
+  return `<div class="sezione"><h2>🎨 Aspetto</h2></div>
+    <div class="temi" id="temi">${TEMI.map(([k, n, g]) => `<button class="tema ${k === tema ? "on" : ""}" data-tema="${k}" style="--p:${g}"><i></i>${n}</button>`).join("")}</div>
+    <div class="scelta-gruppo tre" id="modo" style="margin-top:10px">${[["", "🌗", "Automatico"], ["chiaro", "☀️", "Chiaro"], ["scuro", "🌙", "Scuro"]].map(([k, ic, n]) =>
+      `<button type="button" data-modo="${k}" class="${k === modo ? "on" : ""}"><span>${ic}</span>${n}</button>`).join("")}</div>`;
+};
+function collegaAspetto() {
+  $$("#temi [data-tema]").forEach((b) => (b.onclick = () => {
+    const cambia = () => { applicaAspetto(b.dataset.tema); $$("#temi .tema").forEach((x) => x.classList.toggle("on", x === b)); };
+    if (document.startViewTransition) { const vt = document.startViewTransition(cambia); vt.ready.catch(() => {}); vt.finished.catch(() => {}); } else cambia();
+  }));
+  $$("#modo [data-modo]").forEach((b) => (b.onclick = () => {
+    const cambia = () => { applicaAspetto(null, b.dataset.modo); $$("#modo button").forEach((x) => x.classList.toggle("on", x === b)); };
+    if (document.startViewTransition) { const vt = document.startViewTransition(cambia); vt.ready.catch(() => {}); vt.finished.catch(() => {}); } else cambia();
+  }));
+}
+
 function cambiaPassword(titolo) {
   const v = foglio(`<h3>${titolo} ${xBtn}</h3><form id="fp"><label class="campo"><span>Password attuale</span><input type="password" name="attuale" autocomplete="current-password"></label>
     <label class="campo"><span>Nuova password</span><input type="password" name="nuova" autocomplete="new-password" minlength="6"></label><button class="btn block">Cambia</button></form>`);
@@ -1076,6 +1106,12 @@ async function vistaAltroLocale() {
     <button class="btn block" id="bk">💾 Crea backup e salvalo su File</button>
     <button class="btn sec block" id="rip" style="margin-top:8px">♻️ Ripristina da un backup</button></div></details>
 
+  ${htmlAspetto()}
+
+  <div class="sezione"><h2>Copertine</h2></div>
+  <div class="card"><label class="switch" style="padding:0"><span>🖼️ Cerca da solo le copertine di film, serie e libri<br><span class="small muted">Invia solo il titolo a Wikipedia, Open Library e Apple Books</span></span>
+    <input type="checkbox" id="cop-auto" ${copertineAttive() ? "checked" : ""}></label></div>
+
   <div class="sezione"><h2>Memoria</h2></div>
   <div class="card"><b>${s.documenti} document${s.documenti === 1 ? "o" : "i"}</b> · ${s.uso != null ? dimensione(s.uso) + " usati" : ""}
     ${percentuale != null ? `<div class="progresso"><div style="width:${percentuale}%"></div></div><div class="small muted" style="margin-top:6px">Spazio disponibile per Scrigno: circa ${dimensione(s.quota)}</div>` : ""}
@@ -1089,6 +1125,8 @@ async function vistaAltroLocale() {
   <div class="card small">Quando il computer di casa sarà pronto: crea un backup qui, apri Scrigno dal server e vai su <b>Altro → Importa backup dall'iPhone</b>. Tutto (cartelle, documenti, visite, password) verrà copiato lì.</div>
   <input type="file" id="file-backup" accept=".zip,application/zip" hidden>`;
   collegaSezioneCal(vistaAltroLocale);
+  collegaAspetto();
+  $("#cop-auto").onchange = (e) => { memo.set("copertine", e.target.checked ? null : "no"); toast(e.target.checked ? "🖼️ Copertine automatiche attive" : "Copertine automatiche spente"); };
   $("#bk").onclick = async () => {
     const v = foglio(`<h3>Preparo il backup…</h3><div class="progresso"><div style="width:70%"></div></div>`);
     try { const f = await window.LOCALE.esportaBackup(); v.remove(); await condividiFile(f); toast("💾 Backup pronto: scegli “Salva su File”"); vistaAltroLocale(); }
@@ -1137,6 +1175,8 @@ async function vistaAltroServer() {
     ${passo(1, "Apri con <b>Safari</b> sull'iPhone uno di questi indirizzi:" + s.indirizzi.map((i) => cod(i)).join(""))}
     ${passo(2, "Tocca <b>Condividi</b> → <b>Aggiungi alla schermata Home</b>.")}</div></details>
 
+  ${htmlAspetto()}
+
   <div class="sezione"><h2>Dati</h2></div>
   <div class="lista">
     <a class="voce" href="/api/backup" download><div class="thumb">💾</div><div class="corpo"><div class="tit">Scarica backup completo</div><div class="sub">Documenti e password (cifrate) in un file .zip</div></div><div class="dx">›</div></a>
@@ -1153,6 +1193,7 @@ async function vistaAltroServer() {
   <p class="small muted" style="margin:18px 4px">Server: <b>${esc(s.nome_host)}</b><br>Dati salvati in: <span class="occhio">${esc(s.cartella_dati)}</span></p>
   <input type="file" id="file-backup" accept=".zip,application/zip" hidden>`;
   collegaSezioneCal(vistaAltroServer);
+  collegaAspetto();
   $("#esci").onclick = async () => { await api("/api/esci", { method: "POST" }); location.reload(); };
   const rig = async (q, msg) => { if (!(await conferma(msg, "Rigenera"))) return; await api("/api/impostazioni/rigenera/" + q, { method: "POST" }); toast("♻️ Fatto: aggiorna i Comandi Rapidi"); vistaAltroServer(); };
   $("#rig-api").onclick = () => rig("token_api", "Rigenerare il codice? I Comandi Rapidi esistenti smetteranno di funzionare.");
@@ -1235,15 +1276,16 @@ async function vistaIo() {
     </div>
     <div class="sezione"><h2>La mia vita in numeri</h2></div>
     <div class="numeri">
-      <a href="#/diario/film"><b>${quanti("film")}</b><span>🎬 film</span></a>
-      <a href="#/diario/libro"><b>${quanti("libro")}</b><span>📚 libri</span></a>
-      <a href="#/diario/serie"><b>${quanti("serie")}</b><span>📺 serie</span></a>
-      <a href="#/diario/compleanno"><b>${quanti("compleanno")}</b><span>🎂 compleanni</span></a>
+      <a href="#/diario/film"><b data-conta="${quanti("film")}">${quanti("film")}</b><span>🎬 film</span></a>
+      <a href="#/diario/libro"><b data-conta="${quanti("libro")}">${quanti("libro")}</b><span>📚 libri</span></a>
+      <a href="#/diario/serie"><b data-conta="${quanti("serie")}">${quanti("serie")}</b><span>📺 serie</span></a>
+      <a href="#/diario/compleanno"><b data-conta="${quanti("compleanno")}">${quanti("compleanno")}</b><span>🎂 compleanni</span></a>
       <a href="#/diario/esame"><b>${st.n ? dec(st.ponderata ?? st.media, 1) : "—"}</b><span>🎓 media</span></a>
       <a href="#/diario/acquisto"><b class="${b.saldo >= 0 ? "su" : "giu"}">${quanti("acquisto") ? segno(Math.round(b.saldo)) : "—"}</b><span>💶 bilancio</span></a>
-      <a href="#/"><b>${totDoc}</b><span>📄 documenti</span></a>
+      <a href="#/"><b data-conta="${totDoc}">${totDoc}</b><span>📄 documenti</span></a>
       <a href="#/password"><b>🔐</b><span>password</span></a>
     </div>
+    <div class="grafico-card" style="margin-top:12px"><div class="g-tit">Film, libri e serie mese per mese</div><div id="g-vita"></div></div>
     <div class="sezione"><h2>Dati personali</h2><a href="#" id="mod-prof">✏️ Modifica</a></div>
     <div class="lista">${CAMPI_PROFILO.filter(([k]) => prof[k]).map(([k, n, tipo]) => `<div class="voce dato"><div class="corpo"><div class="sub">${n}</div>
       <div class="tit" style="white-space:normal">${esc(tipo === "date" ? dataIt(prof[k]) : prof[k])}</div></div><button class="btn sec small" data-cp="${esc(prof[k])}">Copia</button></div>`).join("")
@@ -1261,6 +1303,8 @@ async function vistaIo() {
     $("#fp", v).onsubmit = async (e) => { e.preventDefault(); await api("/api/profilo", { method: "PUT", json: Object.fromEntries(new FormData(e.target)) }); v.chiudi(); toast("✅ Dati salvati"); ric(); };
   };
   $("#mod-prof").onclick = (e) => { e.preventDefault(); modifica(); };
+  graficoVita($("#g-vita"), diario);
+  window.Grafici.conta(app);
   $("#primo-prof") && ($("#primo-prof").onclick = modifica);
   const sceltaFoto = () => {
     const v = foglio(`<h3>📸 Fototessera ${xBtn}</h3><div class="azioni-grandi">
@@ -1362,8 +1406,9 @@ function htmlVoceDiario(x) {
       ${venduto ? `<div class="sub">💰 Venduto <b>${euro(e.vendita)}</b>${e.data_vendita ? " il " + dataIt(e.data_vendita) : ""}</div>` : `<div class="sub muted">Non ancora venduto</div>`}</div>
       ${diff != null ? `<div class="delta ${diff >= 0 ? "su" : "giu"}">${segno(diff)}</div>` : `<div class="dx">›</div>`}</div>`;
   }
-  const t = TIPI_D[x.tipo];
-  return `<div class="voce" data-dv="${x.id}"><div class="thumb poster" style="--c:${COLORI[(x.titolo.charCodeAt(0) || 0) % COLORI.length]}">${t.ico}</div>
+  const t = TIPI_D[x.tipo], cop = x.extra?.copertina;
+  return `<div class="voce" data-dv="${x.id}"><div class="thumb poster ${cop ? "con-cop" : ""}" style="--c:${COLORI[(x.titolo.charCodeAt(0) || 0) % COLORI.length]}">${cop
+      ? `<img loading="lazy" src="${esc(cop)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.classList.remove('con-cop');this.replaceWith('${t.ico}')">` : t.ico}</div>
     <div class="corpo"><div class="tit">${esc(x.titolo)}</div>
     <div class="sub">${[x.autore ? esc(x.autore) : "", x.stato === "in corso" ? "📖 in corso" : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
     ${x.voto ? `<div class="stelle">${stelle(x.voto)}</div>` : ""}
@@ -1382,20 +1427,114 @@ async function vistaDiario(tipo) {
   if (filtro === "da-vendere") lista = lista.filter((x) => x.extra?.vendita == null);
   app.innerHTML = `<div class="top"><h1>Diario<small>La mia vita: film, libri, serie e compleanni</small></h1></div>
     <div class="segmenti">${Object.entries(TIPI_D).map(([k, v]) => `<a href="#/diario/${k}" class="${k === tipo ? "on" : ""}"><span>${v.ico}</span>${v.nome}<b>${conta(k) || ""}</b></a>`).join("")}</div>
-    ${tipo === "acquisto" && tuttiAcq.length ? htmlBilancio(bilancio(tuttiAcq), filtro) : ""}
-    ${tipo === "esame" && lista.length && (statEsami(lista).n || statEsami(lista).idonei) ? htmlStatEsami(statEsami(lista)) : ""}
+    ${tipo === "acquisto" && tuttiAcq.length ? htmlBilancio(bilancio(tuttiAcq), filtro) + `<div class="grafico-card"><div class="g-tit">Spese e incassi mese per mese</div><div id="g-acq"></div></div>` : ""}
+    ${tipo === "esame" && lista.length && (statEsami(lista).n || statEsami(lista).idonei) ? htmlStatEsami(statEsami(lista)) + `<div class="grafico-card"><div class="g-tit">Andamento dei voti</div><div id="g-voti"></div></div>` : ""}
     <a class="chat-invito" href="#/chat"><span>💬</span><span>${t.vuoto}</span></a>
     ${tipo === "compleanno" ? `<div class="riga" style="margin:4px 0 12px"><button class="btn sec" id="imp-comp">📥 Importa dai Promemoria</button>${lista.length ? `<button class="btn sec" id="cal-comp">🔔 Notifiche</button>` : ""}</div>` : ""}
     ${lista.length ? `<div class="lista" id="dl">${lista.map(htmlVoceDiario).join("")}</div>`
       : `<div class="vuoto"><span class="big">${t.ico}</span>Ancora niente qui.<br>Tocca <b>＋</b> oppure scrivilo in chat.</div>`}`;
   $("#dl") && ($("#dl").onclick = (e) => { const v = e.target.closest("[data-dv]"); if (v) modificaVoceDiario(lista.find((x) => x.id === +v.dataset.dv), () => vistaDiario(tipo)); });
+  if (["film", "libro", "serie"].includes(tipo)) cercaCopertineMancanti(lista, () => vistaDiario(tipo));
   $("#cal-comp") && ($("#cal-comp").onclick = () => notificheCompleanni(lista));
   $$("[data-filtro]").forEach((b) => (b.onclick = () => { memo.set("filtro-acq", b.dataset.filtro); vistaDiario("acquisto"); }));
+  $("#g-acq") && graficoAcquisti($("#g-acq"), tuttiAcq);
+  $("#g-voti") && graficoVoti($("#g-voti"), lista);
+  window.Grafici.conta(app);
   $("#imp-comp") && ($("#imp-comp").onclick = () => importaCompleanni(() => vistaDiario("compleanno")));
   const b = document.createElement("button"); b.className = "fab"; b.innerHTML = "<span>＋</span>";
   b.onclick = () => modificaVoceDiario({ tipo, data: oggiIso(), extra: {} }, () => vistaDiario(tipo)); app.appendChild(b);
   const seg = $(".segmenti .on"); seg && seg.scrollIntoView({ inline: "center", block: "nearest" });
 }
+/* ------------------------------------------------------------------ copertine automatiche */
+const copertineAttive = () => memo.get("copertine") !== "no";
+let cercandoCopertine = false;
+async function cercaCopertineMancanti(lista, dopo) {
+  if (!copertineAttive() || cercandoCopertine || !navigator.onLine) return;
+  const daFare = lista.filter((x) => ["film", "libro", "serie"].includes(x.tipo) && !x.extra?.copertina && !x.extra?.copertina_cercata).slice(0, 12);
+  if (!daFare.length) return;
+  cercandoCopertine = true;
+  let trovate = 0;
+  try {
+    for (const x of daFare) {
+      const c = await window.Copertine.cerca(x.tipo, x.titolo, x.autore);
+      if (c === null) continue;   // servizio non raggiungibile: riproverò la prossima volta
+      // rileggo la voce aggiornata, così non cancello un commento o un voto aggiunto nel frattempo
+      const ora = (await api(`/api/diario?tipo=${x.tipo}`)).find((y) => y.id === x.id);
+      if (!ora || ora.extra?.copertina) continue;
+      await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...ora, extra: { ...(ora.extra || {}), copertina: c[0]?.url || null, copertina_cercata: true } } });
+      if (c[0]) trovate++;
+      await window.Copertine.attesa(400);
+    }
+  } finally { cercandoCopertine = false; }
+  if (trovate && dopo && location.hash.startsWith("#/diario") && !$(".velo")) dopo();
+}
+function sceltaCopertina(x, dopo) {
+  const v = foglio(`<h3>🖼️ Copertina · ${esc(x.titolo)} ${xBtn}</h3><p class="muted small" style="margin-top:-8px">Cerco su Wikipedia${x.tipo === "libro" ? ", Open Library e Apple Books" : ""}… tocca quella giusta.</p>
+    <div class="copertine" id="cop-lista"><div class="muted small">Ricerca in corso…</div></div>
+    <div class="riga" style="margin-top:12px"><button class="btn sec" id="cop-foto">📷 Usa una mia foto</button>${x.extra?.copertina ? `<button class="btn danger" id="cop-togli">Togli</button>` : ""}</div>`);
+  const salva = async (url) => {
+    await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...x, extra: { ...(x.extra || {}), copertina: url, copertina_cercata: true } } });
+    v.chiudi(); toast(url ? "🖼️ Copertina aggiornata" : "Copertina tolta"); if (dopo) dopo();
+  };
+  window.Copertine.cerca(x.tipo, x.titolo, x.autore).then((c) => {
+    c = c || [];
+    $("#cop-lista", v).innerHTML = c.length ? c.map((k, i) => `<button data-i="${i}" title="${esc(k.fonte)}"><img src="${esc(k.url)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"></button>`).join("")
+      : `<div class="muted small">Non ho trovato copertine${navigator.onLine ? "" : " (sei senza connessione)"}. Puoi usare una tua foto.</div>`;
+    $$("#cop-lista [data-i]", v).forEach((b) => (b.onclick = () => salva(c[+b.dataset.i].url)));
+  });
+  $("#cop-foto", v).onclick = () => {
+    const inp = $("#file-input"); inp.value = ""; inp.accept = "image/*"; inp.removeAttribute("capture");
+    inp.onchange = async () => { if (inp.files[0]) salva(await window.Copertine.riduci(inp.files[0])); };
+    inp.click();
+  };
+  $("#cop-togli", v) && ($("#cop-togli", v).onclick = () => salva(null));
+}
+
+/* ------------------------------------------------------------------ grafici */
+function ultimiMesi(n = 12) {
+  const o = new Date(), out = [];
+  for (let i = n - 1; i >= 0; i--) { const d = new Date(o.getFullYear(), o.getMonth() - i, 1); out.push({ k: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`, nome: `${MESI[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`, breve: MESI[d.getMonth()] }); }
+  return out;
+}
+function graficoVoti(el, esami) {
+  const fatti = esami.map((x) => ({ x, c: esameCalcolato(x.extra) })).filter((e) => e.c.completo && !e.c.idoneita)
+    .sort((a, b) => (a.x.data || a.x.creato || "").localeCompare(b.x.data || b.x.creato || ""));
+  if (fatti.length < 2) { el.closest(".grafico-card")?.remove(); return; }
+  let somma = 0, cfu = 0;
+  const media = fatti.map((e) => { somma += e.c.voto * e.c.cfu; cfu += e.c.cfu; return somma / cfu; });
+  window.Grafici.linea(el, {
+    categorie: fatti.map((e) => (e.x.data ? dataIt(e.x.data).replace(/ \d{4}$/, "") : "")),
+    etichette: fatti.map((e) => e.x.titolo),
+    serie: [{ nome: "Voto", slot: 1, tipo: "punti", valori: fatti.map((e) => e.c.voto) }, { nome: "Media ponderata", slot: 2, tipo: "linea", valori: media }],
+    yMin: 18, yMax: 30, tickY: [18, 22, 26, 30],
+    formato: (v, asse) => (asse || Number.isInteger(v) ? String(Math.round(v * 100) / 100).replace(".", ",") : dec(v, 2)),
+    titoloTabella: "Vedi i voti in tabella",
+  });
+}
+function graficoAcquisti(el, acquisti) {
+  const mesi = ultimiMesi(12);
+  const speso = mesi.map((m) => acquisti.filter((x) => (x.data || "").startsWith(m.k)).reduce((a, x) => a + (x.extra?.prezzo || 0), 0));
+  const incassato = mesi.map((m) => acquisti.filter((x) => (x.extra?.data_vendita || "").startsWith(m.k)).reduce((a, x) => a + (x.extra?.vendita || 0), 0));
+  const primo = mesi.findIndex((_, i) => speso[i] || incassato[i]);
+  if (primo < 0) { el.closest(".grafico-card")?.remove(); return; }
+  const da = Math.min(primo, mesi.length - 6);
+  window.Grafici.colonne(el, {
+    categorie: mesi.slice(da).map((m) => m.nome), etichettaCategoria: (c) => c.split(" ")[0],
+    serie: [{ nome: "Speso", slot: 1, valori: speso.slice(da) }, { nome: "Incassato", slot: 2, valori: incassato.slice(da) }],
+    formato: (v, asse) => (asse && v >= 1000 ? Math.round(v / 100) / 10 + "K" : euro(v)), titoloTabella: "Vedi i numeri mese per mese",
+  });
+}
+function graficoVita(el, diario) {
+  const mesi = ultimiMesi(12);
+  const conta = (tipo) => mesi.map((m) => diario.filter((x) => x.tipo === tipo && (x.data || x.creato || "").startsWith(m.k)).length);
+  const serie = [{ nome: "Film", slot: 1, valori: conta("film") }, { nome: "Libri", slot: 2, valori: conta("libro") }, { nome: "Serie TV", slot: 3, valori: conta("serie") }];
+  const primo = mesi.findIndex((_, i) => serie.some((x) => x.valori[i]));
+  if (primo < 0) { el.closest(".grafico-card")?.remove(); return; }
+  const da = Math.min(primo, mesi.length - 6);
+  serie.forEach((x) => (x.valori = x.valori.slice(da)));
+  window.Grafici.colonne(el, { categorie: mesi.slice(da).map((m) => m.nome), etichettaCategoria: (c) => c.split(" ")[0], serie, formato: (v) => String(Math.round(v)), titoloTabella: "Vedi i numeri mese per mese" });
+}
+
 function htmlBilancio(b, filtro) {
   return `<div class="bilancio">
     <div class="bil-top"><div><div class="bil-et">Bilancio complessivo</div><div class="bil-num ${b.saldo >= 0 ? "su" : "giu"}">${segno(b.saldo)}</div>
@@ -1408,7 +1547,7 @@ function htmlBilancio(b, filtro) {
 }
 function htmlStatEsami(st) {
   return `<div class="bilancio">
-    <div class="bil-top"><div><div class="bil-et">Media ${st.ponderata ? "ponderata" : ""}</div><div class="bil-num">${dec(st.ponderata ?? st.media)}</div>
+    <div class="bil-top"><div><div class="bil-et">Media ${st.ponderata ? "ponderata" : ""}</div><div class="bil-num" data-conta="${st.ponderata ?? st.media ?? ""}" data-dec="2">${dec(st.ponderata ?? st.media)}</div>
       <div class="bil-sub">${st.n} esam${st.n === 1 ? "e" : "i"} superat${st.n === 1 ? "o" : "i"}${st.lodi ? ` · ${st.lodi} lod${st.lodi === 1 ? "e" : "i"} ✨` : ""}${st.inCorso ? ` · ${st.inCorso} in corso` : ""}${st.idonei ? ` · ${st.idonei} idoneit${st.idonei === 1 ? "à" : "à"} ✓` : ""}</div></div><div class="bil-ico">🎓</div></div>
     <div class="bil-griglia">
       <div><div class="bil-et">Media aritmetica</div><div class="bil-n">${dec(st.media)}</div></div>
@@ -1421,7 +1560,9 @@ function modificaVoceDiario(x, dopo) {
   if (x.tipo === "esame" || x.tipo === "acquisto") return modificaVoceSpeciale(x, dopo);
   const comp = x.tipo === "compleanno", t = TIPI_D[x.tipo];
   let voto = x.voto || 0;
-  const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : comp ? "Nuovo compleanno" : "Aggiungi " + t.nome.toLowerCase()} ${xBtn}</h3><form id="fd">
+  const cop = x.extra?.copertina;
+  const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : comp ? "Nuovo compleanno" : "Aggiungi " + t.nome.toLowerCase()} ${xBtn}</h3>
+    ${x.id && !comp ? `<div class="scheda-cop"><button type="button" id="cambia-cop" class="cop-grande">${cop ? `<img src="${esc(cop)}" alt="" referrerpolicy="no-referrer">` : `<span>${t.ico}</span>`}<i>🖼️ ${cop ? "Cambia" : "Aggiungi"} copertina</i></button></div>` : ""}<form id="fd">
     <label class="campo"><span>${comp ? "Nome" : "Titolo"}</span><input type="text" name="titolo" value="${esc(x.titolo || "")}" required placeholder="${comp ? "Es. Marco Rossi" : ""}"></label>
     ${comp ? `<div class="riga"><label class="campo"><span>Giorno</span><select name="giorno">${Array.from({ length: 31 }, (_, i) => `<option ${x.giorno === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label>
       <label class="campo" style="flex:2"><span>Mese</span><select name="mese">${MESI_L.map((m, i) => `<option value="${i + 1}" ${x.mese === i + 1 ? "selected" : ""}>${m}</option>`).join("")}</select></label>
@@ -1434,6 +1575,7 @@ function modificaVoceDiario(x, dopo) {
     <button class="btn block">Salva</button>
     ${x.id ? `<button type="button" class="btn danger block" id="del" style="margin-top:8px">🗑️ Elimina</button>` : ""}
     ${x.id && comp ? `<button type="button" class="btn sec block" id="cal1" style="margin-top:8px">📲 Promemoria ogni anno nel Calendario</button>` : ""}</form>`);
+  $("#cambia-cop", v) && ($("#cambia-cop", v).onclick = () => { v.chiudi(); sceltaCopertina(x, dopo); });
   const disegnaStelle = () => $$("#si button", v).forEach((b) => b.classList.toggle("on", +b.dataset.s <= voto));
   if (!comp) { disegnaStelle(); $("#si", v).onclick = (e) => { const s = e.target.dataset.s; if (s) { voto = voto === +s ? 0 : +s; disegnaStelle(); } }; }
   $("#fd", v).onsubmit = async (e) => {
@@ -1715,6 +1857,7 @@ async function rispondi(testo) {
   }
   if (r.azione === "diario") {
     const x = await api("/api/diario", { method: "POST", json: { tipo: r.tipo, titolo: r.titolo, autore: r.autore, data: r.data, voto: r.voto, commento: r.commento, stato: r.stato } });
+    cercaCopertineMancanti([x]);   // la copertina arriva da sola, in sottofondo
     const t = TIPI_D[r.tipo];
     const dove = r.tipo === "libro" ? (r.stato === "in corso" ? "ai libri che stai leggendo" : "ai libri letti") : r.tipo === "serie" ? "alle serie viste" : "ai film visti";
     const azioni = [];
@@ -1907,7 +2050,23 @@ function mostraAccesso() {
 }
 
 /* ------------------------------------------------------------------ navigazione */
-async function render() {
+/* Passaggio animato tra le pagine (View Transitions, dove il browser le supporta) */
+let ultimaProfondita = 0;
+function render() {
+  const h = location.hash.slice(2), prof = h ? h.split("/").filter(Boolean).length : 0;
+  document.documentElement.dataset.dir = prof < ultimaProfondita ? "indietro" : "avanti";
+  ultimaProfondita = prof;
+  const lento = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (document.startViewTransition && !lento && S.stato?.accesso && !$(".velo")) {
+    try {
+      const vt = document.startViewTransition(() => renderPagina());
+      vt.ready.catch(() => {}); vt.finished.catch(() => {});   // se un'altra pagina parte prima, la transizione viene saltata: va bene così
+      return vt.updateCallbackDone.catch(() => {});
+    } catch (e) { /* si continua senza animazione */ }
+  }
+  return renderPagina();
+}
+async function renderPagina() {
   if (!S.stato?.accesso) return;
   $("#tabbar").hidden = false;
   $$(".velo, .visore").forEach((v) => v.remove());
@@ -1949,7 +2108,16 @@ async function avvia() {
   benvenuto();
 }
 addEventListener("hashchange", render);
+document.addEventListener("pointerdown", (e) => {
+  const el = e.target.closest(".voce, .cartella, .chip, .btn, .azioni-home button, .numeri a, .tabbar a, .sugg, .iconbtn");
+  if (!el) return;
+  el.classList.add("premuto");
+  if (navigator.vibrate && e.pointerType === "touch") navigator.vibrate(6);
+  const via = () => { el.classList.remove("premuto"); removeEventListener("pointerup", via); removeEventListener("pointercancel", via); };
+  addEventListener("pointerup", via); addEventListener("pointercancel", via);
+}, { passive: true });
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-cp]"); if (b) copia(b.dataset.cp); });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && S.stato?.accesso) { svuotaMemoria(); caricaCartelle().catch(() => {}); } });
 if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("sw.js").catch(() => {});
+applicaAspetto();
 avvia();
