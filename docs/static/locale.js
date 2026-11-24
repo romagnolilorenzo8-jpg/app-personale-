@@ -104,6 +104,29 @@
     }
     await kv.set("inventari_v1", true);
   }
+  /* Riquadri dei lavori già inseriti: Periodo, Orari, Paga, Colleghi, Mansioni, Commenti.
+     Le note già scritte restano (quelle senza titolo finiscono in "Commenti"). */
+  const RIQUADRI_LAVORO = [["📅", "Periodo"], ["🕒", "Orari e turni"], ["💶", "Paga"], ["👥", "Colleghi e responsabili"], ["🧰", "Mansioni"], ["💬", "Commenti"]];
+  function conRiquadri(note) {
+    const out = [], commenti = [];
+    for (const n of note || []) { if (n.titolo) out.push({ ...n, icona: n.icona || "📝" }); else if (n.testo) commenti.push(n.testo); }
+    for (const [icona, titolo] of RIQUADRI_LAVORO) {
+      const c = out.find((n) => n.titolo.toLowerCase() === titolo.toLowerCase());
+      if (!c) out.push({ id: Date.now() + Math.random(), titolo, icona, testo: titolo === "Commenti" ? commenti.join("\n\n") : "", data: adesso() });
+      else if (titolo === "Commenti" && commenti.length) c.testo = [c.testo, ...commenti].filter(Boolean).join("\n\n");
+    }
+    // nell'ordine standard, poi gli altri
+    const ord = (n) => { const i = RIQUADRI_LAVORO.findIndex((r) => r[1].toLowerCase() === n.titolo.toLowerCase()); return i < 0 ? 99 : i; };
+    return out.sort((a, b) => ord(a) - ord(b));
+  }
+  async function riquadriLavori() {
+    if (await kv.get("riquadri_v1")) return;
+    const cart = await tutti("cartelle");
+    for (const c of cart.filter((x) => x.tipo === "lavoro" && !cart.some((y) => y.padre === x.id && y.tipo === "lavoro"))) {
+      c.note = conRiquadri(c.note); await scrivi("cartelle", c);
+    }
+    await kv.set("riquadri_v1", true);
+  }
   /* Ripara le cartelle create due volte da una versione precedente (succedeva al primo avvio):
      unisce le cartelle con lo stesso nome allo stesso livello, spostando documenti e sottocartelle
      in quella più vecchia. Non cancella mai documenti. */
@@ -156,6 +179,7 @@
     await cartellePersonali();
     await cartelleLavori();
     await cartelleInventari();
+    await riquadriLavori();
   }
 
   async function discendenti(id) {
@@ -440,7 +464,7 @@
           const figli = (await tutti("cartelle")).filter((x) => x.padre === c.id).map((x) => x.nome);
           for (const [n, ic] of MODELLI[B.tipo]) if (!figli.includes(n)) await aggiungi("cartelle", { nome: n, icona: ic, padre: c.id, ordine: 9 });
         }
-        if (Array.isArray(B.note)) c.note = B.note.map((x) => ({ id: x.id || Date.now() + Math.random(), titolo: String(x.titolo || "").trim(), testo: String(x.testo || ""), data: x.data || adesso() }));
+        if (Array.isArray(B.note)) c.note = B.note.map((x) => ({ id: x.id || Date.now() + Math.random(), titolo: String(x.titolo || "").trim(), icona: String(x.icona || ""), testo: String(x.testo || ""), data: x.data || adesso() }));
         if (B.sposta_padre) {
           if (B.padre != null && (await discendenti(id)).includes(B.padre)) throw errore(400, "Non puoi spostare una cartella dentro sé stessa");
           c.padre = B.padre ?? null;

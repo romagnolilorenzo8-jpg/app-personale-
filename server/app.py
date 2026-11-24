@@ -102,6 +102,7 @@ LAVORI = [('Xmasters', '💼'), ('Benzinaio', '⛽'), ('Inventari', '📦')]
 
 MODELLI = {"lavoro": [["Contratto", "📝"], ["Buste paga", "💶"]], "affitto": [["Contratto d'affitto", "📝"], ["Bollette", "💡"], ["Ricevute affitto", "🧾"], ["Manutenzione", "🛠️"]], "proprieta": [["Atto e mutuo", "📜"], ["Bollette", "💡"], ["Condominio", "🏢"], ["Assicurazione casa", "🛡️"], ["Manutenzione", "🛠️"]]}
 ICONE_MODELLO = {"lavoro": "💼", "affitto": "🔑", "proprieta": "🏡"}
+RIQUADRI_LAVORO = [('📅', 'Periodo'), ('🕒', 'Orari e turni'), ('💶', 'Paga'), ('👥', 'Colleghi e responsabili'), ('🧰', 'Mansioni'), ('💬', 'Commenti')]
 
 
 def _crea_da_modello(con, nome: str, icona: str | None, padre, tipo: str) -> int:
@@ -195,6 +196,24 @@ def init_db():
                     if vuota:
                         con.execute("DELETE FROM cartelle WHERE id=?", (c["id"],))
             imp_set(con, "inventari_v1", "1")
+        if not imp_get(con, "riquadri_v1"):
+            ora = datetime.now(TZ).isoformat(timespec="seconds")
+            for c in con.execute("SELECT id, note FROM cartelle WHERE tipo='lavoro' AND id NOT IN "
+                                 "(SELECT padre FROM cartelle WHERE tipo='lavoro' AND padre IS NOT NULL)").fetchall():
+                note = json.loads(c["note"] or "[]")
+                out = [{**n, "icona": n.get("icona") or "📝"} for n in note if n.get("titolo")]
+                commenti = [n["testo"] for n in note if not n.get("titolo") and n.get("testo")]
+                for icona, titolo in RIQUADRI_LAVORO:
+                    esiste = next((n for n in out if n["titolo"].lower() == titolo.lower()), None)
+                    if not esiste:
+                        out.append({"id": secrets.token_hex(6), "titolo": titolo, "icona": icona, "data": ora,
+                                    "testo": "\n\n".join(commenti) if titolo == "Commenti" else ""})
+                    elif titolo == "Commenti" and commenti:
+                        esiste["testo"] = "\n\n".join([esiste.get("testo") or "", *commenti]).strip()
+                ordine = {t.lower(): i for i, (_, t) in enumerate(RIQUADRI_LAVORO)}
+                out.sort(key=lambda n: ordine.get(n["titolo"].lower(), 99))
+                con.execute("UPDATE cartelle SET note=? WHERE id=?", (json.dumps(out), c["id"]))
+            imp_set(con, "riquadri_v1", "1")
 
 
 def _icona_auto(nome: str) -> str:
@@ -475,7 +494,7 @@ def modifica_cartella(cid: int, body: Cartella, _=Depends(sessione)):
                         con.execute("INSERT INTO cartelle (nome, padre, icona, ordine) VALUES (?,?,?,9)", (n, cid, ic))
         if body.note is not None:
             ora = datetime.now(TZ).isoformat(timespec="seconds")
-            note = [{"id": n.get("id") or secrets.token_hex(6), "titolo": str(n.get("titolo") or "").strip()[:200],
+            note = [{"id": n.get("id") or secrets.token_hex(6), "titolo": str(n.get("titolo") or "").strip()[:200], "icona": str(n.get("icona") or "")[:8],
                      "testo": str(n.get("testo") or "")[:20000], "data": n.get("data") or ora} for n in body.note if isinstance(n, dict)]
             con.execute("UPDATE cartelle SET note=? WHERE id=?", (json.dumps(note), cid))
         if body.sposta_padre:

@@ -635,3 +635,18 @@ a, .link-btn { color: var(--accent); }
 .lavoro-testa.affitto { background: linear-gradient(135deg, color-mix(in srgb, #0ea5a4 26%, transparent), color-mix(in srgb, var(--accent) 14%, transparent)); }
 .lavoro-testa.proprieta { background: linear-gradient(135deg, color-mix(in srgb, #f59e0b 24%, transparent), color-mix(in srgb, var(--accent) 14%, transparent)); }
 .lavoro-testa .btn.small { flex: none; }
+
+/* --- riquadri (al posto delle note) */
+.riquadri { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.riquadro { border-radius: 18px; padding: 10px 12px 8px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--vetro); backdrop-filter: var(--vetro); transition: border-color .2s, box-shadow .2s; }
+.riquadro:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent), var(--shadow); }
+.rq-testa { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.rq-ico { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; background: var(--card2); font-size: 16px; flex: none; }
+.rq-testa b { font-size: 14.5px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rq-stato { font-style: normal; font-size: 11.5px; color: var(--ok); flex: none; }
+.rq-menu { border: 0; background: none; color: var(--muted); font-size: 18px; cursor: pointer; padding: 2px 6px; flex: none; }
+.riquadro textarea { width: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; padding: 4px 2px !important; min-height: 52px;
+  resize: none; font-size: 15px; line-height: 1.45; overflow: hidden; }
+.riquadro textarea::placeholder { color: color-mix(in srgb, var(--muted) 70%, transparent); font-style: italic; }
+.pronti { display: flex; flex-wrap: wrap; gap: 8px; }

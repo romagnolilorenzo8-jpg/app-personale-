@@ -615,47 +615,100 @@ const eCartellaLavori = (c) => c && c.padre == null && /^lavoro/i.test(c.nome);
 const eCartellaCase = (c) => c && c.padre == null && /^casa\b/i.test(c.nome);
 const CON_MODELLO = ["lavoro", "affitto", "proprieta"];
 const TESTA_MODELLO = {
-  lavoro: ["💼", "Il mio lavoro", "Contratto, buste paga e i tuoi appunti, tutto qui."],
-  affitto: ["🔑", "Casa in affitto", "Contratto d'affitto, bollette, ricevute e i tuoi appunti."],
-  proprieta: ["🏡", "Casa di proprietà", "Atto e mutuo, bollette, condominio e i tuoi appunti."],
+  lavoro: ["💼", "Il mio lavoro", "Contratto, buste paga e i riquadri con i tuoi appunti."],
+  affitto: ["🔑", "Casa in affitto", "Contratto d'affitto, bollette, ricevute e i riquadri con i tuoi appunti."],
+  proprieta: ["🏡", "Casa di proprietà", "Atto e mutuo, bollette, condominio e i riquadri con i tuoi appunti."],
 };
+/* Riquadri: ogni lavoro (o casa, o cartella) ha dei riquadri con un titolo, in cui si scrive direttamente.
+   Si salvano da soli mentre scrivi. */
+const RIQUADRI_PRONTI = [["📅", "Periodo"], ["🕒", "Orari e turni"], ["💶", "Paga"], ["👥", "Colleghi e responsabili"], ["🧰", "Mansioni"], ["💬", "Commenti"],
+  ["📍", "Indirizzo"], ["📞", "Contatti"], ["⭐", "Com'è andata"], ["🔑", "Proprietario"], ["💡", "Utenze"], ["🛠️", "Lavori da fare"]];
 function htmlNote(c) {
   const note = c.note || [];
   if (!note.length && !CON_MODELLO.includes(c.tipo)) return "";
-  return `<div class="sezione"><h2>📝 Note e commenti</h2><a href="#" id="nuova-nota">＋ Nuova</a></div>
-    ${note.length ? `<div class="note-griglia">${note.slice().sort((a, b) => (b.data || "").localeCompare(a.data || "")).map((n) => `<button class="nota" data-nota="${esc(String(n.id))}">
-      ${n.titolo ? `<b>${esc(n.titolo)}</b>` : ""}<p>${esc(n.testo).replace(/\n/g, "<br>")}</p><span>${n.data ? dataIt(n.data.slice(0, 10)) : ""}</span></button>`).join("")}</div>`
-      : `<button class="vuoto-cta" id="prima-nota" style="margin-top:0;padding:20px"><span style="font-size:30px">📝</span><b>Scrivi i tuoi appunti</b><span class="muted small">Orari, colleghi, paga, com'è andata… quello che vuoi ricordare</span></button>`}`;
+  return `<div class="sezione"><h2>🗂️ Riquadri</h2><a href="#" id="nuovo-riquadro">＋ Aggiungi</a></div>
+    ${note.length ? `<div class="riquadri">${note.map((n) => `<div class="riquadro" data-rq="${esc(String(n.id))}">
+        <div class="rq-testa"><span class="rq-ico">${esc(n.icona || "📝")}</span><b>${esc(n.titolo || "Nota")}</b><i class="rq-stato"></i>
+          <button class="rq-menu" aria-label="Opzioni">⋯</button></div>
+        <textarea rows="2" placeholder="Tocca per scrivere…">${esc(n.testo || "")}</textarea></div>`).join("")}</div>`
+      : `<button class="vuoto-cta" id="primo-riquadro" style="margin-top:0;padding:20px"><span style="font-size:30px">🗂️</span><b>Aggiungi i tuoi riquadri</b><span class="muted small">Periodo, orari, paga, colleghi… ognuno nel suo riquadro</span></button>`}`;
 }
+function cresci(t) { t.style.height = "auto"; t.style.height = Math.max(t.scrollHeight, 52) + "px"; }
 function collegaNote(c, dopo) {
-  $("#nuova-nota") && ($("#nuova-nota").onclick = (e) => { e.preventDefault(); modificaNota(c, null, dopo); });
-  $("#prima-nota") && ($("#prima-nota").onclick = () => modificaNota(c, null, dopo));
-  $$("[data-nota]").forEach((b) => (b.onclick = () => modificaNota(c, (c.note || []).find((n) => String(n.id) === b.dataset.nota), dopo)));
+  const nuovo = (e) => { e && e.preventDefault(); aggiungiRiquadro(c, dopo); };
+  $("#nuovo-riquadro") && ($("#nuovo-riquadro").onclick = nuovo);
+  $("#primo-riquadro") && ($("#primo-riquadro").onclick = nuovo);
+  $$(".riquadro").forEach((box) => {
+    const t = $("textarea", box), stato = $(".rq-stato", box), id = box.dataset.rq;
+    let timer;
+    const salva = async () => {
+      clearTimeout(timer);
+      const n = (c.note || []).find((x) => String(x.id) === id);
+      if (!n || n.testo === t.value) return;
+      n.testo = t.value; stato.textContent = "…";
+      try { await api(`/api/cartelle/${c.id}`, { method: "PATCH", json: { note: c.note } }); stato.textContent = "✓ Salvato"; setTimeout(() => (stato.textContent = ""), 1800); }
+      catch (err) { stato.textContent = "⚠️ non salvato"; }
+    };
+    cresci(t);
+    t.oninput = () => { cresci(t); stato.textContent = ""; clearTimeout(timer); timer = setTimeout(salva, 800); };
+    t.onblur = salva;
+    $(".rq-menu", box).onclick = () => menuRiquadro(c, (c.note || []).find((x) => String(x.id) === id), dopo);
+  });
 }
 async function salvaNote(c, note) {
   await api(`/api/cartelle/${c.id}`, { method: "PATCH", json: { note } });
   await caricaCartelle();
 }
-function modificaNota(c, n, dopo) {
-  const v = foglio(`<h3>📝 ${n ? "Nota" : "Nuova nota"} <span class="muted small" style="font-weight:500">· ${esc(c.nome)}</span> ${xBtn}</h3><form id="fn">
-    <label class="campo"><span>Titolo <i class="muted">(facoltativo)</i></span><input type="text" name="titolo" value="${esc(n?.titolo || "")}" placeholder="Es. Turni, Colleghi, Com'è andata"></label>
-    <label class="campo"><span>Testo</span><textarea name="testo" class="nota-testo" placeholder="Scrivi qui…">${esc(n?.testo || "")}</textarea></label>
-    <button class="btn block">Salva</button>
-    ${n ? `<div class="riga" style="margin-top:8px"><button type="button" class="btn sec" data-cp="${esc(n.testo)}">📋 Copia</button><button type="button" class="btn danger" id="del-nota">🗑️ Elimina</button></div>` : ""}</form>`);
-  setTimeout(() => $("[name=testo]", v).focus(), 80);
-  $("#fn", v).onsubmit = async (e) => {
+function aggiungiRiquadro(c, dopo, titoloIniziale = "") {
+  const presenti = (c.note || []).map((n) => (n.titolo || "").toLowerCase());
+  const pronti = RIQUADRI_PRONTI.filter(([, t]) => !presenti.includes(t.toLowerCase()));
+  let icona = "📝";
+  const v = foglio(`<h3>🗂️ Nuovo riquadro <span class="muted small" style="font-weight:500">· ${esc(c.nome)}</span> ${xBtn}</h3>
+    ${pronti.length ? `<div class="etichetta">Scegli un riquadro pronto</div><div class="pronti">${pronti.map(([ic, t]) => `<button class="chip" data-ic="${ic}" data-t="${esc(t)}">${ic} ${esc(t)}</button>`).join("")}</div>
+      ${c.tipo === "lavoro" && pronti.length > 3 ? `<button class="link-btn" id="tutti-std">＋ Aggiungi tutti quelli del lavoro (Periodo, Orari, Paga, Colleghi, Mansioni, Commenti)</button>` : ""}` : ""}
+    <form id="fr" style="margin-top:12px"><div class="etichetta">…oppure creane uno tuo</div>
+      <div class="riga" style="gap:8px"><input type="text" name="icona" value="📝" style="flex:0 0 64px;text-align:center;font-size:20px" aria-label="Icona">
+        <input type="text" name="titolo" value="${esc(titoloIniziale)}" placeholder="Es. Divisa, Parcheggio, Ferie…" style="flex:1"></div>
+      <button class="btn block" style="margin-top:12px">Aggiungi</button></form>`);
+  const crea = async (lista) => {
+    c.note = [...(c.note || []), ...lista.map(([ic, t]) => ({ titolo: t, icona: ic, testo: "" }))];
+    await salvaNote(c, c.note); v.chiudi(); toast(lista.length > 1 ? "🗂️ Riquadri aggiunti" : "🗂️ Riquadro aggiunto");
+    if (dopo) await dopo();
+    const ultimo = $$(".riquadro textarea").pop(); if (ultimo && lista.length === 1) { ultimo.focus(); ultimo.scrollIntoView({ block: "center" }); }
+  };
+  $$(".pronti [data-t]", v).forEach((b) => (b.onclick = () => crea([[b.dataset.ic, b.dataset.t]])));
+  $("#tutti-std", v) && ($("#tutti-std", v).onclick = () => crea(RIQUADRI_PRONTI.slice(0, 6).filter(([, t]) => !presenti.includes(t.toLowerCase()))));
+  $("#fr", v).onsubmit = (e) => {
     e.preventDefault();
     const d = Object.fromEntries(new FormData(e.target));
-    if (!d.testo.trim() && !d.titolo.trim()) return toast("Scrivi qualcosa");
-    const altre = (c.note || []).filter((x) => !n || x.id !== n.id);
-    await salvaNote(c, [...altre, { id: n?.id, titolo: d.titolo.trim(), testo: d.testo, data: n?.data }]);
-    v.chiudi(); toast("📝 Nota salvata"); dopo && dopo();
+    if (!d.titolo.trim()) return toast("Scrivi il titolo del riquadro");
+    crea([[[...d.icona.trim()].slice(0, 2).join("") || "📝", d.titolo.trim()]]);
   };
-  $("#del-nota", v) && ($("#del-nota", v).onclick = async () => {
-    if (!(await conferma("Eliminare questa nota?"))) return;
-    await salvaNote(c, (c.note || []).filter((x) => x.id !== n.id)); v.chiudi(); toast("🗑️ Nota eliminata"); dopo && dopo();
+}
+function menuRiquadro(c, n, dopo) {
+  if (!n) return;
+  const v = foglio(`<h3>${esc(n.icona || "📝")} ${esc(n.titolo || "Nota")} ${xBtn}</h3><div class="lista">
+    <div class="voce" data-m="rinomina"><div class="thumb">✏️</div><div class="corpo"><div class="tit">Rinomina</div></div></div>
+    <div class="voce" data-m="icona"><div class="thumb">😀</div><div class="corpo"><div class="tit">Cambia icona</div></div></div>
+    <div class="voce" data-m="su"><div class="thumb">⬆️</div><div class="corpo"><div class="tit">Sposta più in alto</div></div></div>
+    ${n.testo ? `<div class="voce" data-m="copia"><div class="thumb">📋</div><div class="corpo"><div class="tit">Copia il testo</div></div></div>` : ""}
+    <div class="voce" data-m="elimina"><div class="thumb">🗑️</div><div class="corpo"><div class="tit" style="color:var(--danger)">Elimina riquadro</div></div></div></div>`);
+  v.addEventListener("click", async (e) => {
+    const m = e.target.closest("[data-m]")?.dataset.m; if (!m) return; v.chiudi();
+    const note = c.note || [];
+    if (m === "rinomina") { const t = await chiedi("Nuovo titolo", n.titolo || ""); if (!t || !t.trim()) return; n.titolo = t.trim(); }
+    if (m === "icona") { const t = await chiedi("Nuova icona", n.icona || "📝", { aiuto: "Apri la tastiera delle emoji e scegline una." }); if (!t) return; n.icona = [...t.trim()].slice(0, 2).join(""); }
+    if (m === "su") { const i = note.indexOf(n); if (i > 0) { note.splice(i, 1); note.splice(i - 1, 0, n); } }
+    if (m === "copia") return copia(n.testo, "Testo copiato");
+    if (m === "elimina") {
+      if (n.testo && !(await conferma(`Eliminare il riquadro “${n.titolo}”?`, "Elimina", "Anche il testo scritto dentro verrà cancellato."))) return;
+      note.splice(note.indexOf(n), 1);
+    }
+    await salvaNote(c, note); toast("✅ Fatto"); if (dopo) dopo();
   });
 }
+// (compatibilità) aprire una "nota" ora significa aggiungere un riquadro
+function modificaNota(c, n, dopo) { return aggiungiRiquadro(c, dopo); }
 
 async function vistaCartella(id) {
   const c = S.byId[id];
@@ -711,7 +764,7 @@ async function vistaCartella(id) {
   $("#agg") && ($("#agg").onclick = () => $(".fab").click());
   $("#menu").onclick = () => {
     const v = foglio(`<h3>${esc(c.icona)} ${esc(c.nome)} ${xBtn}</h3><div class="lista">
-      <div class="voce" data-m="nota"><div class="thumb">📝</div><div class="corpo"><div class="tit">Scrivi una nota</div><div class="sub">Appunti e commenti in questa cartella</div></div></div>
+      <div class="voce" data-m="nota"><div class="thumb">🗂️</div><div class="corpo"><div class="tit">Aggiungi un riquadro</div><div class="sub">Uno spazio con un titolo dove scrivere i tuoi appunti</div></div></div>
       <div class="voce" data-m="sotto"><div class="thumb">📁</div><div class="corpo"><div class="tit">Nuova sottocartella</div></div></div>
       <div class="voce" data-m="rinomina"><div class="thumb">✏️</div><div class="corpo"><div class="tit">Rinomina</div></div></div>
       <div class="voce" data-m="icona"><div class="thumb">😀</div><div class="corpo"><div class="tit">Cambia icona</div><div class="sub">Scegli una emoji</div></div></div>
@@ -1729,8 +1782,11 @@ async function rispondi(testo) {
     const x = trova(tutte, r.titolo);
     const cart = !x && (S.cartelle.find((c) => c.nome.toLowerCase() === r.titolo.toLowerCase()) || S.cartelle.find((c) => c.tipo === "lavoro" && c.nome.toLowerCase().includes(r.titolo.toLowerCase())));
     if (cart) {
-      await salvaNote(cart, [...(cart.note || []), { titolo: "", testo: r.commento }]);
-      return { da: "scrigno", html: `📝 Ho aggiunto una nota in <b>${esc(cart.nome)}</b>: “${esc(r.commento)}”`, azioni: [{ t: "apri", hash: `#/c/${cart.id}`, etichetta: `${cart.icona} Apri ${cart.nome}` }] };
+      const note = [...(cart.note || [])];
+      let box = note.find((n) => (n.titolo || "").toLowerCase() === "commenti");
+      if (box) box.testo = [box.testo, r.commento].filter(Boolean).join("\n"); else note.push(box = { titolo: "Commenti", icona: "💬", testo: r.commento });
+      await salvaNote(cart, note);
+      return { da: "scrigno", html: `💬 Ho scritto nel riquadro <b>Commenti</b> di <b>${esc(cart.nome)}</b>: “${esc(r.commento)}”`, azioni: [{ t: "apri", hash: `#/c/${cart.id}`, etichetta: `${cart.icona} Apri ${cart.nome}` }] };
     }
     if (!x) return { da: "scrigno", html: `Non trovo “${esc(r.titolo)}” nel diario. Prova a scrivere ad esempio: <i>ho visto ${esc(r.titolo)}, ${esc(r.commento.toLowerCase())}</i>` };
     const nuovo = x.commento ? `${x.commento}\n${r.commento}` : r.commento;
