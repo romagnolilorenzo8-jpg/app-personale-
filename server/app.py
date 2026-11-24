@@ -1106,6 +1106,9 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
         if voto is None or not 18 <= voto <= 30:
             raise HTTPException(400, "Il voto deve essere tra 18 e 30")
         return {"voto": voto, "lode": bool(e.get("lode")) and voto == 30, "cfu": _numero(e.get("cfu")) or 6}
+    if tipo in ("film", "libro", "serie"):
+        cop = e.get("copertina")
+        return {"copertina": cop if isinstance(cop, str) and len(cop) < 400000 else None, "copertina_cercata": bool(e.get("copertina_cercata"))}
     return {}
 
 

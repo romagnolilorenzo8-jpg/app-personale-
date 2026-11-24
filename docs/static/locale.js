@@ -403,6 +403,10 @@
       if (voto == null || !votoOk(voto)) throw errore(400, "Il voto deve essere tra 18 e 30");
       return { voto, lode: !!e.lode && voto === 30, cfu: numero(e.cfu) ?? 6 };
     }
+    if (["film", "libro", "serie"].includes(tipo)) {
+      const cop = typeof e.copertina === "string" && e.copertina.length < 400000 ? e.copertina : null;
+      return { copertina: cop, copertina_cercata: !!e.copertina_cercata };
+    }
     return {};
   }
   function normDiario(b) {
