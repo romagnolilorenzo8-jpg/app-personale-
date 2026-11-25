@@ -553,6 +553,7 @@ async function vistaHome() {
         <a class="palestra-card" href="#/palestra" style="order:4"><span class="pc-ico">🏋️</span><div style="flex:1;min-width:0"><b>Palestra</b>
           <div class="small muted">${ultimoEs ? `Ultimo: ${esc(ultimoEs.nome)} ${ultimoEs.ultima.extra.kg ? kgTesto(ultimoEs.ultima.extra.kg) + " × " + ultimoEs.ultima.extra.reps : ultimoEs.ultima.extra.reps + " rip."} · ${dataIt(ultimoEs.ultima.data).replace(/ \d{4}$/, "")}` : "Registra carichi e ripetizioni e guarda i tuoi progressi"}</div></div>
           ${pesoOra ? `<span class="pc-peso">${kgTesto(pesoOra.extra.peso)}</span>` : ""}<span class="dx">›</span></a>
+        <div id="salute-banner" style="order:4"></div>
         <div style="order:4">
           ${S.daSmistare ? `<a class="avviso" href="#/da-smistare"><div class="av-ico">📥</div><div style="flex:1"><b>${S.daSmistare} document${S.daSmistare === 1 ? "o" : "i"} da sistemare</b><div class="small muted">Tocca per metterl${S.daSmistare === 1 ? "o" : "i"} nella cartella giusta</div></div><span class="dx">›</span></a>` : ""}
           ${backupVecchio ? `<a class="avviso" href="#/altro"><div class="av-ico">💾</div><div style="flex:1"><b>Fai un backup</b><div class="small muted">${info.ultimo_backup ? "L'ultimo è del " + dataIt(info.ultimo_backup.slice(0, 10)) : "Non hai ancora salvato una copia"} — serve 1 minuto</div></div><span class="dx">›</span></a>` : ""}
@@ -578,6 +579,7 @@ async function vistaHome() {
     if (h === "app") location.hash = "#/agenda";
     if (h === "pw") location.hash = "#/password";
   };
+  bannerSalute($("#salute-banner"), () => render());
   $("#nuova-rad").onclick = async (e) => {
     e.preventDefault();
     const nome = await chiedi("Nuova cartella principale", "", { placeholder: "Es. Animali, Scuola, Viaggi…" }); if (!nome) return;
@@ -1399,14 +1401,12 @@ async function vistaPalestra() {
           <div class="es-piede"><span class="muted small">${g.corpoLibero ? "Record" : "Forza stimata"}: <b>${valoreForza(u.kg, g.corpoLibero ? g.record : g.forze[g.forze.length - 1])}</b><br>${dataIt(g.ultima.data)}</span>${scintilla(g.forze)}</div></a>`; }).join("")}</div>`
       : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio ancora.<br>Tocca <b>Registra un esercizio</b> o scrivilo in chat.</div>`}
     <div class="sezione"><h2>🏃 Attività</h2><a href="#/calorie">Calorie ›</a></div>
-    ${attRec.length ? `<div class="lista" id="att-rec">${attRec.map(htmlAttivita).join("")}</div>` : `<div class="small muted" style="padding:0 4px 8px">Corse, camminate, partite: aggiungile qui, oppure collega Strava e arrivano da sole.</div>`}
-    <div class="riga" style="margin-top:10px"><button class="btn sec" id="p-att">🏃 Aggiungi attività</button><button class="btn sec" id="p-strava">🟧 ${stravaCfg()?.refresh_token ? "Strava collegato" : "Collega Strava"}</button></div>`;
+    ${attRec.length ? `<div class="lista" id="att-rec">${attRec.map(htmlAttivita).join("")}</div>` : `<div class="small muted" style="padding:0 4px 8px">Corse, camminate, partite: aggiungile qui, oppure arrivano da Salute di iPhone (pagina Calorie).</div>`}
+    <div class="riga" style="margin-top:10px"><button class="btn sec" id="p-att">🏃 Aggiungi attività</button><a class="btn sec" href="#/calorie">❤️ Dati di Salute</a></div>`;
   const ric = () => vistaPalestra();
   $("#nuovo-es").onclick = () => registraEsercizio(null, ric);
   $("#p-att").onclick = () => aggiungiAttivita({ dopo: ric });
-  $("#p-strava").onclick = () => impostaStrava(ric);
   $$("#att-rec [data-att]").forEach((el) => (el.onclick = () => aggiungiAttivita({ voce: attRec.find((x) => x.id === +el.dataset.att), dopo: ric })));
-  sincronizzaStrava().then((n) => { if (n && location.hash === "#/palestra") vistaPalestra(); });
   $("#agg-peso").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   $("#agg-alt").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   if ($("#g-peso")) {
@@ -1506,7 +1506,8 @@ async function registraEsercizio(nome, dopo, voce) {
   });
 }
 
-/* ================================================================== CALORIE: cibo, attività, Strava, Salute */
+/* ================================================================== CALORIE: cibo, attività, Salute */
+memo.set("strava", null);   // Strava non si usa più: tolgo eventuali chiavi salvate
 const PASTI_N = { colazione: "☕ Colazione", pranzo: "🍝 Pranzo", cena: "🍽️ Cena", spuntino: "🍎 Spuntini" };
 const pastoOra = () => { const h = new Date().getHours(); return h < 11 ? "colazione" : h < 15 ? "pranzo" : h < 18 ? "spuntino" : "cena"; };
 const nK = (n) => Math.round(n || 0).toLocaleString("it-IT");
@@ -1553,7 +1554,7 @@ const testoBilancio = (b) => (b == null ? "—" : `${b > 0 ? "+" : b < 0 ? "−"
 
 async function vistaCalorie(arg) {
   const g = /^\d{4}-\d{2}-\d{2}$/.test(arg || "") ? arg : oggiIso(), oggi = g === oggiIso();
-  const ctx = await contestoCalorie(), d = calcoloGiorno(g, ctx), st = stravaCfg();
+  const ctx = await contestoCalorie(), d = calcoloGiorno(g, ctx);
   const etich = oggi ? "Oggi" : g === isoGiorno(oggiIso(), -1) ? "Ieri" : `${GIORNI[new Date(g + "T00:00").getDay()]} ${dataIt(g)}`;
   const kM = d.p * 4 + d.c * 4 + d.g * 9 || 1;
   const gruppi = [...Object.keys(PASTI_N), null].map((k) => ({ k, l: d.P.filter((x) => (x.extra?.pasto || null) === k) })).filter((x) => x.l.length);
@@ -1573,6 +1574,7 @@ async function vistaCalorie(arg) {
     ${d.mangiate ? `<div class="card macro"><div class="macro-barra" role="img" aria-label="Proteine ${Math.round((d.p * 400) / kM)}%, carboidrati ${Math.round((d.c * 400) / kM)}%, grassi ${Math.round((d.g * 900) / kM)}%">
         <i class="s1" style="width:${(d.p * 400) / kM}%"></i><i class="s2" style="width:${(d.c * 400) / kM}%"></i><i class="s3" style="width:${(d.g * 900) / kM}%"></i></div>
       <div class="macro-leg"><span><i class="s1"></i>Proteine <b>${n1(d.p)} g</b></span><span><i class="s2"></i>Carboidrati <b>${n1(d.c)} g</b></span><span><i class="s3"></i>Grassi <b>${n1(d.g)} g</b></span></div></div>` : ""}
+    <div id="salute-banner"></div>
     <div class="azioni-cal"><button class="btn" id="add-cibo">🍽️ Cibo</button><button class="btn sec" id="add-scan">📷 Codice</button><button class="btn sec" id="add-att">🏃 Attività</button></div>
     <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “a pranzo 80 g di pasta e 2 uova” o “ho corso 5 km in 30 minuti”</span></a>
     ${gruppi.length ? gruppi.map(({ k, l }) => `<div class="sezione"><h2>${k ? PASTI_N[k] : "🍴 Altro"}</h2><span class="muted small">${nK(l.reduce((s, x) => s + x.extra.kcal, 0))} kcal</span></div>
@@ -1585,7 +1587,6 @@ async function vistaCalorie(arg) {
     ${conDati7 ? `<div class="grafico-card" style="margin-top:18px"><div class="g-tit">Ultimi 7 giorni</div><div id="g-cal"></div></div>` : ""}
     <div class="sezione"><h2>Collegamenti</h2></div>
     <div class="lista">
-      <div class="voce" id="v-strava"><div class="thumb">🟧</div><div class="corpo"><div class="tit">Strava</div><div class="sub">${st?.refresh_token ? `✅ Collegato${st.atleta ? " · " + esc(st.atleta) : ""}${st.ultima ? " · controllato " + quandoFa(st.ultima) : ""}` : "Importa da solo corse, camminate e allenamenti"}</div></div><div class="dx">›</div></div>
       <div class="voce" id="v-salute"><div class="thumb">❤️</div><div class="corpo"><div class="tit">Salute di iPhone · Fitness</div><div class="sub">Passi e calorie attive della giornata</div></div><div class="dx">›</div></div>
       <div class="voce" id="v-base"><div class="thumb">⚖️</div><div class="corpo"><div class="tit">Fabbisogno a riposo</div><div class="sub">${ctx.base ? `${nK(ctx.base)} kcal al giorno (${ctx.prof.sesso === "F" ? "donna" : "uomo"}, ${ctx.anni} anni, ${kgTesto(ctx.peso)}, ${ctx.altezza} cm)` : "Serve sesso, età, peso e altezza"}</div></div><div class="dx">›</div></div>
     </div>
@@ -1596,7 +1597,6 @@ async function vistaCalorie(arg) {
   $("#add-att").onclick = () => aggiungiAttivita({ data: g, dopo: ric });
   $$("[data-pasto]").forEach((el) => (el.onclick = () => aggiungiCibo({ voce: d.P.find((x) => x.id === +el.dataset.pasto), dopo: ric })));
   $$("[data-att]").forEach((el) => (el.onclick = () => aggiungiAttivita({ voce: d.A.find((x) => x.id === +el.dataset.att), dopo: ric })));
-  $("#v-strava").onclick = () => impostaStrava(ric);
   $("#v-salute").onclick = () => importaSalute(ric);
   $("#v-base").onclick = () => impostaFabbisogno(ctx, ric);
   if ($("#g-cal")) {
@@ -1604,12 +1604,12 @@ async function vistaCalorie(arg) {
       { nome: ctx.base ? "Bruciate" : "Bruciate con attività", slot: 2, valori: dati7.map((x) => (x.mangiate || x.attivo ? Math.round((x.base || 0) + x.attivo) : 0)) }];
     window.Grafici.colonne($("#g-cal"), { categorie: giorni7.map((x) => dataIt(x).replace(/ \d{4}$/, "")), serie, formato: (v) => nK(v), titoloTabella: "Vedi i numeri in tabella" });
   }
-  if (st?.refresh_token) sincronizzaStrava().then((n) => { if (n && location.hash.startsWith("#/calorie")) vistaCalorie(arg); });
+  if (oggi) bannerSalute($("#salute-banner"), ric, true);
 }
 function htmlAttivita(x) {
   const e = x.extra || {};
   const det = [e.km ? `${n1(e.km)} km` : "", e.minuti ? `${e.minuti} min` : "", e.passi ? `${nK(e.passi)} passi` : ""].filter(Boolean).join(" · ");
-  return `<div class="voce" data-att="${x.id}"><div class="thumb">${icoSport(e.sport)}</div><div class="corpo"><div class="tit">${esc(x.titolo)}${e.fonte ? ` <span class="tag fonte-${e.fonte}">${e.fonte === "strava" ? "Strava" : "Salute"}</span>` : ""}</div>
+  return `<div class="voce" data-att="${x.id}"><div class="thumb">${icoSport(e.sport)}</div><div class="corpo"><div class="tit">${esc(x.titolo)}${e.fonte === "salute" ? ` <span class="tag fonte-salute">Salute</span>` : ""}</div>
     <div class="sub">${esc([dataIt(x.data).replace(/ \d{4}$/, ""), det].filter(Boolean).join(" · "))}</div></div><div class="dx kcal"><b>${nK(e.kcal)}</b> kcal</div></div>`;
 }
 
@@ -1780,7 +1780,7 @@ async function aggiungiAttivita({ voce = null, data = oggiIso(), dopo } = {}) {
     } catch (err) { toast("⚠️ " + err.message); }
   };
   $("#at-del", v) && ($("#at-del", v).onclick = async () => {
-    if (!(await conferma("Eliminare questa attività?", "Elimina", e.fonte === "strava" ? "Non verrà reimportata da Strava." : ""))) return;
+    if (!(await conferma("Eliminare questa attività?", "Elimina"))) return;
     await api(`/api/diario/${voce.id}`, { method: "DELETE" });
     if (e.ext_id) { const sc = JSON.parse(memo.get("scartate") || "[]"); sc.push(e.ext_id); memo.set("scartate", JSON.stringify(sc.slice(-500))); }
     v.chiudi(); toast("🗑️ Eliminata"); if (dopo) dopo();
@@ -1812,123 +1812,60 @@ function impostaFabbisogno(ctx, dopo) {
 
 /* ------------------------------------------------------------------ Salute di iPhone (tramite Comando Rapido) */
 const istruzioniSalute = () => `
-  ${passo(1, "Apri l'app <b>Comandi</b> → <b>＋</b>. Chiamalo <b>LifeApp Salute</b>.")}
-  ${passo(2, "Aggiungi <b>Trova campioni di Salute</b>: tipo <b>Energia attiva</b>, filtro <b>Data di inizio</b> → <b>è oggi</b>. Poi aggiungi <b>Calcola statistiche</b> → <b>Somma</b>.")}
-  ${passo(3, "Ripeti per i <b>Passi</b>: <b>Trova campioni di Salute</b> (tipo <b>Passi</b>, <b>è oggi</b>) e <b>Calcola statistiche</b> → <b>Somma</b>.")}
-  ${passo(4, "Aggiungi <b>Testo</b> e scrivi:" + cod("LifeApp-Salute;") + "poi inserisci la variabile <b>Data corrente</b> (tocca la variabile → <b>Formato personalizzato</b> <code>yyyy-MM-dd</code>), un <b>;</b>, la prima <b>Statistiche</b> (calorie), un <b>;</b> e la seconda <b>Statistiche</b> (passi).")}
-  ${passo(5, "Aggiungi <b>Copia negli appunti</b>. Tocca <b>▶︎</b> e consenti l'accesso a Salute.")}
-  ${passo(6, "Per farlo <b>tutti i giorni da solo</b>: in Comandi vai su <b>Automazione</b> → <b>＋</b> → <b>Ora del giorno</b> (es. 21:30, ogni giorno) → <b>Esegui immediatamente</b> → scegli <b>LifeApp Salute</b>.")}
-  ${passo(7, "Quando apri LifeApp tocca <b>Incolla dati di Salute</b>: un tocco e il giorno è aggiornato.")}`;
-function importaSalute(dopo) {
+  ${passo(1, "Apri l'app <b>Comandi</b> (icona viola e blu) → in basso <b>Comandi</b> → in alto a destra <b>＋</b>. Tocca il nome in alto e chiamalo <b>LifeApp Salute</b>.")}
+  ${passo(2, "Tocca <b>Cerca azioni</b>, scrivi <b>campioni</b> e scegli <b>Trova campioni di Salute</b>. Tocca la parola blu dopo <b>Tipo</b> e scegli <b>Energia attiva</b>. Sotto deve esserci <b>Data di inizio · è oggi</b>: se manca, tocca <b>Aggiungi filtro</b> e impostalo così.")}
+  ${passo(3, "Cerca <b>statistiche</b> e aggiungi <b>Calcola statistiche</b>. Tocca la parola blu (<b>Media</b>) e scegli <b>Somma</b>.")}
+  ${passo(4, "Ripeti i passi 2 e 3 per i passi: <b>Trova campioni di Salute</b> con Tipo <b>Passi</b> (sempre <b>è oggi</b>), poi <b>Calcola statistiche</b> → <b>Somma</b>.")}
+  ${passo(5, "Cerca <b>testo</b> e aggiungi l'azione <b>Testo</b>. Tocca dentro e scrivi <b>LifeApp</b> e uno spazio. Nella barra sopra la tastiera tocca <b>Data corrente</b> e scrivi uno spazio. Poi, sempre nella barra, tocca <b>Seleziona variabile</b> e tocca l'azione <b>Calcola statistiche</b> delle calorie (la prima). Scrivi uno spazio, ancora <b>Seleziona variabile</b> e tocca la seconda <b>Calcola statistiche</b> (i passi). Deve venire: <b>LifeApp [Data corrente] [Statistiche] [Statistiche]</b>.")}
+  ${passo(6, "Cerca <b>appunti</b> e aggiungi <b>Copia negli appunti</b>. Tocca <b>▶︎</b> in basso: la prima volta consenti l'accesso a Salute. Fine!")}
+  ${passo(7, "Per farlo <b>partire da solo ogni sera</b>: in basso tocca <b>Automazione</b> → <b>＋</b> (o <b>Nuova automazione</b>) → <b>Ora del giorno</b> → scegli <b>21:30</b> e <b>Ogni giorno</b> → seleziona <b>Esegui immediatamente</b> → <b>Avanti</b> → scegli <b>LifeApp Salute</b>.")}
+  ${passo(8, "Quando apri LifeApp tocca il riquadro rosso <b>Aggiorna da Salute</b> e poi <b>Incolla</b>. Puoi anche far partire il comando a mano quando vuoi, per avere i dati aggiornati in quel momento.")}`;
+async function salvaSalute(righe) {
+  const att = await api("/api/diario?tipo=attivita", { fresco: true });
+  for (const r of righe) {
+    const id = "salute-" + r.data, gia = att.find((x) => x.extra?.ext_id === id);
+    const dati = { tipo: "attivita", titolo: "Movimento della giornata", data: r.data, extra: { sport: "Movimento (Salute)", passi: r.passi, kcal: r.kcal, minuti: null, km: null, fonte: "salute", ext_id: id } };
+    await api(gia ? `/api/diario/${gia.id}` : "/api/diario", { method: gia ? "PUT" : "POST", json: gia ? { ...gia, ...dati } : dati });
+  }
+  memo.set("salute-usata", "1"); memo.set("salute-ultimo", String(Date.now()));
+  const u = righe[righe.length - 1];
+  toast(`❤️ ${u.data === oggiIso() ? "Oggi" : dataIt(u.data).replace(/ \d{4}$/, "")}: ${nK(u.passi)} passi, ${nK(u.kcal)} kcal attive`, 3500);
+}
+/* Un tocco: leggo gli appunti (iPhone chiede "Incolla"); se non ci sono i dati apro la scheda con le istruzioni */
+async function aggiornaDaSalute(dopo) {
+  let t = null;
+  try { t = await navigator.clipboard.readText(); } catch { /* permesso negato o non disponibile */ }
+  const righe = t ? window.Salute.leggiSalute(t, oggiIso()) : [];
+  if (righe.length) { await salvaSalute(righe); if (dopo) dopo(); return; }
+  importaSalute(dopo, t == null ? "" : "Negli appunti non ci sono i dati di Salute: fai partire il comando <b>LifeApp Salute</b> (o aspetta l'automazione della sera) e riprova.");
+}
+async function bannerSalute(el, dopo, sempre = false) {
+  if (!el || (!sempre && !memo.get("salute-usata"))) return;
+  const oggiS = (await api("/api/diario?tipo=attivita")).find((x) => x.extra?.ext_id === "salute-" + oggiIso());
+  const ultimo = +memo.get("salute-ultimo") || 0;
+  if (oggiS && Date.now() - ultimo < 3 * 3600e3) { el.innerHTML = ""; return; }
+  el.innerHTML = `<button type="button" class="avviso salute-avviso"><div class="av-ico">❤️</div><div style="flex:1;text-align:left"><b>Aggiorna da Salute</b>
+    <div class="small muted">${oggiS ? `Oggi finora: ${nK(oggiS.extra.passi)} passi · ${nK(oggiS.extra.kcal)} kcal attive` : "Passi e calorie attive · un tocco"}</div></div><span class="dx">›</span></button>`;
+  el.firstElementChild.onclick = () => aggiornaDaSalute(dopo);
+}
+function importaSalute(dopo, messaggio = "") {
   const v = foglio(`<h3>❤️ Salute di iPhone ${xBtn}</h3>
-    <p class="muted small" style="margin-top:-6px">Porta in LifeApp <b>passi</b> e <b>calorie attive</b> registrati da iPhone e Apple Watch (gli stessi dell'app Fitness).</p>
+    ${messaggio ? `<div class="avviso" style="margin:0 0 12px"><div class="av-ico">ℹ️</div><div style="flex:1" class="small">${messaggio}</div></div>` : ""}
+    <p class="muted small" style="margin-top:-6px">Porta in LifeApp <b>passi</b> e <b>calorie attive</b> di iPhone e Apple Watch (gli stessi dell'app Fitness, comprese le attività che Strava manda a Salute).</p>
     <button class="btn block" id="sa-incolla">📋 Incolla dati di Salute</button>
-    <textarea id="sa-testo" rows="3" placeholder="LifeApp-Salute;2026-11-25;520;8400" style="margin-top:10px"></textarea>
+    <textarea id="sa-testo" rows="2" placeholder="Oppure tieni premuto qui → Incolla" style="margin-top:10px"></textarea>
     <button class="btn sec block" id="sa-ok" style="margin-top:8px">Importa</button>
-    <details class="card" style="margin-top:12px"><summary><span class="sum-ico">⚙️</span><span>Come preparare il Comando Rapido<br><span class="small muted">Una volta sola, circa 3 minuti</span></span></summary><div class="dentro">${istruzioniSalute()}</div></details>`);
+    <details class="card" style="margin-top:12px" ${memo.get("salute-usata") ? "" : "open"}><summary><span class="sum-ico">⚙️</span><span>Come preparare il Comando Rapido<br><span class="small muted">Una volta sola, circa 5 minuti</span></span></summary><div class="dentro">${istruzioniSalute()}</div></details>`);
   const importa = async (t) => {
-    const righe = window.Salute.leggiSalute(t);
-    if (!righe.length) return toast("⚠️ Non trovo i dati: esegui prima il comando “LifeApp Salute”", 4000);
-    const att = await api("/api/diario?tipo=attivita", { fresco: true });
-    for (const r of righe) {
-      const id = "salute-" + r.data, gia = att.find((x) => x.extra?.ext_id === id);
-      const dati = { tipo: "attivita", titolo: "Movimento della giornata", data: r.data, extra: { sport: "Movimento (Salute)", passi: r.passi, kcal: r.kcal, minuti: null, km: null, fonte: "salute", ext_id: id } };
-      await api(gia ? `/api/diario/${gia.id}` : "/api/diario", { method: gia ? "PUT" : "POST", json: gia ? { ...gia, ...dati } : dati });
-    }
-    const u = righe[righe.length - 1];
-    v.chiudi(); toast(`❤️ ${dataIt(u.data).replace(/ \d{4}$/, "")}: ${nK(u.passi)} passi, ${nK(u.kcal)} kcal attive`); if (dopo) dopo();
+    const righe = window.Salute.leggiSalute(t, oggiIso());
+    if (!righe.length) return toast("⚠️ Non trovo i dati: fai partire prima il comando “LifeApp Salute”", 4000);
+    await salvaSalute(righe); v.chiudi(); if (dopo) dopo();
   };
   $("#sa-incolla", v).onclick = async () => {
     try { const t = await navigator.clipboard.readText(); $("#sa-testo", v).value = t; await importa(t); }
     catch { toast("Tieni premuto nel riquadro e scegli Incolla"); $("#sa-testo", v).focus(); }
   };
   $("#sa-ok", v).onclick = () => importa($("#sa-testo", v).value);
-}
-
-/* ------------------------------------------------------------------ Strava */
-const stravaCfg = () => { try { return JSON.parse(memo.get("strava") || "null"); } catch { return null; } };
-const stravaSalva = (c) => memo.set("strava", c ? JSON.stringify(c) : null);
-const redirectStrava = () => location.origin + location.pathname;
-let syncStrava = null;
-function sincronizzaStrava(forza = false) {
-  const cfg0 = stravaCfg();
-  if (!cfg0?.refresh_token) return Promise.resolve(0);
-  if (!forza && Date.now() / 1000 - (cfg0.ultima || 0) < 1800) return Promise.resolve(0);
-  if (syncStrava) return syncStrava;
-  syncStrava = (async () => {
-    try {
-      const cfg = await window.Salute.strava.valido(cfg0); stravaSalva(cfg);
-      const dopo = cfg.ultima ? cfg.ultima - 3 * 86400 : Date.now() / 1000 - 30 * 86400;
-      const lista = await window.Salute.strava.attivita(cfg, dopo);
-      const att = await api("/api/diario?tipo=attivita", { fresco: true });
-      const gia = new Set([...att.map((x) => x.extra?.ext_id).filter(Boolean), ...JSON.parse(memo.get("scartate") || "[]")]);
-      const peso = ultimoPeso(await api("/api/diario?tipo=peso"))?.extra?.peso || 70;
-      let n = 0;
-      for (const a of lista) {
-        const voce = window.Salute.daStrava(a, peso);
-        if (gia.has(voce.extra.ext_id) || !voce.data) continue;
-        await api("/api/diario", { method: "POST", json: voce }); gia.add(voce.extra.ext_id); n++;
-      }
-      stravaSalva({ ...stravaCfg(), ...cfg, ultima: Math.floor(Date.now() / 1000) });
-      if (n) toast(`🟧 Strava: ${n} ${n === 1 ? "nuova attività" : "nuove attività"}`);
-      return n;
-    } catch (e) { if (forza) toast("⚠️ " + e.message, 4000); return 0; }
-    finally { syncStrava = null; }
-  })();
-  return syncStrava;
-}
-async function ritornoStrava() {   // Strava riapre LifeApp con ?code=…&state=lifeapp-strava
-  const q = new URLSearchParams(location.search);
-  if (q.get("state") !== "lifeapp-strava") return false;
-  history.replaceState(null, "", location.pathname + "#/calorie");
-  const code = q.get("code");
-  if (!code) { toast("Strava: collegamento annullato"); return false; }
-  const cfg = stravaCfg();
-  if (!cfg?.client_secret) {   // si è aperto Safari invece dell'app sulla Home: memoria diversa
-    $("#tabbar").hidden = true;
-    app.innerHTML = `<div class="vuoto"><span class="big">🟧</span><b>Quasi fatto!</b><br>Questa pagina si è aperta in Safari. Copia il codice qui sotto, apri <b>LifeApp dall'icona sulla Home</b> → Calorie → Strava → <b>Si è aperto Safari con un codice?</b> e incollalo.<br><br>
-      ${cod(code)}</div>`;
-    return true;
-  }
-  try { stravaSalva(await window.Salute.strava.scambia(cfg, code)); toast("✅ Strava collegato"); sincronizzaStrava(true).then((n) => { if (n) render(); }); }
-  catch (e) { toast("⚠️ " + e.message, 4000); }
-  return false;
-}
-function impostaStrava(dopo) {
-  const c = stravaCfg() || {};
-  const v = foglio(`<h3>🟧 Strava ${xBtn}</h3>
-    ${c.refresh_token ? `<div class="card"><b>✅ Collegato${c.atleta ? ` come ${esc(c.atleta)}` : ""}</b>
-        <div class="small muted" style="margin-top:4px">Le attività arrivano da sole ogni volta che apri LifeApp.${c.ultima ? " Ultimo controllo: " + quandoFa(c.ultima) + "." : ""}</div></div>
-      <button class="btn block" id="st-sync" style="margin-top:10px">🔄 Controlla adesso</button>
-      <button class="btn danger block" id="st-via" style="margin-top:8px">Scollega Strava</button>`
-    : `<p class="muted small" style="margin-top:-6px">Si fa <b>una volta sola</b> (circa 3 minuti). Poi corse, camminate e allenamenti di Strava compaiono qui da soli, con le calorie.</p>
-      <div class="avviso" style="margin:0 0 12px"><div class="av-ico">ℹ️</div><div style="flex:1" class="small">Da giugno 2026 Strava permette di creare l'applicazione solo a chi ha <b>l'abbonamento Strava</b>. Se non ce l'hai, usa <b>Salute di iPhone</b> (nella pagina Calorie): in Strava attiva l'invio delle attività a Salute e le calorie arrivano lo stesso.</div></div>
-      ${passo(1, `Apri <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> e accedi con il tuo account.`)}
-      ${passo(2, `Crea un'applicazione: <b>Nome</b> LifeApp · <b>Categoria</b> Visualizer · <b>Sito web</b> e <b>Dominio di callback</b>:${cod(location.hostname)}`)}
-      ${passo(3, "Copia qui <b>ID client</b> e <b>Segreto client</b>: restano solo su questo telefono.")}
-      <form id="st-f"><label class="campo"><span>ID client</span><input type="text" name="id" inputmode="numeric" autocomplete="off" value="${esc(c.client_id || "")}"></label>
-        <label class="campo"><span>Segreto client</span><input type="password" name="secret" autocomplete="off" value="${esc(c.client_secret || "")}"></label>
-        <button class="btn block">🔗 Collega Strava</button></form>
-      <details class="card" style="margin-top:12px"><summary><span>Si è aperto Safari con un codice?</span></summary><div class="dentro">
-        <form id="st-cod" class="riga"><input type="text" name="codice" autocomplete="off" placeholder="Incolla il codice"><button class="btn">OK</button></form></div></details>`}
-    <p class="small muted" style="margin-top:12px">💡 Vuoi anche gli allenamenti dell'app Fitness / Apple Watch? Nell'app Strava: <b>Tu → Impostazioni → Applicazioni, servizi e dispositivi → Salute</b>, attiva l'importazione degli allenamenti. Così arrivano a Strava e da lì qui.</p>`);
-  const leggiForm = () => {
-    const f = $("#st-f", v), id = f.id.value.trim(), secret = f.secret.value.trim();
-    if (!/^\d+$/.test(id) || secret.length < 20) { toast("Controlla ID client (solo numeri) e Segreto client"); return null; }
-    const cfg = { ...(stravaCfg() || {}), client_id: id, client_secret: secret }; stravaSalva(cfg); return cfg;
-  };
-  $("#st-f", v) && ($("#st-f", v).onsubmit = (e) => { e.preventDefault(); const cfg = leggiForm(); if (cfg) location.href = window.Salute.strava.urlAutorizza(cfg.client_id, redirectStrava()); });
-  $("#st-cod", v) && ($("#st-cod", v).onsubmit = async (e) => {
-    e.preventDefault(); const cfg = leggiForm(); if (!cfg) return;
-    try { stravaSalva(await window.Salute.strava.scambia(cfg, e.target.codice.value.trim())); v.chiudi(); toast("✅ Strava collegato"); await sincronizzaStrava(true); if (dopo) dopo(); }
-    catch (err) { toast("⚠️ " + err.message, 4000); }
-  });
-  $("#st-sync", v) && ($("#st-sync", v).onclick = async () => { const n = await sincronizzaStrava(true); if (!n) toast("Nessuna attività nuova"); v.chiudi(); if (dopo) dopo(); });
-  $("#st-via", v) && ($("#st-via", v).onclick = async () => {
-    if (!(await conferma("Scollegare Strava?", "Scollega", "Le attività già importate restano."))) return;
-    fetch("https://www.strava.com/oauth/deauthorize", { method: "POST", headers: { Authorization: "Bearer " + c.access_token } }).catch(() => {});
-    stravaSalva(null); v.chiudi(); toast("Strava scollegato"); if (dopo) dopo();
-  });
 }
 
 function aggiornaCorpo(prof, pAtt, dopo) {
@@ -2773,7 +2710,6 @@ async function renderPagina() {
 }
 
 async function avvia() {
-  if (await ritornoStrava()) return;
   try { S.stato = await api("/api/stato"); }
   catch (e) {
     app.innerHTML = `<div class="vuoto"><span class="big">📡</span>${LOC ? "Non riesco ad aprire la memoria del telefono.<br>" + esc(e.message) : "Server non raggiungibile.<br>Sei connesso al Wi-Fi di casa?"}<br><br><button class="btn" onclick="avvia()">Riprova</button></div>`;
@@ -2783,7 +2719,6 @@ async function avvia() {
   await caricaCartelle();
   render();
   benvenuto();
-  sincronizzaStrava().then((n) => { if (n && /^#\/(calorie|palestra)/.test(location.hash)) render(); });
 }
 addEventListener("hashchange", render);
 document.addEventListener("pointerdown", (e) => {
@@ -2795,7 +2730,7 @@ document.addEventListener("pointerdown", (e) => {
   addEventListener("pointerup", via); addEventListener("pointercancel", via);
 }, { passive: true });
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-cp]"); if (b) copia(b.dataset.cp); });
-document.addEventListener("visibilitychange", () => { if (!document.hidden && S.stato?.accesso) { svuotaMemoria(); caricaCartelle().catch(() => {}); sincronizzaStrava().then((n) => { if (n && /^#\/(calorie|palestra)/.test(location.hash)) render(); }); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.stato?.accesso) { svuotaMemoria(); caricaCartelle().catch(() => {}); } });
 if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("sw.js").catch(() => {});
 applicaAspetto();
 avvia();

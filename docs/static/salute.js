@@ -2,7 +2,8 @@
    - tabella di alimenti comuni (valori per 100 g, approssimati da tabelle CREA/USDA)
    - lettura di frasi come "80 g di pasta e 2 uova" → grammi di ogni alimento
    - calorie bruciate (MET × peso × ore) e fabbisogno base (Mifflin-St Jeor)
-   - Open Food Facts (codici a barre) e Strava (allenamenti), chiamati direttamente dal telefono */
+   - Open Food Facts (codici a barre), chiamato direttamente dal telefono
+   - dati di Salute di iPhone portati da un Comando Rapido */
 (function (glob) {
   "use strict";
 
@@ -173,33 +174,40 @@
     if (!minuti) return 0;
     return Math.round((met(sport, minuti, km) - 1) * peso * (minuti / 60));
   }
-  const STRAVA_SPORT = { Run: "Corsa", TrailRun: "Corsa", VirtualRun: "Corsa", Walk: "Camminata", Hike: "Escursione", Ride: "Bici", VirtualRide: "Bici", MountainBikeRide: "Bici",
-    GravelRide: "Bici", EBikeRide: "Bici", Swim: "Nuoto", WeightTraining: "Palestra", Workout: "Palestra", Crossfit: "Palestra", Yoga: "Yoga", Pilates: "Yoga",
-    Soccer: "Calcio", Tennis: "Tennis / Padel", Padel: "Tennis / Padel", Pickleball: "Tennis / Padel" };
-  function daStrava(a, peso = 70) {
-    const sport = STRAVA_SPORT[a.sport_type] || STRAVA_SPORT[a.type] || "Altro";
-    const minuti = Math.round((a.moving_time || a.elapsed_time || 0) / 60), km = a.distance ? Math.round(a.distance / 10) / 100 : null;
-    const kcal = a.calories ? Math.round(a.calories) : a.kilojoules ? Math.round(a.kilojoules) : kcalAttivita({ sport, minuti, km }, peso);
-    return { tipo: "attivita", titolo: a.name || sport, data: (a.start_date_local || a.start_date || "").slice(0, 10),
-      extra: { sport, minuti, km, passi: null, kcal, fonte: "strava", ext_id: "strava-" + a.id } };
-  }
-
   /* fabbisogno a riposo (Mifflin-St Jeor) */
   function bmr({ sesso, eta, peso, altezza }) {
     if (!sesso || !eta || !peso || !altezza) return null;
     return Math.round(10 * peso + 6.25 * altezza - 5 * eta + (sesso === "F" ? -161 : 5));
   }
 
-  /* Dati Salute incollati dal Comando Rapido: "LifeApp-Salute;2026-11-25;520;8400" (una riga per giorno) */
-  function leggiSalute(testo) {
-    const out = [];
-    for (const r of String(testo || "").split(/\r?\n/)) {
+  /* Dati Salute copiati dal Comando Rapido. Va bene quasi qualsiasi forma, purché ci sia "LifeApp":
+       "LifeApp 812,4 9.350"                       → oggi, 812 kcal attive, 9350 passi
+       "LifeApp 25 nov 2026 alle ore 21:30 812 9350" → con la data (anche 25/11/26)
+       "LifeApp-Salute;2026-11-25;520;8400"        → formato di prima, una riga per giorno */
+  const MESI_S = { gen: 1, feb: 2, mar: 3, apr: 4, mag: 5, giu: 6, lug: 7, ago: 8, set: 9, ott: 10, nov: 11, dic: 12 };
+  const numIt = (s) => Math.round(+s.replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", "."));
+  function leggiSalute(testo, oggi = null) {
+    const t = String(testo || ""), out = [];
+    for (const r of t.split(/\r?\n/)) {
       const m = r.match(/(\d{4}-\d{2}-\d{2})\s*[;|,]\s*([\d.,]+)\s*[;|,]\s*([\d.,]+)/);
-      if (!m) continue;
-      const n = (s) => Math.round(+s.replace(/\.(?=\d{3}\b)/g, "").replace(",", "."));
-      out.push({ data: m[1], kcal: n(m[2]), passi: n(m[3]) });
+      if (m) out.push({ data: m[1], kcal: numIt(m[2]), passi: numIt(m[3]) });
     }
-    return out;
+    if (out.length) return out;
+    if (!/lifeapp/i.test(t)) return [];
+    const p2 = (n) => String(n).padStart(2, "0");
+    let data = oggi, resto = t.replace(/lifeapp(?:[-\s]*salute)?/gi, " "), m;
+    if ((m = resto.match(/(\d{4})-(\d{2})-(\d{2})/))) data = m[0];
+    else if ((m = resto.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})\b/))) data = `${m[3].length === 2 ? 2000 + +m[3] : m[3]}-${p2(m[2])}-${p2(m[1])}`;
+    else if ((m = resto.match(/\b(\d{1,2})\s+(gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)[a-z]*\.?\s+(\d{4})\b/i))) data = `${m[3]}-${p2(MESI_S[m[2].toLowerCase()])}-${p2(m[1])}`;
+    else if ((m = resto.match(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})\b/i)))
+      data = `${m[3]}-${p2("janfebmaraprmayjunjulaugsepoctnovdec".indexOf(m[1].toLowerCase()) / 3 + 1)}-${p2(m[2])}`;
+    if (m) resto = resto.replace(m[0], " ");
+    resto = resto.replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, " ");   // l'ora
+    const n = resto.match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?/g) || [];
+    if (n.length < 2 || !data) return [];
+    const kcal = numIt(n[0]), passi = numIt(n[1]);
+    if (kcal > 20000 || passi > 200000) return [];
+    return [{ data, kcal, passi }];
   }
 
   /* ------------------------------------------------------------ Open Food Facts */
@@ -231,38 +239,7 @@
     return (d.products || []).map((p) => daOff(p, p.code)).filter(Boolean);
   }
 
-  /* ------------------------------------------------------------ Strava */
-  const STRAVA = "https://www.strava.com";
-  const strava = {
-    urlAutorizza: (clientId, redirect) => `${STRAVA}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirect)}&approval_prompt=auto&scope=activity:read_all&state=lifeapp-strava`,
-    async token(cfg, corpo) {
-      const r = await fetch(`${STRAVA}/oauth/token`, { method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: cfg.client_id, client_secret: cfg.client_secret, ...corpo }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(r.status === 400 || r.status === 401 ? "Strava ha rifiutato: controlla Client ID e Client Secret" : "Strava non risponde");
-      return { ...cfg, access_token: d.access_token, refresh_token: d.refresh_token || cfg.refresh_token, expires_at: d.expires_at,
-        atleta: d.athlete ? [d.athlete.firstname, d.athlete.lastname].filter(Boolean).join(" ") : cfg.atleta };
-    },
-    scambia: (cfg, code) => strava.token(cfg, { code, grant_type: "authorization_code" }),
-    async valido(cfg) {
-      if (cfg.access_token && cfg.expires_at > Date.now() / 1000 + 120) return cfg;
-      return strava.token(cfg, { refresh_token: cfg.refresh_token, grant_type: "refresh_token" });
-    },
-    async attivita(cfg, dopo) {
-      const out = [];
-      for (let pag = 1; pag <= 5; pag++) {
-        const r = await fetch(`${STRAVA}/api/v3/athlete/activities?after=${Math.floor(dopo)}&per_page=100&page=${pag}`, { headers: { Authorization: "Bearer " + cfg.access_token } });
-        if (r.status === 401) throw new Error("Strava: collegamento scaduto, ricollegalo");
-        if (!r.ok) throw new Error("Strava non risponde");
-        const l = await r.json();
-        out.push(...l);
-        if (l.length < 100) break;
-      }
-      return out;
-    },
-  };
-
-  const api = { ALIMENTI: T, cercaAlimento, suggerimenti, leggiPasto, valori, SPORT, kcalAttivita, daStrava, bmr, leggiSalute, prodotto, cercaOnline, daOff, strava };
+  const api = { ALIMENTI: T, cercaAlimento, suggerimenti, leggiPasto, valori, SPORT, kcalAttivita, bmr, leggiSalute, prodotto, cercaOnline, daOff };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else glob.Salute = api;
 })(typeof window !== "undefined" ? window : globalThis);

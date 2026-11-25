@@ -1,5 +1,5 @@
 // Fa funzionare LifeApp anche senza connessione (generato da tools/crea_versione_iphone.py)
-const CACHE = "scrigno-9aa74f1729";
+const CACHE = "scrigno-3eca7ba08b";
 const FILE = ["./", "index.html", "manifest.webmanifest", "static/app.css", "static/app.js", "static/chat.js", "static/copertine.js", "static/grafici.js", "static/icona-180.png", "static/icona-192.png", "static/icona-512.png", "static/icona.svg", "static/locale.js", "static/nlp.js", "static/salute.js", "static/zxing.min.js"];
 self.addEventListener("install", (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILE))); self.skipWaiting(); });
 self.addEventListener("activate", (e) => e.waitUntil(caches.keys().then((k) => Promise.all(k.filter((x) => x !== CACHE).map((x) => caches.delete(x)))).then(() => self.clients.claim())));

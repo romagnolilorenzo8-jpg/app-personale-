@@ -34,12 +34,20 @@ def test_calorie_attivita_fabbisogno():
     out = js("""console.log(JSON.stringify([S.kcalAttivita({ sport: "Corsa", minuti: 30, km: 5 }, 75), S.kcalAttivita({ sport: "Camminata", passi: 8000 }, 70),
       S.bmr({ sesso: "M", eta: 24, peso: 75, altezza: 178 }), S.bmr({ sesso: "F", eta: 30, peso: 60, altezza: 165 }), S.bmr({ sesso: "M" }),
       S.leggiSalute("LifeApp-Salute;2026-11-25;520,4;8.400"),
-      S.daStrava({ id: 9, name: "Corsa mattutina", sport_type: "Run", moving_time: 1800, distance: 5000, start_date_local: "2026-11-24T07:10:00Z" }, 75),
-      S.daStrava({ id: 10, name: "Giro", sport_type: "Ride", moving_time: 3600, distance: 25000, kilojoules: 600, start_date_local: "2026-11-23T10:00:00Z" }),
       S.daOff({ product_name: "Gocciole", brands: "Pavesi", nutriments: { "energy-kcal_100g": 489, proteins_100g: 7.2, carbohydrates_100g: 66, fat_100g: 21 }, serving_quantity: 30 }, "8013355998771")]));""")
-    corsa, cammina, bm, bf, nessuno, salute, strava, bici, off = out
+    corsa, cammina, bm, bf, nessuno, salute, off = out
     assert corsa == 338 and cammina == 320 and bm == 1748 and bf == 1320 and nessuno is None
     assert salute == [{"data": "2026-11-25", "kcal": 520, "passi": 8400}]
-    assert strava["data"] == "2026-11-24" and strava["extra"] == {"sport": "Corsa", "minuti": 30, "km": 5, "passi": None, "kcal": 338, "fonte": "strava", "ext_id": "strava-9"}
-    assert bici["extra"]["sport"] == "Bici" and bici["extra"]["kcal"] == 600
     assert off == {"nome": "Gocciole (Pavesi)", "codice": "8013355998771", "kcal": 489, "p": 7.2, "c": 66, "g": 21, "pezzo": 30, "porz": 30}
+
+
+def test_dati_salute_dal_comando_rapido():
+    out = js("""console.log(JSON.stringify(["LifeApp 812,456 9350", "LifeApp 24 nov 2026 alle ore 21:30 812 9.350", "LifeApp 24/11/26, 21:30 1.023,5 12.004",
+      "LifeApp Nov 24, 2026 at 9:30 PM 500 7000", "ciao 12 34", "LifeApp 812"].map((t) => S.leggiSalute(t, "2026-11-25"))));""")
+    assert out == [
+        [{"data": "2026-11-25", "kcal": 812, "passi": 9350}],
+        [{"data": "2026-11-24", "kcal": 812, "passi": 9350}],
+        [{"data": "2026-11-24", "kcal": 1024, "passi": 12004}],
+        [{"data": "2026-11-24", "kcal": 500, "passi": 7000}],
+        [], [],
+    ]
