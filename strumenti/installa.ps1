@@ -1,10 +1,10 @@
-﻿# Installa (o aggiorna) Scrigno nella cartella "App personale" (C:\Users\<nome>\App personale).
+﻿# Installa (o aggiorna) LifeApp nella cartella "App personale" (C:\Users\<nome>\App personale).
 # Si avvia con un doppio clic su installa.bat. I documenti già salvati non vengono mai cancellati.
 $ErrorActionPreference = 'Stop'
 $src  = Split-Path $PSScriptRoot -Parent
 $dest = Join-Path $env:USERPROFILE 'App personale'
 Write-Host ""
-Write-Host "Installo Scrigno in: $dest" -ForegroundColor Cyan
+Write-Host "Installo LifeApp in: $dest" -ForegroundColor Cyan
 
 if ($src -ne $dest) {
   New-Item -ItemType Directory -Force $dest | Out-Null
@@ -46,7 +46,7 @@ if ($src -ne $dest) {
       continue
     }
     try { Remove-Item $v.FullName -Recurse -Force }
-    catch { Write-Host "Non riesco a cancellare $($v.FullName): chiudi la finestra nera di Scrigno e riprova." -ForegroundColor Yellow }
+    catch { Write-Host "Non riesco a cancellare $($v.FullName): chiudi la finestra nera di LifeApp e riprova." -ForegroundColor Yellow }
   }
   foreach ($dl in $downloads) {
     Get-ChildItem $dl -File -Filter 'app-personale-*.zip' -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
@@ -55,21 +55,23 @@ if ($src -ne $dest) {
   Write-Host "Cartella Download ripulita." -ForegroundColor Green
 }
 
-# 5. icona "Scrigno" sul Desktop
+# 5. icona "LifeApp" sul Desktop
+$vecchia = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Scrigno.lnk'   # nome di prima
+if (Test-Path $vecchia) { Remove-Item $vecchia -Force }
 $ws  = New-Object -ComObject WScript.Shell
-$lnk = $ws.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Scrigno.lnk'))
+$lnk = $ws.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'LifeApp.lnk'))
 $lnk.TargetPath = Join-Path $dest 'avvia.bat'
 $lnk.WorkingDirectory = $dest
 $lnk.IconLocation = (Join-Path $dest 'strumenti\scrigno.ico') + ',0'
-$lnk.Description = 'Avvia Scrigno'
+$lnk.Description = 'Avvia LifeApp'
 $lnk.Save()
-Write-Host "Creata l'icona 'Scrigno' sul Desktop." -ForegroundColor Green
+Write-Host "Creata l'icona 'LifeApp' sul Desktop." -ForegroundColor Green
 
-# 6. avvia Scrigno e, alla fine, cancella la cartella estratta in Download
+# 6. avvia LifeApp e, alla fine, cancella la cartella estratta in Download
 Start-Process (Join-Path $dest 'avvia.bat') -WorkingDirectory $dest
 if ($radice) {
   Start-Process cmd.exe -ArgumentList "/c timeout /t 12 /nobreak >nul & rmdir /s /q `"$radice`"" -WindowStyle Hidden -WorkingDirectory $env:TEMP
 }
 Write-Host ""
-Write-Host "Fatto! Da ora avvia Scrigno con l'icona sul Desktop." -ForegroundColor Cyan
+Write-Host "Fatto! Da ora avvia LifeApp con l'icona sul Desktop." -ForegroundColor Cyan
 Start-Sleep -Seconds 4

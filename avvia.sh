@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Avvia Scrigno (Mac / Linux). La prima volta installa tutto il necessario.
+# Avvia LifeApp (Mac / Linux). La prima volta installa tutto il necessario.
 set -e
 cd "$(dirname "$0")"
 if [ ! -d .venv ]; then

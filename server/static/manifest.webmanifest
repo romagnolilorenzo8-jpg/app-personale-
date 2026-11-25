@@ -1,6 +1,6 @@
 {
-  "name": "Scrigno — il mio archivio",
-  "short_name": "Scrigno",
+  "name": "LifeApp — la mia vita",
+  "short_name": "LifeApp",
   "description": "Documenti, password, scadenze e visite mediche in un unico posto.",
   "start_url": "/",
   "scope": "/",

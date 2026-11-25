@@ -32,7 +32,7 @@ for i in manifest["icons"]:
 
 file_app = ["./", "index.html", "manifest.webmanifest"] + sorted(f"static/{f.name}" for f in (DST / "static").iterdir())
 versione = hashlib.sha256(b"".join((DST / p).read_bytes() for p in file_app[1:])).hexdigest()[:10]
-(DST / "sw.js").write_text(f"""// Fa funzionare Scrigno anche senza connessione (generato da tools/crea_versione_iphone.py)
+(DST / "sw.js").write_text(f"""// Fa funzionare LifeApp anche senza connessione (generato da tools/crea_versione_iphone.py)
 const CACHE = "scrigno-{versione}";
 const FILE = {json.dumps(file_app)};
 self.addEventListener("install", (e) => {{ e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILE))); self.skipWaiting(); }});

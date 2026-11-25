@@ -1,4 +1,4 @@
-# 🔐 Scrigno — la mia app personale
+# 🔐 LifeApp — la mia app personale
 
 > 👉 **Cosa fare adesso: [GUIDA-RAPIDA.md](GUIDA-RAPIDA.md)**
 
@@ -8,10 +8,10 @@ Gira sul tuo computer o sul mini server di casa: i file restano tuoi e non passa
 | | |
 |---|---|
 | 🗂️ **Archivio a cartelle** | Già pronte: *Mezzi di trasporto › Motorino / Auto › Bollo, Assicurazione, Revisione…*, *Salute › Analisi del sangue, Dentista › Radiografie denti…*, *Assicurazioni*, *Documenti personali*, *Casa*, *Lavoro e tasse*. Puoi crearne, rinominarle, spostarle e cambiarne l'icona. |
-| 📤 **Menu “Condividi” di iPhone** | Da qualsiasi app: *Condividi → Invia a Scrigno*. Il file arriva in **📥 Da smistare** e con un tocco lo sposti nella cartella giusta. |
+| 📤 **Menu “Condividi” di iPhone** | Da qualsiasi app: *Condividi → Invia a LifeApp*. Il file arriva in **📥 Da smistare** e con un tocco lo sposti nella cartella giusta. |
 | 🛡️ **Raccolte rapide** | “Tutte le assicurazioni”, “Tutti i bolli”, “Revisioni”: raccolgono i documenti da tutte le cartelle (es. assicurazione dell'auto + del motorino + della casa). |
 | ⏰ **Scadenze** | Imposti la scadenza di bollo, assicurazione o carta d'identità e ricevi un avviso sul calendario 7 giorni prima. |
-| 🗓️ **Visite → Calendario iPhone** | Scrivi *“il 16 dicembre avrò il controllo dal dentista dalle 10 alle 11”*: Scrigno capisce data, ora di inizio e fine, titolo e luogo, e l'appuntamento compare nel Calendario dell'iPhone con promemoria. |
+| 🗓️ **Visite → Calendario iPhone** | Scrivi *“il 16 dicembre avrò il controllo dal dentista dalle 10 alle 11”*: LifeApp capisce data, ora di inizio e fine, titolo e luogo, e l'appuntamento compare nel Calendario dell'iPhone con promemoria. |
 | 🔑 **Password** | Cifrate (AES, chiave ricavata dalla tua password), con generatore e copia rapida. |
 | 🌗 **Interfaccia** | Pensata per iPhone, si installa sulla schermata Home e funziona a schermo intero; tema chiaro e scuro automatici. |
 
@@ -23,13 +23,13 @@ L'app funziona anche **da sola sull'iPhone**: documenti, visite e password vengo
 
 ⚠️ Il repository è **privato**: GitHub Pages (il sito gratuito per aprirla) funziona solo con repository pubblici o con GitHub Pro. Per ora si usa la versione con server sul PC.
 
-**Se in futuro attivi Pages:** con **Safari** vai su **https://romagnolilorenzo8-jpg.github.io/app-personale-/**, poi **Condividi → Aggiungi alla schermata Home** e da quel momento apri Scrigno **solo dall'icona**. Tutti i passaggi sono in **[GUIDA-RAPIDA.md](GUIDA-RAPIDA.md)**.
+**Se in futuro attivi Pages:** con **Safari** vai su **https://romagnolilorenzo8-jpg.github.io/app-personale-/**, poi **Condividi → Aggiungi alla schermata Home** e da quel momento apri LifeApp **solo dall'icona**. Tutti i passaggi sono in **[GUIDA-RAPIDA.md](GUIDA-RAPIDA.md)**.
 
 Note:
 - Online c'è solo il **codice** dell'app (il repository è pubblico): i tuoi documenti **non escono mai dal telefono**.
 - In **Altro → Backup** crei un file con tutto, da salvare nell'app File. Fallo ogni tanto: se cancelli l'app o cambi telefono, è l'unica copia.
 - Il menu “Condividi” e il Calendario funzionano tramite due Comandi Rapidi: le istruzioni passo passo sono in **Altro**.
-- Quando il server di casa sarà pronto: crea un backup sull'iPhone, apri Scrigno dal server → **Altro → Importa backup dall'iPhone**.
+- Quando il server di casa sarà pronto: crea un backup sull'iPhone, apri LifeApp dal server → **Altro → Importa backup dall'iPhone**.
 - La cartella `docs/` si rigenera con `python3 tools/crea_versione_iphone.py` dopo ogni modifica a `server/static/`; il sito pubblicato è il ramo `gh-pages` (`git subtree split --prefix docs` del contenuto di `docs/`).
 
 ## 1. Avvio (prova sul tuo computer)
@@ -47,7 +47,7 @@ Al primo accesso scegli una password. **Non dimenticarla**: senza, le password s
 Le istruzioni passo passo, con l'indirizzo e il codice già pronti da copiare, sono nell'app: scheda **⚙️ Altro**.
 
 1. **Installa l'app**: Safari → Condividi → *Aggiungi alla schermata Home*.
-2. **Menu Condividi**: crea il Comando Rapido *Invia a Scrigno* (6 passaggi, servono circa 2 minuti).
+2. **Menu Condividi**: crea il Comando Rapido *Invia a LifeApp* (6 passaggi, servono circa 2 minuti).
 3. **Calendario**: tocca *Collega calendario*. Da quel momento visite e scadenze compaiono da sole nel Calendario dell'iPhone.
 4. **(Facoltativo) Siri**: comando *“Ehi Siri, nuova visita”* → detti l'appuntamento → viene creato subito nel Calendario.
 
@@ -67,7 +67,7 @@ sudo cp scrigno.service /etc/systemd/system/ && sudo systemctl enable --now scri
 - Nel router dai al PC un **IP fisso** (DHCP statico), così l'indirizzo non cambia.
 - Per portare i dati di prova sul server basta copiare la cartella `dati/`.
 - **Backup**: tutto quello che conta è nella cartella `dati/` (database + file). Copiala ogni tanto su un disco esterno.
-- **Fuori casa**: installa [Tailscale](https://tailscale.com) (gratuito) sul server e sull'iPhone. Scrigno è raggiungibile ovunque, in modo sicuro, **senza aprire porte sul router**. Sconsiglio di esporlo direttamente su Internet.
+- **Fuori casa**: installa [Tailscale](https://tailscale.com) (gratuito) sul server e sull'iPhone. LifeApp è raggiungibile ovunque, in modo sicuro, **senza aprire porte sul router**. Sconsiglio di esporlo direttamente su Internet.
 
 ## Quanto spazio serve sul server?
 

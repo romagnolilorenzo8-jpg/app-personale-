@@ -1,4 +1,4 @@
-/* Scrigno — la chat: capisce frasi semplici in italiano e decide cosa fare.
+/* LifeApp — la chat: capisce frasi semplici in italiano e decide cosa fare.
    Restituisce un "intento", ad esempio:
      { azione: "compleanno", nome: "Marco Rossi", giorno: 6, mese: 8, anno: null }
      { azione: "diario", tipo: "film", titolo: "After", data: "2026-11-22", voto: 5, commento: "Bellissimo" }
@@ -88,6 +88,8 @@
     // ---------------------------------------------------------------- domande
     const domanda = /\?$/.test(orig) || rx("^(quando|quali|quale|quanti|quante|che|cosa|elenca|mostra|dimmi|fammi vedere|lista|prossimi|prossime|i miei|le mie|tutti i|tutte le)\\b").test(low)
       || /^(compleanni|film|libri|serie|visite|scadenze)( visti| letti| viste)?$/.test(low);
+    if (rx("\\b(calorie|kcal|dieta|quanto ho mangiato|bilancio calorico|cosa ho mangiato)\\b").test(low) && !/\d+\s*(?:g|gr|grammi|ml|kcal|calorie)\b/.test(low)
+      && (domanda || rx("\\b(quant[ei]|bilancio|oggi|come va|riepilogo)\\b").test(low))) return { azione: "domanda", cosa: "calorie" };
     if (rx("\\b(bilancio|quanto ho (?:speso|guadagnato|incassato)|guadagno|guadagni|profitto|quanto ci ho guadagnato)\\b").test(low)) return { azione: "domanda", cosa: "bilancio" };
     if (rx("\\b(la mia media|media (?:dei )?(?:voti|esami)|qual è la (?:mia )?media|quanti (?:crediti|cfu))\\b").test(low)) return { azione: "domanda", cosa: "esami" };
     if (rx("\\b(come va|com'è|progressi|andamento|record|massimal[ei]|quanto sollevo)\\b").test(low) && /palestra|forza|massimal|allenam|panca|squat|stacco|esercizi/.test(low)) return { azione: "domanda", cosa: "palestra" };
@@ -123,6 +125,46 @@
       if (!d) return { azione: "chiedi", motivo: "data_compleanno", nome: nome ? capParole(nome) : "" };
       if (!nome) return { azione: "chiedi", motivo: "nome_compleanno", ...d };
       return { azione: "compleanno", nome: capParole(nome), giorno: d.giorno, mese: d.mese, anno: d.anno };
+    }
+
+    // ---------------------------------------------------------------- attività fisica (corsa, camminata, bici…)
+    {
+      const SP = [["Corsa", "corso|corsa|correre|running|jogging|corsetta"], ["Camminata", "camminato|camminata|camminare|passeggiata|passeggiato|passi"],
+        ["Bici", "bici|bicicletta|pedalato|pedalata|ciclismo|mtb|spinning|cyclette"], ["Nuoto", "nuotato|nuoto|piscina|nuotata|vasche"],
+        ["Escursione", "escursione|trekking|hiking"], ["Calcio", "calcio|calcetto|partita di calcio|futsal"], ["Tennis / Padel", "tennis|padel"],
+        ["Yoga", "yoga|pilates|stretching"], ["Palestra", "palestra|crossfit|funzionale"]];
+      const sp = SP.find(([, r]) => rx("\\b(?:" + r + ")\\b").test(low));
+      let minuti = null, m;
+      if ((m = low.match(/(\d+(?:[.,]\d+)?)\s*(?:ore|ora|h)\b(?:\s*e\s*(\d+)|\s*e\s*mezz[ao])?/))) minuti = Math.round(+m[1].replace(",", ".") * 60) + (m[2] ? +m[2] : /mezz/.test(m[0]) ? 30 : 0);
+      else if (rx("\\bun'? ?ora e mezz[ao]\\b").test(low)) minuti = 90;
+      else if (rx("\\bun'? ?ora\\b").test(low)) minuti = 60;
+      else if (rx("\\bmezz'? ?ora\\b").test(low)) minuti = 30;
+      if ((m = low.match(/(\d+)\s*(?:min|minuti|minuto|')(?![a-z])/))) minuti = (minuti && /\b(?:ore|ora|h)\b/.test(low) && !/\be\s*\d+\s*min/.test(low) ? minuti : 0) + +m[1];
+      const km = (m = low.match(/(\d+(?:[.,]\d+)?)\s*(?:km|chilometri)\b/)) ? +m[1].replace(",", ".") : null;
+      const passi = (m = low.match(/(\d{1,3}(?:[.\s]\d{3})+|\d+)\s*passi\b/)) ? +m[1].replace(/[.\s]/g, "") : null;
+      const kcal = (m = low.match(/(\d+)\s*(?:kcal|calorie)\b/)) ? +m[1] : null;
+      if (sp && (minuti || km || passi) && !/\d\s*(?:kg|chili)\b/.test(low) && !domanda) {
+        const sport = passi && !minuti && !km ? "Camminata" : sp[0];
+        return { azione: "attivita", sport, minuti, km, passi, kcal, data: dataPassata(low, oggi).data };
+      }
+    }
+
+    // ---------------------------------------------------------------- cibo: "a pranzo 80 g di pasta e 2 uova"
+    {
+      const PASTI = { colazione: "colazione", pranzo: "pranzo", cena: "cena", merenda: "spuntino", spuntino: "spuntino", aperitivo: "spuntino" };
+      const reVerbo = rx("\\b(?:ho mangiato|mangiato|ho bevuto|bevuto|ho fatto colazione con|ho fatto merenda con|ho preso|mangio)\\b", "iu");
+      const reMeal = rx("\\b(?:a |per |come |di )?(colazione|pranzo|cena|merenda|spuntino|aperitivo)\\b\\s*:?", "iu");
+      const qta = /^\d+(?:[.,]\d+)?\s*(?:g|gr|grammi|ml|cl)\b/i.test(orig);
+      const meal = low.match(reMeal);
+      const conGrammi = /\d+\s*(?:g|gr|grammi|ml)\b/i.test(low);
+      if (!domanda && (reVerbo.test(low) || qta || (meal && (conGrammi || /^\s*(?:a |per )?(?:colazione|pranzo|cena|merenda|spuntino)\s*:/i.test(low))))) {
+        const quando = dataPassata(low, oggi);
+        let corpo = orig;
+        if (quando.re) corpo = corpo.replace(new RegExp(quando.re.source, "iu"), " ");
+        corpo = corpo.replace(new RegExp(reVerbo.source, "giu"), " ").replace(new RegExp(reMeal.source, "giu"), " ").replace(rx("\\b(?:oggi|stamattina|stasera|ieri)\\b", "giu"), " ");
+        corpo = pulisci(corpo.replace(/^\s*[:\-]\s*/, ""));
+        if (corpo) return { azione: "pasto", testo: corpo, pasto: meal ? PASTI[meal[1].toLowerCase()] : null, data: quando.data };
+      }
     }
 
     // ---------------------------------------------------------------- palestra: peso corporeo ed esercizi

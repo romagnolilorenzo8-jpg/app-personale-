@@ -1,4 +1,4 @@
-"""Scrigno — archivio personale: documenti, password, scadenze e visite mediche.
+"""LifeApp — archivio personale: documenti, password, scadenze e visite mediche.
 
 Avvio:  python -m uvicorn app:app --host 0.0.0.0 --port 8080   (dalla cartella server/)
 """
@@ -285,7 +285,7 @@ def chiave_sessione(s: str = Depends(sessione)) -> bytes:
 
 
 # =========================================================================== app
-app = FastAPI(title="Scrigno", docs_url=None, redoc_url=None)
+app = FastAPI(title="LifeApp", docs_url=None, redoc_url=None)
 
 
 class Password(BaseModel):
@@ -664,7 +664,7 @@ async def carica(request: Request, who=Depends(autorizzato)):
                 if est and not nuovo.lower().endswith(est.lower()):
                     nuovo += est
                 con.execute("UPDATE documenti SET nome=? WHERE id=?", (nuovo, nuovi[0]))
-    return {"ok": True, "ids": nuovi, "messaggio": f"{len(nuovi)} file salvati in Scrigno"}
+    return {"ok": True, "ids": nuovi, "messaggio": f"{len(nuovi)} file salvati in LifeApp"}
 
 
 class DocMod(BaseModel):
@@ -776,7 +776,7 @@ async def importa(request: Request, s: str = Depends(sessione)):
         m = json.loads(z.read("scrigno.json"))
         assert m.get("formato") == "scrigno-backup"
     except Exception:
-        raise HTTPException(400, "Il file non è un backup di Scrigno creato sull'iPhone")
+        raise HTTPException(400, "Il file non è un backup di LifeApp creato sull'iPhone")
 
     # password della cassaforte del telefono (AES-GCM, chiave PBKDF2-SHA256)
     voci_chiare = []
@@ -1055,7 +1055,7 @@ def _ev_ics(r) -> dict:
 
 
 # ======================================================================= diario
-TIPI_DIARIO = ("film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso")
+TIPI_DIARIO = ("film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso", "pasto", "attivita")
 
 
 class VoceDiario(BaseModel):
@@ -1123,6 +1123,22 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
             return {"kg": best["kg"], "reps": best["reps"], "serie": len(st), "set": st}
         serie = _numero(e.get("serie"))
         return {"kg": best["kg"], "reps": best["reps"], "serie": round(serie) if serie else None}
+    if tipo == "pasto":
+        grammi, kcal100 = _numero(e.get("grammi")), _numero(e.get("kcal100"))
+        if not grammi or not 0 < grammi <= 5000:
+            raise HTTPException(400, "Indica i grammi")
+        if kcal100 is None or not 0 <= kcal100 <= 1000:
+            raise HTTPException(400, "Calorie per 100 g non valide")
+        v = lambda k: max(0, _numero(e.get(k)) or 0)
+        return {"grammi": grammi, "kcal100": kcal100, "p100": v("p100"), "c100": v("c100"), "g100": v("g100"), "kcal": round(kcal100 * grammi / 100),
+                "pasto": e.get("pasto") if e.get("pasto") in ("colazione", "pranzo", "cena", "spuntino") else None,
+                "codice": str(e["codice"])[:20] if e.get("codice") else None}
+    if tipo == "attivita":
+        def n(k):
+            x = _numero(e.get(k))
+            return x if x is not None and x >= 0 else None
+        return {"sport": str(e.get("sport") or "Altro")[:40], "minuti": n("minuti"), "km": n("km"), "passi": n("passi"), "kcal": round(n("kcal") or 0),
+                "fonte": e.get("fonte") if e.get("fonte") in ("strava", "salute") else None, "ext_id": str(e["ext_id"])[:60] if e.get("ext_id") else None}
     if tipo == "peso":
         peso = _numero(e.get("peso"))
         if not peso or not 20 <= peso <= 400:
@@ -1237,7 +1253,7 @@ def ics_singolo(aid: int, _=Depends(autorizzato)):
     if not r:
         raise HTTPException(404)
     nome = re.sub(r"[^\w\- ]", "", r["titolo"])[:40] or "appuntamento"
-    return Response(ics.calendario([_ev_ics(r)], "Scrigno", TZ), media_type="text/calendar; charset=utf-8",
+    return Response(ics.calendario([_ev_ics(r)], "LifeApp", TZ), media_type="text/calendar; charset=utf-8",
                     headers={"Content-Disposition": f'inline; filename="{nome}.ics"'})
 
 
@@ -1251,14 +1267,14 @@ def feed_calendario(token: str):
         for r in con.execute("SELECT * FROM documenti WHERE scadenza IS NOT NULL"):
             eventi.append({"uid": f"scadenza-{r['id']}@scrigno", "titolo": f"⏰ Scadenza: {Path(r['nome']).stem}",
                            "inizio": r["scadenza"], "fine": r["scadenza"], "tutto_il_giorno": True,
-                           "note": f"Documento in Scrigno: {_percorso_cartella(con, r['cartella'])}",
+                           "note": f"Documento in LifeApp: {_percorso_cartella(con, r['cartella'])}",
                            "avvisi": [7 * 24 * 60, 12 * 60]})
         for r in con.execute("SELECT * FROM diario WHERE tipo='compleanno'"):
             d = _prossimo(r["giorno"], r["mese"]).replace(year=datetime.now(TZ).year) if not (r["mese"] == 2 and r["giorno"] == 29) else _prossimo(29, 2)
             eventi.append({"uid": f"compleanno-{r['id']}@scrigno", "titolo": f"🎂 Compleanno di {r['titolo']}", "inizio": d.isoformat(),
                            "fine": d.isoformat(), "tutto_il_giorno": True, "rrule": "FREQ=YEARLY",
                            "note": f"Nato/a nel {r['anno']}" if r["anno"] else "", "avvisi_assoluti": ["PT9H", "-PT15H"]})
-    return Response(ics.calendario(eventi, "Scrigno", TZ), media_type="text/calendar; charset=utf-8")
+    return Response(ics.calendario(eventi, "LifeApp", TZ), media_type="text/calendar; charset=utf-8")
 
 
 # ======================================================================= frontend
@@ -1299,7 +1315,7 @@ def salute():
 
 if __name__ == "__main__":
     import uvicorn
-    print(f"\n  Scrigno è attivo. Apri dal telefono uno di questi indirizzi:")
+    print(f"\n  LifeApp è attivo. Apri dal telefono uno di questi indirizzi:")
     for ip in _ip_locali() or ["localhost"]:
         print(f"     http://{ip}:{PORT}")
     print(f"  Dati salvati in: {DATA}\n")

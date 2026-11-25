@@ -1,4 +1,4 @@
-/* Scrigno — interfaccia (nessuna dipendenza esterna).
+/* LifeApp — interfaccia (nessuna dipendenza esterna).
    Funziona in due modi:
    - con il server di casa (le richieste /api/... vanno al server)
    - "modalità iPhone" (window.LOCALE: tutto salvato nella memoria del telefono) */
@@ -479,7 +479,7 @@ const istruzioniCal = () => `
 
 function configuraCalendario(a) {
   const v = foglio(`<h3>🗓️ Collega il Calendario ${xBtn}</h3>
-    <p class="muted" style="margin-top:-6px">Si fa <b>una volta sola</b> (circa 2 minuti). Poi ogni visita che salvi in Scrigno finisce <b>da sola</b> nel Calendario dell'iPhone, con promemoria.</p>
+    <p class="muted" style="margin-top:-6px">Si fa <b>una volta sola</b> (circa 2 minuti). Poi ogni visita che salvi in LifeApp finisce <b>da sola</b> nel Calendario dell'iPhone, con promemoria.</p>
     <div class="card">${istruzioniCal()}</div>
     <button class="btn block" id="fatto" style="margin-top:14px">✅ Ho creato il comando${a ? ": prova ora" : ""}</button>
     ${a ? `<button class="btn sec block" id="ics" style="margin-top:8px">Solo per questa volta: aggiungi con file calendario</button>` : ""}`);
@@ -492,8 +492,8 @@ function aggiungiAlCalendario(a) { comandoCalPronto() ? eseguiComandoCal(a) : co
 function bannerInstalla() {
   if (!IOS || STANDALONE || sessionStorage.getItem("no-installa")) return "";
   return `<div class="avviso install"><div class="av-ico">📲</div>
-    <div style="flex:1"><b>Installa Scrigno sulla Home</b>
-      <div class="small">Tocca <b>Condividi</b> <span class="ios-share">⎙</span> → <b>Aggiungi alla schermata Home</b>.${LOC ? " Poi apri Scrigno sempre dall'icona: lì i documenti restano al sicuro." : ""}</div>
+    <div style="flex:1"><b>Installa LifeApp sulla Home</b>
+      <div class="small">Tocca <b>Condividi</b> <span class="ios-share">⎙</span> → <b>Aggiungi alla schermata Home</b>.${LOC ? " Poi apri LifeApp sempre dall'icona: lì i documenti restano al sicuro." : ""}</div>
       <button class="link-btn" id="non-ora">Più tardi</button></div></div>`;
 }
 
@@ -542,7 +542,7 @@ async function vistaHome() {
     ${compOggi.map((x) => `<a class="avviso festa" href="#/diario/compleanno"><div class="av-ico">🎂</div><div style="flex:1"><b>${infoComp(x).g === 0 ? "Oggi" : "Domani"} è il compleanno di ${esc(x.titolo)}!</b><div class="small">${infoComp(x).anni ? `Compie ${infoComp(x).anni} anni. ` : ""}Ricordati di fargli gli auguri 🎉</div></div></a>`).join("")}
     <div class="home-griglia">
       <div class="col">
-        <form class="chat-home" id="f-chat" style="order:1"><span>💬</span><input type="text" id="cq" placeholder="Scrivi a Scrigno: “ho visto After”…" enterkeyhint="send"><button aria-label="Invia">➤</button></form>
+        <form class="chat-home" id="f-chat" style="order:1"><span>💬</span><input type="text" id="cq" placeholder="Scrivi a LifeApp: “ho visto After”…" enterkeyhint="send"><button aria-label="Invia">➤</button></form>
         <form class="cerca" id="f-cerca" style="order:2"><input type="search" id="q" placeholder="Cerca un documento…" enterkeyhint="search"></form>
         <div class="azioni-home" style="order:3">
           <button data-h="foto"><span class="ah-ico"><svg class="ico"><use href="#i-foto"/></svg></span>Fotografa</button>
@@ -802,7 +802,7 @@ async function vistaDaSmistare() {
   app.innerHTML = `<div class="top"><h1>Da smistare<small>Documenti senza cartella</small></h1></div>
     ${docs.length ? `<p class="muted small" style="margin:-6px 4px 14px">Tocca un suggerimento ✨ per spostare il documento con un tocco.</p><div id="docs">${htmlDocs(docs, { suggerisci: true })}</div>`
       : `<div class="vuoto"><span class="big">✨</span><b>Tutto in ordine!</b><br>Qui finiscono i documenti che decidi di sistemare dopo${LOC ? "." : " e quelli inviati dal menu Condividi dell'iPhone."}</div>`}
-    ${LOC ? `<div class="card" style="margin-top:16px"><b>📂 Hai salvato file nell'app File?</b><p class="small muted" style="margin:6px 0 12px">Se usi il comando “${CMD_INVIA}” dal menu Condividi, i file finiscono in <b>File › Scrigno › In arrivo</b>. Importali da qui:</p>
+    ${LOC ? `<div class="card" style="margin-top:16px"><b>📂 Hai salvato file nell'app File?</b><p class="small muted" style="margin:6px 0 12px">Se usi il comando “${CMD_INVIA}” dal menu Condividi, i file finiscono in <b>File › LifeApp › In arrivo</b>. Importali da qui:</p>
       <button class="btn block" id="importa">📂 Importa da File</button></div>` : ""}`;
   if (docs.length) collegaDocs($("#docs"), docs, vistaDaSmistare);
   $("#importa") && ($("#importa").onclick = () => scegliFile({ dopo: vistaDaSmistare }));
@@ -820,7 +820,7 @@ async function vistaScadenze() {
   const docs = await api("/api/scadenze");
   app.innerHTML = `<div class="top"><a class="iconbtn" href="#/">‹</a><h1 style="font-size:26px">⏰ Scadenze<small>Bolli, assicurazioni, revisioni, documenti</small></h1></div>
     ${docs.length ? `<div id="docs">${htmlDocs(docs, { mostraCartella: true })}</div>`
-      : `<div class="vuoto"><span class="big">⏰</span>Nessuna scadenza impostata.<br>Quando salvi un bollo o un'assicurazione, Scrigno ti chiede quando scade.<br>Puoi anche aprire un documento e toccare <b>⏰ Aggiungi scadenza</b>.</div>`}`;
+      : `<div class="vuoto"><span class="big">⏰</span>Nessuna scadenza impostata.<br>Quando salvi un bollo o un'assicurazione, LifeApp ti chiede quando scade.<br>Puoi anche aprire un documento e toccare <b>⏰ Aggiungi scadenza</b>.</div>`}`;
   if (docs.length) collegaDocs($("#docs"), docs, vistaScadenze);
 }
 
@@ -1073,7 +1073,7 @@ function cambiaPassword(titolo) {
   };
 }
 const sezioneCal = () => `<details class="card"><summary><span class="sum-ico">🗓️</span><span>Calendario dell'iPhone<br><span class="small muted">${comandoCalPronto() ? "✅ Collegato" : "Da collegare (una volta sola)"}</span></span></summary><div class="dentro">
-    <p class="small muted">Scrigno usa un Comando Rapido per inserire le visite nel Calendario, con promemoria.</p>${istruzioniCal()}
+    <p class="small muted">LifeApp usa un Comando Rapido per inserire le visite nel Calendario, con promemoria.</p>${istruzioniCal()}
     <button class="btn block" id="cal-ok">${comandoCalPronto() ? "🧪 Prova il comando" : "✅ Ho creato il comando"}</button>
     ${comandoCalPronto() ? `<button class="link-btn" id="cal-reset">Scollega</button>` : ""}</div></details>`;
 function collegaSezioneCal(ricarica) {
@@ -1081,7 +1081,7 @@ function collegaSezioneCal(ricarica) {
     memo.set("cmd-cal", "1");
     const d = new Date(); d.setDate(d.getDate() + 1);
     const g = new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-    eseguiComandoCal({ titolo: "Prova Scrigno (puoi cancellarla)", icona: "🧪", inizio: g + "T10:00", fine: g + "T10:30", luogo: "", note: "Evento di prova creato da Scrigno" });
+    eseguiComandoCal({ titolo: "Prova LifeApp (puoi cancellarla)", icona: "🧪", inizio: g + "T10:00", fine: g + "T10:30", luogo: "", note: "Evento di prova creato da LifeApp" });
   };
   $("#cal-reset") && ($("#cal-reset").onclick = () => { memo.set("cmd-cal", null); ricarica(); });
 }
@@ -1094,19 +1094,19 @@ async function vistaAltroLocale() {
   ${IOS && !STANDALONE ? `<details class="card" open><summary><span class="sum-ico">📲</span><span>Installa sulla schermata Home<br><span class="small muted">Da fare subito</span></span></summary><div class="dentro">
     ${passo(1, "In basso in Safari tocca <b>Condividi</b> (il quadrato con la freccia verso l'alto).")}
     ${passo(2, "Scorri e tocca <b>Aggiungi alla schermata Home</b> → <b>Aggiungi</b>.")}
-    ${passo(3, "Da ora apri Scrigno <b>solo dall'icona</b> sulla Home.")}</div></details>` : ""}
+    ${passo(3, "Da ora apri LifeApp <b>solo dall'icona</b> sulla Home.")}</div></details>` : ""}
 
   ${sezioneCal()}
 
   <details class="card"><summary><span class="sum-ico">📤</span><span>Ricevere file dal menu “Condividi”<br><span class="small muted">Da WhatsApp, Mail, Foto, Safari…</span></span></summary><div class="dentro">
-    <p class="small muted">Senza server, iPhone non permette di mandare un file direttamente dentro Scrigno. Il modo più comodo:</p>
-    <p class="small"><b>Metodo veloce (senza configurare niente):</b> da qualsiasi app tocca <b>Condividi</b> → <b>Salva su File</b> → scegli la cartella <b>Scrigno › In arrivo</b> (creala la prima volta). Poi in Scrigno: <b>Da smistare → Importa da File</b>.</p>
+    <p class="small muted">Senza server, iPhone non permette di mandare un file direttamente dentro LifeApp. Il modo più comodo:</p>
+    <p class="small"><b>Metodo veloce (senza configurare niente):</b> da qualsiasi app tocca <b>Condividi</b> → <b>Salva su File</b> → scegli la cartella <b>LifeApp › In arrivo</b> (creala la prima volta). Poi in LifeApp: <b>Da smistare → Importa da File</b>.</p>
     <p class="small"><b>Metodo con un tocco solo</b>: crea un Comando Rapido che salva il file al posto tuo.</p>
     ${passo(1, `Comandi Rapidi → <b>+</b> → chiamalo ${cod(CMD_INVIA)}`)}
     ${passo(2, "Tocca <b>ⓘ</b> in basso → attiva <b>Mostra nel foglio di condivisione</b>.")}
-    ${passo(3, "Aggiungi l'azione <b>Salva file</b>: salva <b>Input comando rapido</b>, disattiva <b>Chiedi dove salvare</b> e scegli la cartella <b>Scrigno › In arrivo</b> in iCloud Drive o Sul mio iPhone.")}
-    ${passo(4, "Aggiungi <b>Mostra notifica</b> con il testo “Salvato per Scrigno ✅”.")}
-    <p class="small muted">Quando avrai il server di casa, i file arriveranno direttamente in Scrigno, senza passare da File.</p></div></details>
+    ${passo(3, "Aggiungi l'azione <b>Salva file</b>: salva <b>Input comando rapido</b>, disattiva <b>Chiedi dove salvare</b> e scegli la cartella <b>LifeApp › In arrivo</b> in iCloud Drive o Sul mio iPhone.")}
+    ${passo(4, "Aggiungi <b>Mostra notifica</b> con il testo “Salvato per LifeApp ✅”.")}
+    <p class="small muted">Quando avrai il server di casa, i file arriveranno direttamente in LifeApp, senza passare da File.</p></div></details>
 
   <details class="card" open><summary><span class="sum-ico">💾</span><span>Backup<br><span class="small muted">${s.ultimo_backup ? "Ultimo: " + dataIt(s.ultimo_backup.slice(0, 10)) : "Mai fatto"}</span></span></summary><div class="dentro">
     <p class="small muted">I documenti sono salvati <b>solo su questo iPhone</b>. Il backup crea un unico file con tutto (le password restano cifrate) da salvare nell'app <b>File</b> (meglio su iCloud Drive o su un computer). Ti servirà anche per spostare tutto sul server di casa.</p>
@@ -1121,15 +1121,15 @@ async function vistaAltroLocale() {
 
   <div class="sezione"><h2>Memoria</h2></div>
   <div class="card"><b>${s.documenti} document${s.documenti === 1 ? "o" : "i"}</b> · ${s.uso != null ? dimensione(s.uso) + " usati" : ""}
-    ${percentuale != null ? `<div class="progresso"><div style="width:${percentuale}%"></div></div><div class="small muted" style="margin-top:6px">Spazio disponibile per Scrigno: circa ${dimensione(s.quota)}</div>` : ""}
-    <div class="small muted" style="margin-top:6px">${s.persistente ? "✅ iPhone conserverà questi dati." : "ℹ️ Installa Scrigno sulla Home e fai backup regolari: così i dati sono al sicuro."}</div></div>
+    ${percentuale != null ? `<div class="progresso"><div style="width:${percentuale}%"></div></div><div class="small muted" style="margin-top:6px">Spazio disponibile per LifeApp: circa ${dimensione(s.quota)}</div>` : ""}
+    <div class="small muted" style="margin-top:6px">${s.persistente ? "✅ iPhone conserverà questi dati." : "ℹ️ Installa LifeApp sulla Home e fai backup regolari: così i dati sono al sicuro."}</div></div>
 
   <div class="sezione"><h2>Sicurezza</h2></div>
   <div class="lista"><a class="voce" href="#/password"><div class="thumb">🔐</div><div class="corpo"><div class="tit">Le mie password</div></div><div class="dx">›</div></a><div class="voce" id="cambia"><div class="thumb">🔑</div><div class="corpo"><div class="tit">Cambia password della cassaforte</div></div><div class="dx">›</div></div>
     <div class="voce" id="intro"><div class="thumb">👋</div><div class="corpo"><div class="tit">Rivedi la presentazione</div></div><div class="dx">›</div></div></div>
 
   <div class="sezione"><h2>Server di casa</h2></div>
-  <div class="card small">Quando il computer di casa sarà pronto: crea un backup qui, apri Scrigno dal server e vai su <b>Altro → Importa backup dall'iPhone</b>. Tutto (cartelle, documenti, visite, password) verrà copiato lì.</div>
+  <div class="card small">Quando il computer di casa sarà pronto: crea un backup qui, apri LifeApp dal server e vai su <b>Altro → Importa backup dall'iPhone</b>. Tutto (cartelle, documenti, visite, password) verrà copiato lì.</div>
   <input type="file" id="file-backup" accept=".zip,application/zip" hidden>`;
   collegaSezioneCal(vistaAltroLocale);
   collegaAspetto();
@@ -1142,7 +1142,7 @@ async function vistaAltroLocale() {
   $("#rip").onclick = () => $("#file-backup").click();
   $("#file-backup").onchange = async (e) => {
     const f = e.target.files[0]; if (!f) return;
-    if (!(await conferma("Ripristinare questo backup?", "Ripristina", "Tutto quello che c'è ora in Scrigno su questo iPhone verrà sostituito dal contenuto del backup."))) return;
+    if (!(await conferma("Ripristinare questo backup?", "Ripristina", "Tutto quello che c'è ora in LifeApp su questo iPhone verrà sostituito dal contenuto del backup."))) return;
     try { svuotaMemoria(); const r = await window.LOCALE.ripristina(f); await caricaCartelle(); toast(`♻️ Ripristinati ${r.documenti} documenti e ${r.appuntamenti} visite`); location.hash = "#/"; }
     catch (err) { toast("⚠️ " + err.message); }
   };
@@ -1154,7 +1154,7 @@ async function vistaAltroServer() {
   const s = await api("/api/impostazioni");
   const base = location.origin;
   const feed = `webcal://${location.host}/calendario/${s.token_calendario}.ics`;
-  app.innerHTML = `<div class="top"><h1>Altro<small>Collega Scrigno al tuo iPhone</small></h1></div>
+  app.innerHTML = `<div class="top"><h1>Altro<small>Collega LifeApp al tuo iPhone</small></h1></div>
 
   <details class="card"><summary><span class="sum-ico">📤</span><span>Invia file dal menu “Condividi”</span></summary><div class="dentro">
     <p class="small muted">Crei una volta sola un Comando Rapido: comparirà nel menu Condividi di qualsiasi app. I file arrivano in <b>📥 Da smistare</b>.</p>
@@ -1163,12 +1163,12 @@ async function vistaAltroServer() {
     ${passo(3, `Aggiungi <b>Ottieni contenuti dell'URL</b> con questo URL:${cod(base + "/api/documenti")}`)}
     ${passo(4, `<b>Mostra di più</b>: Metodo <b>POST</b>. In <b>Intestazioni</b> aggiungi chiave <b>X-Token</b> con valore:${cod(s.token_api)}`)}
     ${passo(5, "Corpo richiesta: <b>Modulo</b>. Aggiungi un campo <b>File</b> con chiave <b>file</b> e valore <b>Input comando rapido</b>.")}
-    ${passo(6, "Aggiungi <b>Mostra notifica</b>: “Salvato in Scrigno ✅”.")}</div></details>
+    ${passo(6, "Aggiungi <b>Mostra notifica</b>: “Salvato in LifeApp ✅”.")}</div></details>
 
   ${sezioneCal()}
 
   <details class="card"><summary><span class="sum-ico">🔄</span><span>Calendario sempre aggiornato (abbonamento)</span></summary><div class="dentro">
-    <p class="small muted">In alternativa al comando: l'iPhone si abbona al calendario di Scrigno e scarica da solo visite e scadenze ogni 15 minuti (funziona quando sei sulla rete di casa).</p>
+    <p class="small muted">In alternativa al comando: l'iPhone si abbona al calendario di LifeApp e scarica da solo visite e scadenze ogni 15 minuti (funziona quando sei sulla rete di casa).</p>
     <a class="btn block" href="${feed}">📲 Abbonati al calendario</a>${cod(feed)}</div></details>
 
   <details class="card"><summary><span class="sum-ico">🎙️</span><span>“Ehi Siri, nuova visita”</span></summary><div class="dentro">
@@ -1376,7 +1376,8 @@ function intervalloY(valori) {   // asse con valori "tondi" (es. 70 · 80 · 90 
 }
 
 async function vistaPalestra() {
-  const [allen, pesi, prof] = await Promise.all([api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=peso"), api("/api/profilo")]);
+  const [allen, pesi, prof, ctxC] = await Promise.all([api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=peso"), api("/api/profilo"), contestoCalorie()]);
+  const dC = calcoloGiorno(oggiIso(), ctxC), attRec = ctxC.att.filter((x) => x.extra?.fonte !== "salute").sort((a, b) => (b.data || "").localeCompare(a.data || "") || b.id - a.id).slice(0, 5);
   const esercizi = raggruppaEsercizi(allen), pAtt = ultimoPeso(pesi), alt = +prof.altezza || null, b = bmi(pAtt?.extra?.peso, alt);
   app.innerHTML = `<div class="top"><a class="iconbtn" href="#/" aria-label="Indietro">‹</a><h1 style="font-size:28px">🏋️ <span class="grad">Palestra</span><small>Carichi, ripetizioni e progressi</small></h1></div>
     <div class="bilancio corpo">
@@ -1385,6 +1386,8 @@ async function vistaPalestra() {
         <button class="corpo-dato" id="agg-alt"><div class="bil-et">Altezza</div><div class="bil-n">${alt ? alt + " cm" : "—"}</div><div class="bil-sub">${alt ? "" : "tocca per inserirla"}</div></button>
         <div class="corpo-dato"><div class="bil-et">BMI</div><div class="bil-n">${b ? dec(b.v, 1) : "—"}</div><div class="bil-sub">${b ? b.etichetta : "serve peso e altezza"}</div></div>
       </div></div>
+    <a class="palestra-card" href="#/calorie" id="card-cal" style="margin:0 0 12px"><span class="pc-ico">🔥</span><div style="flex:1;min-width:0"><b>Calorie di oggi</b>
+      <div class="small muted">${nK(dC.mangiate)} mangiate · ${nK(dC.attivo)} bruciate con attività${dC.bilancio != null ? ` · bilancio ${testoBilancio(dC.bilancio)}` : ""}</div></div><span class="dx">›</span></a>
     ${pesi.length >= 2 ? `<div class="grafico-card"><div class="g-tit">Il mio peso</div><div id="g-peso"></div></div>` : ""}
     <button class="btn block" id="nuovo-es" style="margin:4px 0 6px">➕ Registra un esercizio</button>
     <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “panca piana 80 kg per 8”</span></a>
@@ -1394,9 +1397,16 @@ async function vistaPalestra() {
           <div class="es-testa"><b>${esc(g.nome)}</b>${g.voci.length > 1 ? `<span class="tag ${g.progresso >= 0 ? "ok" : "danger"}">${g.progresso >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(g.progresso))}%</span>` : ""}</div>
           <div class="es-ultima">${testoSerie(u)}</div>
           <div class="es-piede"><span class="muted small">${g.corpoLibero ? "Record" : "Forza stimata"}: <b>${valoreForza(u.kg, g.corpoLibero ? g.record : g.forze[g.forze.length - 1])}</b><br>${dataIt(g.ultima.data)}</span>${scintilla(g.forze)}</div></a>`; }).join("")}</div>`
-      : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio ancora.<br>Tocca <b>Registra un esercizio</b> o scrivilo in chat.</div>`}`;
+      : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio ancora.<br>Tocca <b>Registra un esercizio</b> o scrivilo in chat.</div>`}
+    <div class="sezione"><h2>🏃 Attività</h2><a href="#/calorie">Calorie ›</a></div>
+    ${attRec.length ? `<div class="lista" id="att-rec">${attRec.map(htmlAttivita).join("")}</div>` : `<div class="small muted" style="padding:0 4px 8px">Corse, camminate, partite: aggiungile qui, oppure collega Strava e arrivano da sole.</div>`}
+    <div class="riga" style="margin-top:10px"><button class="btn sec" id="p-att">🏃 Aggiungi attività</button><button class="btn sec" id="p-strava">🟧 ${stravaCfg()?.refresh_token ? "Strava collegato" : "Collega Strava"}</button></div>`;
   const ric = () => vistaPalestra();
   $("#nuovo-es").onclick = () => registraEsercizio(null, ric);
+  $("#p-att").onclick = () => aggiungiAttivita({ dopo: ric });
+  $("#p-strava").onclick = () => impostaStrava(ric);
+  $$("#att-rec [data-att]").forEach((el) => (el.onclick = () => aggiungiAttivita({ voce: attRec.find((x) => x.id === +el.dataset.att), dopo: ric })));
+  sincronizzaStrava().then((n) => { if (n && location.hash === "#/palestra") vistaPalestra(); });
   $("#agg-peso").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   $("#agg-alt").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   if ($("#g-peso")) {
@@ -1493,6 +1503,430 @@ async function registraEsercizio(nome, dopo, voce) {
   $("#del-es", v) && ($("#del-es", v).onclick = async () => {
     if (!(await conferma("Eliminare questa registrazione?"))) return;
     await api(`/api/diario/${voce.id}`, { method: "DELETE" }); v.chiudi(); toast("🗑️ Eliminata"); if (dopo) dopo();
+  });
+}
+
+/* ================================================================== CALORIE: cibo, attività, Strava, Salute */
+const PASTI_N = { colazione: "☕ Colazione", pranzo: "🍝 Pranzo", cena: "🍽️ Cena", spuntino: "🍎 Spuntini" };
+const pastoOra = () => { const h = new Date().getHours(); return h < 11 ? "colazione" : h < 15 ? "pranzo" : h < 18 ? "spuntino" : "cena"; };
+const nK = (n) => Math.round(n || 0).toLocaleString("it-IT");
+const n1 = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString("it-IT");
+const isoGiorno = (iso, d) => { const x = new Date(iso + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + d); return x.toISOString().slice(0, 10); };
+const quandoFa = (sec) => { const m = Math.round((Date.now() / 1000 - sec) / 60); return m < 1 ? "adesso" : m < 60 ? `${m} min fa` : m < 1440 ? `${Math.round(m / 60)} ore fa` : `${Math.round(m / 1440)} giorni fa`; };
+const icoSport = (s) => (window.Salute.SPORT[s] || window.Salute.SPORT.Altro).ico;
+
+const cibiMiei = () => { try { return JSON.parse(memo.get("cibi") || "[]"); } catch { return []; } };
+function ricordaCibo(a) {   // prodotti scansionati o inseriti a mano: si ritrovano nella ricerca, anche senza internet
+  const l = cibiMiei().filter((x) => x.nome.toLowerCase() !== a.nome.toLowerCase());
+  l.unshift({ nome: a.nome, kcal: a.kcal, p: a.p || 0, c: a.c || 0, g: a.g || 0, pezzo: a.pezzo || null, porz: a.porz || 100, codice: a.codice || null });
+  memo.set("cibi", JSON.stringify(l.slice(0, 300)));
+}
+function alimentiNoti(pasti) {   // i miei prodotti + i cibi già mangiati (con i loro valori e l'ultima quantità)
+  const out = [...cibiMiei()], visti = new Set(out.map((x) => x.nome.toLowerCase()));
+  pasti.slice().sort((a, b) => (b.data || "").localeCompare(a.data || "") || b.id - a.id).forEach((x) => {
+    const k = x.titolo.toLowerCase(); if (visti.has(k)) return; visti.add(k);
+    const e = x.extra || {};
+    out.push({ nome: x.titolo, kcal: e.kcal100, p: e.p100, c: e.c100, g: e.g100, porz: e.grammi, pezzo: null, codice: e.codice, recente: true });
+  });
+  return out;
+}
+
+async function contestoCalorie() {
+  const [pasti, att, pesi, prof] = await Promise.all([api("/api/diario?tipo=pasto"), api("/api/diario?tipo=attivita"), api("/api/diario?tipo=peso"), api("/api/profilo")]);
+  const peso = ultimoPeso(pesi)?.extra?.peso || null, altezza = +prof.altezza || null, anni = eta(prof.nascita);
+  return { pasti, att, prof, peso, altezza, anni, base: window.Salute.bmr({ sesso: prof.sesso, eta: anni, peso, altezza }) };
+}
+/* Il giorno in numeri. Se ci sono i dati di Salute (calorie attive di tutta la giornata, allenamenti compresi)
+   uso quelli; altrimenti sommo le attività. Base: metabolismo a riposo (× 1,2 senza dati di Salute). */
+function calcoloGiorno(g, ctx) {
+  const P = ctx.pasti.filter((x) => x.data === g), A = ctx.att.filter((x) => x.data === g);
+  const sal = A.find((x) => x.extra?.fonte === "salute"), altre = A.filter((x) => x !== sal);
+  const sommaAtt = altre.reduce((s, x) => s + (x.extra?.kcal || 0), 0);
+  const attivo = sal ? Math.max(sal.extra.kcal || 0, sommaAtt) : sommaAtt;
+  const base = ctx.base ? (sal ? ctx.base : Math.round(ctx.base * 1.2)) : null;
+  const mac = (k) => P.reduce((s, x) => s + ((x.extra?.[k] || 0) * (x.extra?.grammi || 0)) / 100, 0);
+  const mangiate = P.reduce((s, x) => s + (x.extra?.kcal || 0), 0);
+  return { P, A, sal, altre, mangiate, attivo, base, p: mac("p100"), c: mac("c100"), g: mac("g100"),
+    passi: sal?.extra?.passi || A.reduce((s, x) => s + (x.extra?.passi || 0), 0), bilancio: base != null ? mangiate - base - attivo : null };
+}
+const testoBilancio = (b) => (b == null ? "—" : `${b > 0 ? "+" : b < 0 ? "−" : ""}${nK(Math.abs(b))}`);
+
+async function vistaCalorie(arg) {
+  const g = /^\d{4}-\d{2}-\d{2}$/.test(arg || "") ? arg : oggiIso(), oggi = g === oggiIso();
+  const ctx = await contestoCalorie(), d = calcoloGiorno(g, ctx), st = stravaCfg();
+  const etich = oggi ? "Oggi" : g === isoGiorno(oggiIso(), -1) ? "Ieri" : `${GIORNI[new Date(g + "T00:00").getDay()]} ${dataIt(g)}`;
+  const kM = d.p * 4 + d.c * 4 + d.g * 9 || 1;
+  const gruppi = [...Object.keys(PASTI_N), null].map((k) => ({ k, l: d.P.filter((x) => (x.extra?.pasto || null) === k) })).filter((x) => x.l.length);
+  const giorni7 = Array.from({ length: 7 }, (_, i) => isoGiorno(g, i - 6)), dati7 = giorni7.map((x) => calcoloGiorno(x, ctx));
+  const conDati7 = dati7.some((x) => x.mangiate || x.attivo);
+  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:28px">🔥 <span class="grad">Calorie</span><small>Cibo, attività e bilancio</small></h1></div>
+    <div class="giorno-nav"><a class="iconbtn" href="#/calorie/${isoGiorno(g, -1)}" aria-label="Giorno prima">‹</a><b id="cal-giorno">${esc(etich)}</b>
+      <a class="iconbtn" href="#/calorie/${isoGiorno(g, 1)}" aria-label="Giorno dopo" ${oggi ? 'style="visibility:hidden"' : ""}>›</a></div>
+    <div class="bilancio">
+      <div class="bil-top"><div><div class="bil-et">Mangiate</div><div class="bil-num" id="cal-mangiate">${nK(d.mangiate)} kcal</div>
+        <div class="bil-sub">${d.base != null ? `Bruciate in tutto: ${nK(d.base + d.attivo)} kcal (${nK(d.base)} base + ${nK(d.attivo)} attività)` : "Indica sesso, età e altezza per calcolare quanto bruci a riposo"}</div></div><div class="bil-ico">🔥</div></div>
+      <div class="bil-griglia">
+        <div><div class="bil-et">Attività</div><div class="bil-n" id="cal-attivo">${nK(d.attivo)} kcal</div><div class="bil-sub">${d.passi ? `${nK(d.passi)} passi` : "bruciate muovendoti"}</div></div>
+        <div><div class="bil-et">Bilancio</div><div class="bil-n" id="cal-bilancio">${testoBilancio(d.bilancio)}${d.bilancio != null ? " kcal" : ""}</div>
+          <div class="bil-sub">${d.bilancio == null ? "serve il fabbisogno" : d.bilancio > 0 ? "più di quanto bruci" : "meno di quanto bruci"}</div></div>
+      </div></div>
+    ${d.mangiate ? `<div class="card macro"><div class="macro-barra" role="img" aria-label="Proteine ${Math.round((d.p * 400) / kM)}%, carboidrati ${Math.round((d.c * 400) / kM)}%, grassi ${Math.round((d.g * 900) / kM)}%">
+        <i class="s1" style="width:${(d.p * 400) / kM}%"></i><i class="s2" style="width:${(d.c * 400) / kM}%"></i><i class="s3" style="width:${(d.g * 900) / kM}%"></i></div>
+      <div class="macro-leg"><span><i class="s1"></i>Proteine <b>${n1(d.p)} g</b></span><span><i class="s2"></i>Carboidrati <b>${n1(d.c)} g</b></span><span><i class="s3"></i>Grassi <b>${n1(d.g)} g</b></span></div></div>` : ""}
+    <div class="azioni-cal"><button class="btn" id="add-cibo">🍽️ Cibo</button><button class="btn sec" id="add-scan">📷 Codice</button><button class="btn sec" id="add-att">🏃 Attività</button></div>
+    <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “a pranzo 80 g di pasta e 2 uova” o “ho corso 5 km in 30 minuti”</span></a>
+    ${gruppi.length ? gruppi.map(({ k, l }) => `<div class="sezione"><h2>${k ? PASTI_N[k] : "🍴 Altro"}</h2><span class="muted small">${nK(l.reduce((s, x) => s + x.extra.kcal, 0))} kcal</span></div>
+      <div class="lista">${l.map((x) => `<div class="voce" data-pasto="${x.id}"><div class="corpo"><div class="tit">${esc(x.titolo)}</div>
+        <div class="sub">${n1(x.extra.grammi)} g · P ${n1((x.extra.p100 * x.extra.grammi) / 100)} · C ${n1((x.extra.c100 * x.extra.grammi) / 100)} · G ${n1((x.extra.g100 * x.extra.grammi) / 100)}</div></div>
+        <div class="dx kcal"><b>${nK(x.extra.kcal)}</b> kcal</div></div>`).join("")}</div>`).join("")
+      : `<div class="vuoto" style="padding:22px 10px"><span class="big">🍽️</span>Niente cibo segnato ${oggi ? "oggi" : "in questo giorno"}.</div>`}
+    ${d.A.length ? `<div class="sezione"><h2>🏃 Attività</h2><span class="muted small">${nK(d.attivo)} kcal</span></div>
+      <div class="lista">${d.A.map((x) => htmlAttivita(x)).join("")}</div>` : ""}
+    ${conDati7 ? `<div class="grafico-card" style="margin-top:18px"><div class="g-tit">Ultimi 7 giorni</div><div id="g-cal"></div></div>` : ""}
+    <div class="sezione"><h2>Collegamenti</h2></div>
+    <div class="lista">
+      <div class="voce" id="v-strava"><div class="thumb">🟧</div><div class="corpo"><div class="tit">Strava</div><div class="sub">${st?.refresh_token ? `✅ Collegato${st.atleta ? " · " + esc(st.atleta) : ""}${st.ultima ? " · controllato " + quandoFa(st.ultima) : ""}` : "Importa da solo corse, camminate e allenamenti"}</div></div><div class="dx">›</div></div>
+      <div class="voce" id="v-salute"><div class="thumb">❤️</div><div class="corpo"><div class="tit">Salute di iPhone · Fitness</div><div class="sub">Passi e calorie attive della giornata</div></div><div class="dx">›</div></div>
+      <div class="voce" id="v-base"><div class="thumb">⚖️</div><div class="corpo"><div class="tit">Fabbisogno a riposo</div><div class="sub">${ctx.base ? `${nK(ctx.base)} kcal al giorno (${ctx.prof.sesso === "F" ? "donna" : "uomo"}, ${ctx.anni} anni, ${kgTesto(ctx.peso)}, ${ctx.altezza} cm)` : "Serve sesso, età, peso e altezza"}</div></div><div class="dx">›</div></div>
+    </div>
+    <p class="small muted" style="margin:10px 4px">Le calorie sono stime: valori medi degli alimenti (o dell'etichetta, se scansioni il codice), attività calcolate dal tuo peso, fabbisogno con la formula di Mifflin-St Jeor.</p>`;
+  const ric = () => vistaCalorie(g);
+  $("#add-cibo").onclick = () => aggiungiCibo({ data: g, dopo: ric });
+  $("#add-scan").onclick = () => aggiungiCibo({ data: g, dopo: ric, scansiona: true });
+  $("#add-att").onclick = () => aggiungiAttivita({ data: g, dopo: ric });
+  $$("[data-pasto]").forEach((el) => (el.onclick = () => aggiungiCibo({ voce: d.P.find((x) => x.id === +el.dataset.pasto), dopo: ric })));
+  $$("[data-att]").forEach((el) => (el.onclick = () => aggiungiAttivita({ voce: d.A.find((x) => x.id === +el.dataset.att), dopo: ric })));
+  $("#v-strava").onclick = () => impostaStrava(ric);
+  $("#v-salute").onclick = () => importaSalute(ric);
+  $("#v-base").onclick = () => impostaFabbisogno(ctx, ric);
+  if ($("#g-cal")) {
+    const serie = [{ nome: "Mangiate", slot: 1, valori: dati7.map((x) => Math.round(x.mangiate)) },
+      { nome: ctx.base ? "Bruciate" : "Bruciate con attività", slot: 2, valori: dati7.map((x) => (x.mangiate || x.attivo ? Math.round((x.base || 0) + x.attivo) : 0)) }];
+    window.Grafici.colonne($("#g-cal"), { categorie: giorni7.map((x) => dataIt(x).replace(/ \d{4}$/, "")), serie, formato: (v) => nK(v), titoloTabella: "Vedi i numeri in tabella" });
+  }
+  if (st?.refresh_token) sincronizzaStrava().then((n) => { if (n && location.hash.startsWith("#/calorie")) vistaCalorie(arg); });
+}
+function htmlAttivita(x) {
+  const e = x.extra || {};
+  const det = [e.km ? `${n1(e.km)} km` : "", e.minuti ? `${e.minuti} min` : "", e.passi ? `${nK(e.passi)} passi` : ""].filter(Boolean).join(" · ");
+  return `<div class="voce" data-att="${x.id}"><div class="thumb">${icoSport(e.sport)}</div><div class="corpo"><div class="tit">${esc(x.titolo)}${e.fonte ? ` <span class="tag fonte-${e.fonte}">${e.fonte === "strava" ? "Strava" : "Salute"}</span>` : ""}</div>
+    <div class="sub">${esc([dataIt(x.data).replace(/ \d{4}$/, ""), det].filter(Boolean).join(" · "))}</div></div><div class="dx kcal"><b>${nK(e.kcal)}</b> kcal</div></div>`;
+}
+
+/* ------------------------------------------------------------------ aggiungere cibo */
+async function aggiungiCibo({ voce = null, data = oggiIso(), pasto = null, nome = "", grammi = null, dopo, scansiona = false } = {}) {
+  const noti = alimentiNoti(await api("/api/diario?tipo=pasto"));
+  const e = voce?.extra || {};
+  let sel = voce ? { nome: voce.titolo, kcal: e.kcal100, p: e.p100, c: e.c100, g: e.g100, codice: e.codice, porz: e.grammi } : null;
+  const num = (n, extra = "") => `type="number" inputmode="decimal" min="0" step="any" ${extra}`;
+  const v = foglio(`<h3>🍽️ ${voce ? "Modifica" : "Aggiungi cibo"} ${xBtn}</h3><form id="fcb" autocomplete="off" novalidate>
+    <label class="campo"><span>Cosa hai mangiato</span><input type="search" name="titolo" enterkeyhint="search" placeholder="Cerca: pasta, mela, yogurt…" value="${esc(voce?.titolo || nome)}"></label>
+    <div class="cb-sugg" id="cb-sugg"></div>
+    ${voce ? "" : `<div class="riga" style="margin:0 0 12px"><button type="button" class="btn sec" id="cb-scan">📷 Codice a barre</button><button type="button" class="btn sec" id="cb-web">🌐 Cerca online</button></div>`}
+    <div class="riga"><label class="campo"><span>Quanto (g o ml)</span><input name="grammi" ${num(0, 'max="5000"')} value="${e.grammi ?? grammi ?? ""}"></label>
+      <label class="campo"><span>Pasto</span><select name="pasto">${Object.entries(PASTI_N).map(([k, t]) => `<option value="${k}" ${k === (e.pasto || pasto || pastoOra()) ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>
+    <div class="pronti" id="cb-dosi" style="margin:-4px 0 12px"></div>
+    <details class="card" id="cb-valori"><summary><span>Valori per 100 g <span class="muted small" id="cb-fonte"></span></span></summary><div class="dentro">
+      <div class="riga"><label class="campo"><span>Calorie (kcal)</span><input name="kcal100" ${num(0, 'max="1000"')}></label><label class="campo"><span>Proteine (g)</span><input name="p100" ${num(0, 'max="100"')}></label></div>
+      <div class="riga"><label class="campo"><span>Carboidrati (g)</span><input name="c100" ${num(0, 'max="100"')}></label><label class="campo"><span>Grassi (g)</span><input name="g100" ${num(0, 'max="100"')}></label></div>
+    </div></details>
+    <div class="anteprima-forza" id="cb-ant" style="margin-top:10px"></div>
+    <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || data)}"></label>
+    <button class="btn block">Salva</button>
+    ${voce ? `<button type="button" class="btn danger block" id="cb-del" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
+  const f = $("#fcb", v), sugg = $("#cb-sugg", v);
+  const val = (n) => (f[n].value === "" ? null : +f[n].value);
+  const anteprima = () => {
+    const gr = val("grammi"), k = val("kcal100");
+    $("#cb-ant", v).innerHTML = gr && k != null ? `🔥 <b>${nK((k * gr) / 100)} kcal</b> <span class="muted">· P ${n1(((val("p100") || 0) * gr) / 100)} g · C ${n1(((val("c100") || 0) * gr) / 100)} g · G ${n1(((val("g100") || 0) * gr) / 100)} g</span>` : "";
+  };
+  const scegli = (a) => {
+    sel = a; f.titolo.value = a.nome;
+    f.kcal100.value = a.kcal ?? ""; f.p100.value = a.p ?? ""; f.c100.value = a.c ?? ""; f.g100.value = a.g ?? "";
+    if (!f.grammi.value) f.grammi.value = a.porz || a.pezzo || 100;
+    const dosi = [a.pezzo && a.pezzo !== a.porz ? [a.pezzo, `1 ${a.unita || "pezzo"} · ${a.pezzo} g`] : null, a.porz ? [a.porz, `${a.recente ? "come l'ultima volta" : "porzione"} · ${n1(a.porz)} g`] : null, [100, "100 g"]].filter(Boolean);
+    $("#cb-dosi", v).innerHTML = dosi.map(([q, t]) => `<button type="button" class="chip" data-q="${q}">${esc(t)}</button>`).join("");
+    $("#cb-fonte", v).textContent = a.codice ? "· dall'etichetta (Open Food Facts)" : a.recente ? "· come l'ultima volta" : "· valori medi";
+    $("#cb-valori", v).open = a.kcal == null;
+    sugg.innerHTML = ""; anteprima();
+  };
+  const mostra = (lista, vuoto = "") => {
+    sugg.innerHTML = lista.length ? lista.map((a, i) => `<button type="button" class="cb-voce" data-i="${i}"><span>${esc(a.nome)}</span><span class="muted small">${a.kcal != null ? nK(a.kcal) + " kcal/100 g" : ""}${a.codice ? " · 🏷️" : a.recente ? " · 🕘" : ""}</span></button>`).join("") : vuoto;
+    $$("[data-i]", sugg).forEach((b) => (b.onclick = () => scegli(lista[+b.dataset.i])));
+  };
+  f.titolo.oninput = () => { sel = null; mostra(window.Salute.suggerimenti(f.titolo.value, noti, 8), f.titolo.value.trim().length > 1 ? `<div class="small muted" style="padding:4px 6px 10px">Non lo trovo: prova <b>Cerca online</b> o il <b>codice a barre</b>, oppure scrivi i valori per 100 g.</div>` : ""); };
+  ["grammi", "kcal100", "p100", "c100", "g100"].forEach((n) => (f[n].oninput = anteprima));
+  $("#cb-dosi", v).onclick = (ev) => { const b = ev.target.closest("[data-q]"); if (b) { f.grammi.value = b.dataset.q; anteprima(); } };
+  const daCodice = async (codice) => {
+    const s = $("#cb-fonte", v); toast("🔎 Cerco il prodotto…", 1500);
+    try {
+      const p = await window.Salute.prodotto(codice);
+      if (p) { ricordaCibo(p); scegli(p); toast(`🏷️ ${p.nome}`); }
+      else { sel = { codice }; $("#cb-valori", v).open = true; s.textContent = `· codice ${codice}`; toast("Prodotto non trovato: scrivi nome e valori dall'etichetta (li ricorderò)", 4500); f.titolo.focus(); }
+    } catch (err) { toast("⚠️ " + err.message); }
+  };
+  $("#cb-scan", v) && ($("#cb-scan", v).onclick = async () => { const c = await scansionaCodice(); if (c) daCodice(c); });
+  $("#cb-web", v) && ($("#cb-web", v).onclick = async () => {
+    const q = f.titolo.value.trim(); if (!q) { toast("Scrivi prima cosa cercare"); f.titolo.focus(); return; }
+    sugg.innerHTML = `<div class="small muted" style="padding:6px">🌐 Cerco “${esc(q)}” su Open Food Facts…</div>`;
+    try { const l = await window.Salute.cercaOnline(q); mostra(l.map((x) => ({ ...x, online: true })), `<div class="small muted" style="padding:6px">Nessun risultato online. Scrivi i valori dall'etichetta.</div>`);
+      $$("[data-i]", sugg).forEach((b) => { const x = l[+b.dataset.i]; b.onclick = () => { ricordaCibo(x); scegli(x); }; }); }
+    catch (err) { sugg.innerHTML = `<div class="small muted" style="padding:6px">⚠️ ${esc(err.message)}</div>`; }
+  });
+  if (voce) scegli(sel);
+  else if (nome) { const a = window.Salute.cercaAlimento(nome, noti); if (a) scegli(a); else { f.titolo.dispatchEvent(new Event("input")); $("#cb-valori", v).open = true; } }
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    const titolo = f.titolo.value.trim(), gr = val("grammi"), k = val("kcal100");
+    if (!titolo) { toast("Scrivi cosa hai mangiato"); f.titolo.focus(); return; }
+    if (!gr || gr <= 0) { toast("Scrivi quanti grammi"); f.grammi.focus(); return; }
+    if (k == null) { $("#cb-valori", v).open = true; toast("Scrivi le calorie per 100 g (le trovi sull'etichetta)"); f.kcal100.focus(); return; }
+    const extra = { grammi: gr, kcal100: k, p100: val("p100") || 0, c100: val("c100") || 0, g100: val("g100") || 0, pasto: f.pasto.value, codice: sel?.codice || null };
+    const daTabella = window.Salute.ALIMENTI.some((a) => a.nome === titolo && a.kcal === k);
+    if (!daTabella) ricordaCibo({ nome: titolo, kcal: k, p: extra.p100, c: extra.c100, g: extra.g100, porz: gr, codice: extra.codice });
+    const dati = { tipo: "pasto", titolo, data: f.data.value || oggiIso(), extra };
+    try {
+      const x = await api(voce ? `/api/diario/${voce.id}` : "/api/diario", { method: voce ? "PUT" : "POST", json: voce ? { ...voce, ...dati } : dati });
+      v.chiudi(); toast(`🍽️ ${x.titolo}: ${nK(x.extra.kcal)} kcal`); if (dopo) dopo();
+    } catch (err) { toast("⚠️ " + err.message); }
+  };
+  $("#cb-del", v) && ($("#cb-del", v).onclick = async () => {
+    if (!(await conferma("Eliminare questo cibo?"))) return;
+    await api(`/api/diario/${voce.id}`, { method: "DELETE" }); v.chiudi(); toast("🗑️ Eliminato"); if (dopo) dopo();
+  });
+  if (scansiona) $("#cb-scan", v).click();
+  else if (!voce && !nome && matchMedia("(pointer:fine)").matches) f.titolo.focus();
+}
+
+/* ------------------------------------------------------------------ lettore di codici a barre (ZXing, caricato solo quando serve) */
+async function caricaZxing() {
+  if (window.ZXing) return;
+  await new Promise((ok, ko) => { const s = document.createElement("script"); s.src = "static/zxing.min.js"; s.onload = ok; s.onerror = () => ko(new Error("Lettore di codici non disponibile")); document.head.appendChild(s); });
+}
+function suggerimentiZxing() {
+  const h = new Map(), F = window.ZXing.BarcodeFormat;
+  h.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E]);
+  h.set(window.ZXing.DecodeHintType.TRY_HARDER, true);
+  return h;
+}
+function scansionaCodice() {
+  return new Promise((risolvi) => {
+    let fatto = false, lettore = null;
+    const fine = (c) => { if (fatto) return; fatto = true; try { lettore?.reset(); } catch { /* */ } v.remove(); risolvi(c); };
+    const v = foglio(`<h3>📷 Codice a barre ${xBtn}</h3>
+      <div class="scanner"><video id="sc-video" playsinline muted autoplay></video><div class="sc-mirino"></div><div class="sc-stato" id="sc-stato">Avvio la fotocamera…</div></div>
+      <p class="small muted" style="margin:8px 2px">Inquadra il codice a barre della confezione: lo leggo da solo.</p>
+      <button type="button" class="btn sec block" id="sc-foto">🖼️ Leggilo da una foto</button>
+      <form id="sc-man" class="riga" style="margin-top:10px"><input type="text" name="codice" inputmode="numeric" autocomplete="off" placeholder="Oppure scrivi le cifre sotto il codice"><button class="btn">Cerca</button></form>`,
+      { onClose: () => fine(null) });
+    const stato = (t) => { const s = $("#sc-stato", v); if (s) s.textContent = t; };
+    caricaZxing().then(async () => {
+      if (fatto) return;
+      if (!navigator.mediaDevices?.getUserMedia) return stato("Fotocamera non disponibile: usa una foto o scrivi le cifre.");
+      lettore = new window.ZXing.BrowserMultiFormatReader(suggerimentiZxing(), 250);
+      try {
+        await lettore.decodeFromConstraints({ video: { facingMode: "environment" } }, $("#sc-video", v), (r) => { if (r && !fatto) { navigator.vibrate?.(40); fine(r.getText()); } });
+        stato("");
+      } catch { stato("Non posso usare la fotocamera: consenti l'accesso, oppure usa una foto o scrivi le cifre."); }
+    }).catch((e) => stato(e.message));
+    $("#sc-foto", v).onclick = () => {
+      const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+      inp.onchange = async () => {
+        const file = inp.files[0]; if (!file) return;
+        stato("Leggo la foto…");
+        try {
+          await caricaZxing();
+          const url = URL.createObjectURL(file);
+          try { const r = await new window.ZXing.BrowserMultiFormatReader(suggerimentiZxing()).decodeFromImageUrl(url); fine(r.getText()); }
+          finally { URL.revokeObjectURL(url); }
+        } catch { stato(""); toast("Non riesco a leggere il codice: fai la foto più da vicino, dritta e con luce", 4000); }
+      };
+      inp.click();
+    };
+    $("#sc-man", v).onsubmit = (e) => { e.preventDefault(); const c = e.target.codice.value.replace(/\D/g, ""); if (c.length < 6) return toast("Scrivi tutte le cifre del codice"); fine(c); };
+  });
+}
+
+/* ------------------------------------------------------------------ attività */
+async function aggiungiAttivita({ voce = null, data = oggiIso(), dopo } = {}) {
+  const peso = ultimoPeso(await api("/api/diario?tipo=peso"))?.extra?.peso || 70;
+  const e = voce?.extra || {};
+  let sport = e.sport || "Corsa";
+  const sport_l = Object.entries(window.Salute.SPORT).filter(([k]) => k !== "Movimento (Salute)" || e.sport === k);
+  const v = foglio(`<h3>🏃 ${voce ? "Modifica attività" : "Aggiungi attività"} ${xBtn}</h3><form id="fat" novalidate>
+    <div class="pronti" id="at-sport" style="margin-bottom:12px">${sport_l.map(([k, s]) => `<button type="button" class="chip ${k === sport ? "on" : ""}" data-s="${esc(k)}">${s.ico} ${esc(k)}</button>`).join("")}</div>
+    <label class="campo"><span>Titolo <i class="muted">(facoltativo)</i></span><input type="text" name="titolo" value="${esc(voce?.titolo || "")}" placeholder="Es. Corsa al parco"></label>
+    <div class="riga"><label class="campo"><span>Minuti</span><input type="number" name="minuti" inputmode="numeric" min="0" value="${e.minuti ?? ""}"></label>
+      <label class="campo"><span>Km</span><input type="number" name="km" inputmode="decimal" step="any" min="0" value="${e.km ?? ""}"></label>
+      <label class="campo"><span>Passi</span><input type="number" name="passi" inputmode="numeric" min="0" value="${e.passi ?? ""}"></label></div>
+    <label class="campo"><span>Calorie bruciate <i class="muted">(se le sai)</i></span><input type="number" name="kcal" inputmode="numeric" min="0" value="${voce ? e.kcal ?? "" : ""}" placeholder="le calcolo io"></label>
+    <div class="anteprima-forza" id="at-ant"></div>
+    <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || data)}"></label>
+    <button class="btn block">Salva</button>
+    ${voce ? `<button type="button" class="btn danger block" id="at-del" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
+  const f = $("#fat", v), num = (n) => (f[n].value === "" ? null : +f[n].value);
+  const stima = () => window.Salute.kcalAttivita({ sport, minuti: num("minuti"), km: num("km"), passi: num("passi") }, peso);
+  const ant = () => { const k = stima(); $("#at-ant", v).innerHTML = f.kcal.value === "" && k ? `🔥 Stima: <b>${nK(k)} kcal</b> <span class="muted">(con il tuo peso di ${kgTesto(peso)})</span>` : ""; };
+  $("#at-sport", v).onclick = (ev) => { const b = ev.target.closest("[data-s]"); if (!b) return; sport = b.dataset.s; $$("[data-s]", v).forEach((x) => x.classList.toggle("on", x === b)); ant(); };
+  ["minuti", "km", "passi", "kcal"].forEach((n) => (f[n].oninput = ant)); ant();
+  f.onsubmit = async (ev) => {
+    ev.preventDefault();
+    if (!num("minuti") && !num("km") && !num("passi") && !num("kcal")) { toast("Scrivi almeno i minuti"); f.minuti.focus(); return; }
+    const dati = { tipo: "attivita", titolo: f.titolo.value.trim() || sport, data: f.data.value || oggiIso(),
+      extra: { ...e, sport, minuti: num("minuti"), km: num("km"), passi: num("passi"), kcal: num("kcal") ?? stima() } };
+    try {
+      const x = await api(voce ? `/api/diario/${voce.id}` : "/api/diario", { method: voce ? "PUT" : "POST", json: voce ? { ...voce, ...dati } : dati });
+      v.chiudi(); toast(`${icoSport(sport)} ${x.titolo}: ${nK(x.extra.kcal)} kcal`); if (dopo) dopo();
+    } catch (err) { toast("⚠️ " + err.message); }
+  };
+  $("#at-del", v) && ($("#at-del", v).onclick = async () => {
+    if (!(await conferma("Eliminare questa attività?", "Elimina", e.fonte === "strava" ? "Non verrà reimportata da Strava." : ""))) return;
+    await api(`/api/diario/${voce.id}`, { method: "DELETE" });
+    if (e.ext_id) { const sc = JSON.parse(memo.get("scartate") || "[]"); sc.push(e.ext_id); memo.set("scartate", JSON.stringify(sc.slice(-500))); }
+    v.chiudi(); toast("🗑️ Eliminata"); if (dopo) dopo();
+  });
+}
+
+/* ------------------------------------------------------------------ fabbisogno a riposo */
+function impostaFabbisogno(ctx, dopo) {
+  const p = ctx.prof;
+  const v = foglio(`<h3>⚖️ Fabbisogno a riposo ${xBtn}</h3>
+    <p class="muted small" style="margin-top:-6px">Servono per stimare quante calorie bruci anche senza fare niente (formula di Mifflin-St Jeor).</p>
+    <form id="ffb"><div class="pronti" style="margin-bottom:12px"><button type="button" class="chip ${p.sesso !== "F" && p.sesso ? "on" : ""}" data-sx="M">👨 Uomo</button><button type="button" class="chip ${p.sesso === "F" ? "on" : ""}" data-sx="F">👩 Donna</button></div>
+      <label class="campo"><span>Data di nascita</span><input type="date" name="nascita" value="${esc(p.nascita || "")}"></label>
+      <div class="riga"><label class="campo"><span>Altezza (cm)</span><input type="number" name="altezza" inputmode="numeric" min="100" max="230" value="${esc(p.altezza || "")}"></label>
+        <label class="campo"><span>Peso (kg)</span><input type="number" name="peso" inputmode="decimal" step="0.1" min="25" max="300" value="${ctx.peso ?? ""}"></label></div>
+      <button class="btn block">Salva</button></form>`);
+  let sesso = p.sesso || null;
+  $$("[data-sx]", v).forEach((b) => (b.onclick = () => { sesso = b.dataset.sx; $$("[data-sx]", v).forEach((x) => x.classList.toggle("on", x === b)); }));
+  $("#ffb", v).onsubmit = async (ev) => {
+    ev.preventDefault();
+    const f = ev.target;
+    if (!sesso) return toast("Scegli uomo o donna");
+    if (!f.nascita.value || !f.altezza.value || !f.peso.value) return toast("Compila tutti i campi");
+    await api("/api/profilo", { method: "PUT", json: { ...p, sesso, nascita: f.nascita.value, altezza: String(Math.round(+f.altezza.value)) } });
+    if (+f.peso.value !== ctx.peso) await api("/api/diario", { method: "POST", json: { tipo: "peso", titolo: "Peso", data: oggiIso(), extra: { peso: +f.peso.value } } });
+    v.chiudi(); toast("✅ Salvato"); if (dopo) dopo();
+  };
+}
+
+/* ------------------------------------------------------------------ Salute di iPhone (tramite Comando Rapido) */
+const istruzioniSalute = () => `
+  ${passo(1, "Apri l'app <b>Comandi</b> → <b>＋</b>. Chiamalo <b>LifeApp Salute</b>.")}
+  ${passo(2, "Aggiungi <b>Trova campioni di Salute</b>: tipo <b>Energia attiva</b>, filtro <b>Data di inizio</b> → <b>è oggi</b>. Poi aggiungi <b>Calcola statistiche</b> → <b>Somma</b>.")}
+  ${passo(3, "Ripeti per i <b>Passi</b>: <b>Trova campioni di Salute</b> (tipo <b>Passi</b>, <b>è oggi</b>) e <b>Calcola statistiche</b> → <b>Somma</b>.")}
+  ${passo(4, "Aggiungi <b>Testo</b> e scrivi:" + cod("LifeApp-Salute;") + "poi inserisci la variabile <b>Data corrente</b> (tocca la variabile → <b>Formato personalizzato</b> <code>yyyy-MM-dd</code>), un <b>;</b>, la prima <b>Statistiche</b> (calorie), un <b>;</b> e la seconda <b>Statistiche</b> (passi).")}
+  ${passo(5, "Aggiungi <b>Copia negli appunti</b>. Tocca <b>▶︎</b> e consenti l'accesso a Salute.")}
+  ${passo(6, "Per farlo <b>tutti i giorni da solo</b>: in Comandi vai su <b>Automazione</b> → <b>＋</b> → <b>Ora del giorno</b> (es. 21:30, ogni giorno) → <b>Esegui immediatamente</b> → scegli <b>LifeApp Salute</b>.")}
+  ${passo(7, "Quando apri LifeApp tocca <b>Incolla dati di Salute</b>: un tocco e il giorno è aggiornato.")}`;
+function importaSalute(dopo) {
+  const v = foglio(`<h3>❤️ Salute di iPhone ${xBtn}</h3>
+    <p class="muted small" style="margin-top:-6px">Porta in LifeApp <b>passi</b> e <b>calorie attive</b> registrati da iPhone e Apple Watch (gli stessi dell'app Fitness).</p>
+    <button class="btn block" id="sa-incolla">📋 Incolla dati di Salute</button>
+    <textarea id="sa-testo" rows="3" placeholder="LifeApp-Salute;2026-11-25;520;8400" style="margin-top:10px"></textarea>
+    <button class="btn sec block" id="sa-ok" style="margin-top:8px">Importa</button>
+    <details class="card" style="margin-top:12px"><summary><span class="sum-ico">⚙️</span><span>Come preparare il Comando Rapido<br><span class="small muted">Una volta sola, circa 3 minuti</span></span></summary><div class="dentro">${istruzioniSalute()}</div></details>`);
+  const importa = async (t) => {
+    const righe = window.Salute.leggiSalute(t);
+    if (!righe.length) return toast("⚠️ Non trovo i dati: esegui prima il comando “LifeApp Salute”", 4000);
+    const att = await api("/api/diario?tipo=attivita", { fresco: true });
+    for (const r of righe) {
+      const id = "salute-" + r.data, gia = att.find((x) => x.extra?.ext_id === id);
+      const dati = { tipo: "attivita", titolo: "Movimento della giornata", data: r.data, extra: { sport: "Movimento (Salute)", passi: r.passi, kcal: r.kcal, minuti: null, km: null, fonte: "salute", ext_id: id } };
+      await api(gia ? `/api/diario/${gia.id}` : "/api/diario", { method: gia ? "PUT" : "POST", json: gia ? { ...gia, ...dati } : dati });
+    }
+    const u = righe[righe.length - 1];
+    v.chiudi(); toast(`❤️ ${dataIt(u.data).replace(/ \d{4}$/, "")}: ${nK(u.passi)} passi, ${nK(u.kcal)} kcal attive`); if (dopo) dopo();
+  };
+  $("#sa-incolla", v).onclick = async () => {
+    try { const t = await navigator.clipboard.readText(); $("#sa-testo", v).value = t; await importa(t); }
+    catch { toast("Tieni premuto nel riquadro e scegli Incolla"); $("#sa-testo", v).focus(); }
+  };
+  $("#sa-ok", v).onclick = () => importa($("#sa-testo", v).value);
+}
+
+/* ------------------------------------------------------------------ Strava */
+const stravaCfg = () => { try { return JSON.parse(memo.get("strava") || "null"); } catch { return null; } };
+const stravaSalva = (c) => memo.set("strava", c ? JSON.stringify(c) : null);
+const redirectStrava = () => location.origin + location.pathname;
+let syncStrava = null;
+function sincronizzaStrava(forza = false) {
+  const cfg0 = stravaCfg();
+  if (!cfg0?.refresh_token) return Promise.resolve(0);
+  if (!forza && Date.now() / 1000 - (cfg0.ultima || 0) < 1800) return Promise.resolve(0);
+  if (syncStrava) return syncStrava;
+  syncStrava = (async () => {
+    try {
+      const cfg = await window.Salute.strava.valido(cfg0); stravaSalva(cfg);
+      const dopo = cfg.ultima ? cfg.ultima - 3 * 86400 : Date.now() / 1000 - 30 * 86400;
+      const lista = await window.Salute.strava.attivita(cfg, dopo);
+      const att = await api("/api/diario?tipo=attivita", { fresco: true });
+      const gia = new Set([...att.map((x) => x.extra?.ext_id).filter(Boolean), ...JSON.parse(memo.get("scartate") || "[]")]);
+      const peso = ultimoPeso(await api("/api/diario?tipo=peso"))?.extra?.peso || 70;
+      let n = 0;
+      for (const a of lista) {
+        const voce = window.Salute.daStrava(a, peso);
+        if (gia.has(voce.extra.ext_id) || !voce.data) continue;
+        await api("/api/diario", { method: "POST", json: voce }); gia.add(voce.extra.ext_id); n++;
+      }
+      stravaSalva({ ...stravaCfg(), ...cfg, ultima: Math.floor(Date.now() / 1000) });
+      if (n) toast(`🟧 Strava: ${n} ${n === 1 ? "nuova attività" : "nuove attività"}`);
+      return n;
+    } catch (e) { if (forza) toast("⚠️ " + e.message, 4000); return 0; }
+    finally { syncStrava = null; }
+  })();
+  return syncStrava;
+}
+async function ritornoStrava() {   // Strava riapre LifeApp con ?code=…&state=lifeapp-strava
+  const q = new URLSearchParams(location.search);
+  if (q.get("state") !== "lifeapp-strava") return false;
+  history.replaceState(null, "", location.pathname + "#/calorie");
+  const code = q.get("code");
+  if (!code) { toast("Strava: collegamento annullato"); return false; }
+  const cfg = stravaCfg();
+  if (!cfg?.client_secret) {   // si è aperto Safari invece dell'app sulla Home: memoria diversa
+    $("#tabbar").hidden = true;
+    app.innerHTML = `<div class="vuoto"><span class="big">🟧</span><b>Quasi fatto!</b><br>Questa pagina si è aperta in Safari. Copia il codice qui sotto, apri <b>LifeApp dall'icona sulla Home</b> → Calorie → Strava → <b>Si è aperto Safari con un codice?</b> e incollalo.<br><br>
+      ${cod(code)}</div>`;
+    return true;
+  }
+  try { stravaSalva(await window.Salute.strava.scambia(cfg, code)); toast("✅ Strava collegato"); sincronizzaStrava(true).then((n) => { if (n) render(); }); }
+  catch (e) { toast("⚠️ " + e.message, 4000); }
+  return false;
+}
+function impostaStrava(dopo) {
+  const c = stravaCfg() || {};
+  const v = foglio(`<h3>🟧 Strava ${xBtn}</h3>
+    ${c.refresh_token ? `<div class="card"><b>✅ Collegato${c.atleta ? ` come ${esc(c.atleta)}` : ""}</b>
+        <div class="small muted" style="margin-top:4px">Le attività arrivano da sole ogni volta che apri LifeApp.${c.ultima ? " Ultimo controllo: " + quandoFa(c.ultima) + "." : ""}</div></div>
+      <button class="btn block" id="st-sync" style="margin-top:10px">🔄 Controlla adesso</button>
+      <button class="btn danger block" id="st-via" style="margin-top:8px">Scollega Strava</button>`
+    : `<p class="muted small" style="margin-top:-6px">Si fa <b>una volta sola</b> (circa 3 minuti). Poi corse, camminate e allenamenti di Strava compaiono qui da soli, con le calorie.</p>
+      ${passo(1, `Apri <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> e accedi con il tuo account.`)}
+      ${passo(2, `Crea un'applicazione: <b>Nome</b> LifeApp · <b>Categoria</b> Visualizer · <b>Sito web</b> e <b>Dominio di callback</b>:${cod(location.hostname)}`)}
+      ${passo(3, "Copia qui <b>ID client</b> e <b>Segreto client</b>: restano solo su questo telefono.")}
+      <form id="st-f"><label class="campo"><span>ID client</span><input type="text" name="id" inputmode="numeric" autocomplete="off" value="${esc(c.client_id || "")}"></label>
+        <label class="campo"><span>Segreto client</span><input type="password" name="secret" autocomplete="off" value="${esc(c.client_secret || "")}"></label>
+        <button class="btn block">🔗 Collega Strava</button></form>
+      <details class="card" style="margin-top:12px"><summary><span>Si è aperto Safari con un codice?</span></summary><div class="dentro">
+        <form id="st-cod" class="riga"><input type="text" name="codice" autocomplete="off" placeholder="Incolla il codice"><button class="btn">OK</button></form></div></details>`}
+    <p class="small muted" style="margin-top:12px">💡 Vuoi anche gli allenamenti dell'app Fitness / Apple Watch? Nell'app Strava: <b>Tu → Impostazioni → Applicazioni, servizi e dispositivi → Salute</b>, attiva l'importazione degli allenamenti. Così arrivano a Strava e da lì qui.</p>`);
+  const leggiForm = () => {
+    const f = $("#st-f", v), id = f.id.value.trim(), secret = f.secret.value.trim();
+    if (!/^\d+$/.test(id) || secret.length < 20) { toast("Controlla ID client (solo numeri) e Segreto client"); return null; }
+    const cfg = { ...(stravaCfg() || {}), client_id: id, client_secret: secret }; stravaSalva(cfg); return cfg;
+  };
+  $("#st-f", v) && ($("#st-f", v).onsubmit = (e) => { e.preventDefault(); const cfg = leggiForm(); if (cfg) location.href = window.Salute.strava.urlAutorizza(cfg.client_id, redirectStrava()); });
+  $("#st-cod", v) && ($("#st-cod", v).onsubmit = async (e) => {
+    e.preventDefault(); const cfg = leggiForm(); if (!cfg) return;
+    try { stravaSalva(await window.Salute.strava.scambia(cfg, e.target.codice.value.trim())); v.chiudi(); toast("✅ Strava collegato"); await sincronizzaStrava(true); if (dopo) dopo(); }
+    catch (err) { toast("⚠️ " + err.message, 4000); }
+  });
+  $("#st-sync", v) && ($("#st-sync", v).onclick = async () => { const n = await sincronizzaStrava(true); if (!n) toast("Nessuna attività nuova"); v.chiudi(); if (dopo) dopo(); });
+  $("#st-via", v) && ($("#st-via", v).onclick = async () => {
+    if (!(await conferma("Scollegare Strava?", "Scollega", "Le attività già importate restano."))) return;
+    fetch("https://www.strava.com/oauth/deauthorize", { method: "POST", headers: { Authorization: "Bearer " + c.access_token } }).catch(() => {});
+    stravaSalva(null); v.chiudi(); toast("Strava scollegato"); if (dopo) dopo();
   });
 }
 
@@ -1952,7 +2386,7 @@ function notificheCompleanni(lista, importati) {
 function apriIcsCompleanni(lista) {
   const e = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
   const anno = new Date().getFullYear();
-  const r = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Scrigno//IT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  const r = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//LifeApp//IT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
   for (const x of lista) {
     const g = (d) => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
     const d0 = new Date(anno, x.mese - 1, x.giorno), d1 = new Date(anno, x.mese - 1, x.giorno + 1);
@@ -1968,7 +2402,7 @@ function apriIcsCompleanni(lista) {
 }
 
 /* ================================================================== CHAT */
-const AIUTO = ["panca piana 80 kg per 8", "oggi peso 72,5 kg", "importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "esame di Fisica da 12 cfu", "primo modulo di Fisica con 27", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
+const AIUTO = ["a pranzo 80 g di pasta e 2 uova", "ho corso 5 km in 30 minuti", "quante calorie ho mangiato oggi?", "panca piana 80 kg per 8", "oggi peso 72,5 kg", "importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "esame di Fisica da 12 cfu", "primo modulo di Fisica con 27", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
   "il 16 dicembre dentista dalle 10 alle 11", "quando è il compleanno di Marco?", "che film ho visto?"];
 const chatStoria = () => { try { return JSON.parse(memo.get("chat") || "[]"); } catch { return []; } };
 const chatSalva = (l) => memo.set("chat", JSON.stringify(l.slice(-150)));
@@ -2010,6 +2444,8 @@ function vistaChat(precompila) {
       if (a.t === "calComp") apriIcsCompleanni([a.voce]);
       if (a.t === "importaComp") importaCompleanni(null);
       if (a.t === "calApp") aggiungiAlCalendario(a.voce);
+      if (a.t === "cibo") aggiungiCibo({ nome: a.nome, grammi: a.grammi, data: a.data, pasto: a.pasto, dopo: () => aggiungi({ da: "scrigno", testo: "🍽️ Salvato. Da ora lo conosco anch'io: la prossima volta basta scriverlo." }) });
+      if (a.t === "annullaTutti") { for (const u of a.urls) await api(u, { method: "DELETE" }); b.closest(".msg-az").remove(); aggiungi({ da: "scrigno", testo: "↩️ Annullato, non l'ho salvato." }); }
     } catch (err) { toast("⚠️ " + err.message); }
   };
   if (precompila) { history.replaceState(null, "", "#/chat"); invia(precompila); }
@@ -2047,7 +2483,7 @@ async function rispondi(testo) {
     const voce = { tipo: "compleanno", titolo: r.nome, giorno: r.giorno, mese: r.mese, anno: r.anno || gia?.anno || null };
     const x = gia ? await api(`/api/diario/${gia.id}`, { method: "PUT", json: { ...gia, ...voce } }) : await api("/api/diario", { method: "POST", json: voce });
     const i = infoComp(x);
-    return { da: "scrigno", html: `🎂 ${gia ? "Ho aggiornato" : "Ho segnato"} il compleanno di <b>${esc(x.titolo)}</b>: <b>${x.giorno} ${MESI_L[x.mese - 1]}</b>${i.anni ? ` (compirà ${i.anni} anni)` : ""}.<br>${i.g === 0 ? "È oggi! 🎉" : `Mancano ${i.g} giorni.`} Te lo ricorderò ogni anno qui in Scrigno; per l'avviso sull'iPhone mettilo nel Calendario:`,
+    return { da: "scrigno", html: `🎂 ${gia ? "Ho aggiornato" : "Ho segnato"} il compleanno di <b>${esc(x.titolo)}</b>: <b>${x.giorno} ${MESI_L[x.mese - 1]}</b>${i.anni ? ` (compirà ${i.anni} anni)` : ""}.<br>${i.g === 0 ? "È oggi! 🎉" : `Mancano ${i.g} giorni.`} Te lo ricorderò ogni anno qui in LifeApp; per l'avviso sull'iPhone mettilo nel Calendario:`,
       azioni: [{ t: "calComp", voce: x, etichetta: "📲 Promemoria annuale nel Calendario" }, ...(gia ? [] : [{ t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }])] };
   }
   if (r.azione === "diario") {
@@ -2107,6 +2543,32 @@ async function rispondi(testo) {
     return { da: "scrigno", html: `💪 Segnato: <b>${esc(x.titolo)}</b> — ${testoSerie(x.extra)}<br>` +
       (r.kg ? `Forza stimata: <b>${kgTesto(f)}</b>` : "") + (record ? `<br>🏆 <b>Nuovo record!</b> Prima era ${valoreForza(r.kg, prima.record)}.` : prima ? `<br><span class="muted">Il tuo record resta ${valoreForza(r.kg, prima.record)}.</span>` : ""),
       azioni: [{ t: "apri", hash: `#/palestra/${encodeURIComponent(x.titolo)}`, etichetta: "📈 Vedi il grafico" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
+  }
+  if (r.azione === "pasto") {
+    const noti = alimentiNoti(await api("/api/diario?tipo=pasto"));
+    const voci = window.Salute.leggiPasto(r.testo, noti), pasto = r.pasto || pastoOra();
+    const salvati = [], mancanti = [];
+    for (const v of voci) {
+      const a = v.alimento;
+      if (!a || a.kcal == null || !v.grammi) { mancanti.push(v); continue; }
+      salvati.push(await api("/api/diario", { method: "POST", json: { tipo: "pasto", titolo: a.nome, data: r.data,
+        extra: { grammi: v.grammi, kcal100: a.kcal, p100: a.p || 0, c100: a.c || 0, g100: a.g || 0, pasto, codice: a.codice || null } } }));
+    }
+    const A_PASTO = { colazione: "a colazione", pranzo: "a pranzo", cena: "a cena", spuntino: "come spuntino" };
+    const d = calcoloGiorno(r.data, await contestoCalorie()), tot = salvati.reduce((s, x) => s + x.extra.kcal, 0);
+    let html = salvati.length ? `🍽️ Segnato ${A_PASTO[pasto]}${r.data !== oggiIso() ? ` (${giorno(r.data)})` : ""}:<br>${salvati.map((x) => `• ${esc(x.titolo)} ${n1(x.extra.grammi)} g — <b>${nK(x.extra.kcal)} kcal</b>`).join("<br>")}`
+      + `${salvati.length > 1 ? `<br>Totale: <b>${nK(tot)} kcal</b>` : ""}<br><span class="muted">${r.data === oggiIso() ? "Oggi" : "Quel giorno"}: ${nK(d.mangiate)} kcal mangiate${d.bilancio != null ? ` · bilancio ${testoBilancio(d.bilancio)} kcal` : ""}</span>` : "";
+    if (mancanti.length) html += `${html ? "<br><br>" : ""}🤔 Non conosco ${mancanti.map((x) => `<b>${esc(x.scritto)}</b>`).join(", ")}: cercalo o scansiona il codice a barre, così imparo i suoi valori.`;
+    return { da: "scrigno", html, azioni: [...mancanti.slice(0, 3).map((x) => ({ t: "cibo", nome: x.scritto, grammi: x.grammi, data: r.data, pasto, etichetta: `🔎 ${x.scritto}` })),
+      { t: "apri", hash: `#/calorie/${r.data}`, etichetta: "🔥 Calorie del giorno" }, ...(salvati.length ? [{ t: "annullaTutti", urls: salvati.map((x) => `/api/diario/${x.id}`), etichetta: "↩️ Annulla" }] : [])] };
+  }
+  if (r.azione === "attivita") {
+    const peso = ultimoPeso(await api("/api/diario?tipo=peso"))?.extra?.peso || 70;
+    const kcal = r.kcal ?? window.Salute.kcalAttivita(r, peso);
+    const x = await api("/api/diario", { method: "POST", json: { tipo: "attivita", titolo: r.sport, data: r.data, extra: { sport: r.sport, minuti: r.minuti, km: r.km, passi: r.passi, kcal } } });
+    const det = [r.km ? `${n1(r.km)} km` : "", r.minuti ? `${r.minuti} min` : "", r.passi ? `${nK(r.passi)} passi` : ""].filter(Boolean).join(" · ");
+    return { da: "scrigno", html: `${icoSport(r.sport)} Segnato: <b>${esc(r.sport)}</b>${det ? " — " + det : ""}${r.data !== oggiIso() ? ` (${giorno(r.data)})` : ""}<br>Calorie bruciate: <b>${nK(kcal)} kcal</b>${r.kcal ? "" : ` <span class="muted">(stima con il tuo peso di ${kgTesto(peso)})</span>`}`,
+      azioni: [{ t: "apri", hash: `#/calorie/${r.data}`, etichetta: "🔥 Calorie del giorno" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
   }
   if (r.azione === "peso") {
     const x = await api("/api/diario", { method: "POST", json: { tipo: "peso", titolo: "Peso", data: r.data, extra: { peso: r.peso } } });
@@ -2188,6 +2650,12 @@ async function rispondi(testo) {
       return { da: "scrigno", html: `🎓 Esami superati: <b>${st.n}</b>${st.idonei ? ` + ${st.idonei} idoneità` : ""}, ${st.cfu} crediti${st.inCorso ? ` (+${st.inCorso} in corso)` : ""}<br>Media ponderata: <b>${dec(st.ponderata)}</b><br>Media aritmetica: <b>${dec(st.media)}</b><br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
         azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }] };
     }
+    if (r.cosa === "calorie") {
+      const d = calcoloGiorno(oggiIso(), await contestoCalorie());
+      return { da: "scrigno", html: `🔥 Oggi hai mangiato <b>${nK(d.mangiate)} kcal</b>${d.mangiate ? ` (proteine ${n1(d.p)} g · carboidrati ${n1(d.c)} g · grassi ${n1(d.g)} g)` : ""}<br>🏃 Attività: <b>${nK(d.attivo)} kcal</b> bruciate${d.passi ? ` · ${nK(d.passi)} passi` : ""}`
+        + (d.base != null ? `<br>⚖️ Bilancio: <b>${testoBilancio(d.bilancio)} kcal</b> (contando ${nK(d.base)} kcal bruciate a riposo)` : `<br><span class="muted">Per il bilancio completo indica sesso, età e altezza nella pagina Calorie.</span>`),
+        azioni: [{ t: "apri", hash: "#/calorie", etichetta: "🔥 Apri Calorie" }] };
+    }
     if (r.cosa === "palestra") {
       const es = raggruppaEsercizi(await api("/api/diario?tipo=allenamento"));
       if (!es.length) return { da: "scrigno", html: "Non hai ancora segnato esercizi. Scrivimi ad esempio <i>panca piana 80 kg per 8</i>." };
@@ -2219,11 +2687,11 @@ async function rispondi(testo) {
 function benvenuto(forza) {
   if (!forza && memo.get("benvenuto")) return;
   const pagine = [
-    ["", "Benvenuto in Scrigno", "La tua app personale per documenti, scadenze, visite e password."],
+    ["", "Benvenuto in LifeApp", "La tua app personale per documenti, scadenze, visite e password."],
     ["🗂️", "Tutti i tuoi documenti, in ordine", "Bollo, assicurazioni, analisi, patente, bollette: ogni cosa nella sua cartella, già pronta."],
-    ["📷", "Aggiungere è facilissimo", "Fotografa un foglio o scegli un file. Scrigno ti suggerisce dove metterlo e ti ricorda quando scade."],
+    ["📷", "Aggiungere è facilissimo", "Fotografa un foglio o scegli un file. LifeApp ti suggerisce dove metterlo e ti ricorda quando scade."],
     ["💬", "Raccontami la tua giornata", "Nella chat scrivi “stasera ho visto After” o “il 6 agosto è il compleanno di Marco”: salvo tutto io nel tuo diario e ti ricordo i compleanni ogni anno."],
-    ["🗓️", "Appuntamenti nel calendario", "Scrivi “il 16 dicembre dentista dalle 10 alle 11”: Scrigno capisce giorno e orario e lo mette nel Calendario dell'iPhone."],
+    ["🗓️", "Appuntamenti nel calendario", "Scrivi “il 16 dicembre dentista dalle 10 alle 11”: LifeApp capisce giorno e orario e lo mette nel Calendario dell'iPhone."],
     LOC ? ["🔒", "Tutto resta sul tuo iPhone", "Niente cloud: i documenti sono salvati solo sul telefono. Ogni tanto fai un backup su File (te lo ricordo io)."]
       : ["🔒", "Tutto resta a casa tua", "I documenti sono salvati sul tuo server, le password sono cifrate."],
   ];
@@ -2251,7 +2719,7 @@ function mostraAccesso() {
   const nuovo = !S.stato.configurato;
   app.innerHTML = `<div class="accesso"><form class="box" id="f">
     <img class="logo" src="static/icona.svg" alt="">
-    <h1>Scrigno</h1><p>${nuovo ? "Benvenuto! Scegli una password per proteggere i tuoi documenti e cifrare le tue password." : "Il tuo archivio personale"}</p>
+    <h1>LifeApp</h1><p>${nuovo ? "Benvenuto! Scegli una password per proteggere i tuoi documenti e cifrare le tue password." : "Il tuo archivio personale"}</p>
     <input type="password" id="pw" placeholder="${nuovo ? "Scegli una password (min. 6 caratteri)" : "Password"}" autocomplete="${nuovo ? "new-password" : "current-password"}">
     ${nuovo ? `<div style="height:10px"></div><input type="password" id="pw2" placeholder="Ripeti la password" autocomplete="new-password">` : ""}
     <div style="height:14px"></div><button class="btn block">${nuovo ? "Inizia" : "Entra"}</button>
@@ -2277,7 +2745,7 @@ async function renderPagina() {
   $$(".velo, .visore").forEach((v) => v.remove());
   const h = decodeURIComponent(location.hash.slice(2));
   const [sez, arg] = [h.split("/")[0], h.split("/").slice(1).join("/")];
-  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home", palestra: "home" }[sez] || sez;
+  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home", palestra: "home", calorie: "home" }[sez] || sez;
   document.body.classList.toggle("in-chat", sez === "chat");
   $$("#tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
   scrollTo(0, 0);
@@ -2290,6 +2758,7 @@ async function renderPagina() {
     else if (sez === "diario") await vistaDiario(arg);
     else if (sez === "io") await vistaIo();
     else if (sez === "palestra") await (arg ? vistaEsercizio(arg) : vistaPalestra());
+    else if (sez === "calorie") await vistaCalorie(arg);
     else if (sez === "chat") vistaChat(arg || "");
     else if (sez === "altro") await (LOC ? vistaAltroLocale() : vistaAltroServer());
     else if (sez === "scadenze") await vistaScadenze();
@@ -2303,6 +2772,7 @@ async function renderPagina() {
 }
 
 async function avvia() {
+  if (await ritornoStrava()) return;
   try { S.stato = await api("/api/stato"); }
   catch (e) {
     app.innerHTML = `<div class="vuoto"><span class="big">📡</span>${LOC ? "Non riesco ad aprire la memoria del telefono.<br>" + esc(e.message) : "Server non raggiungibile.<br>Sei connesso al Wi-Fi di casa?"}<br><br><button class="btn" onclick="avvia()">Riprova</button></div>`;
@@ -2312,6 +2782,7 @@ async function avvia() {
   await caricaCartelle();
   render();
   benvenuto();
+  sincronizzaStrava().then((n) => { if (n && /^#\/(calorie|palestra)/.test(location.hash)) render(); });
 }
 addEventListener("hashchange", render);
 document.addEventListener("pointerdown", (e) => {
@@ -2323,7 +2794,7 @@ document.addEventListener("pointerdown", (e) => {
   addEventListener("pointerup", via); addEventListener("pointercancel", via);
 }, { passive: true });
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-cp]"); if (b) copia(b.dataset.cp); });
-document.addEventListener("visibilitychange", () => { if (!document.hidden && S.stato?.accesso) { svuotaMemoria(); caricaCartelle().catch(() => {}); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && S.stato?.accesso) { svuotaMemoria(); caricaCartelle().catch(() => {}); sincronizzaStrava().then((n) => { if (n && /^#\/(calorie|palestra)/.test(location.hash)) render(); }); } });
 if ("serviceWorker" in navigator && window.isSecureContext) navigator.serviceWorker.register("sw.js").catch(() => {});
 applicaAspetto();
 avvia();

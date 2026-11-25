@@ -1,5 +1,5 @@
 @echo off
-REM Avvia Scrigno (Windows). La prima volta installa tutto il necessario.
+REM Avvia LifeApp (Windows). La prima volta installa tutto il necessario.
 cd /d "%~dp0"
 if not exist .venv (
   echo Prima installazione, attendi 1-3 minuti...

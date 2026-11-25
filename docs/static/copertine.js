@@ -1,4 +1,4 @@
-/* Scrigno — copertine di film, serie e libri.
+/* LifeApp — copertine di film, serie e libri.
    Fonti pubbliche e gratuite, senza registrazione: Wikipedia (locandine), Open Library e Apple Books (libri).
    Viene inviato solo il titolo (e l'autore per i libri). Si può disattivare in Altro. */
 (function () {
@@ -12,7 +12,7 @@
   async function wiki(lingua, query, n = 6) {
     const u = `https://${lingua}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=${n}` +
       `&prop=pageimages&piprop=thumbnail&pithumbsize=500&pilicense=any&format=json&origin=*`;
-    const d = await json(u, { headers: { "Api-User-Agent": "Scrigno/1.0 (app personale)" } });
+    const d = await json(u, { headers: { "Api-User-Agent": "LifeApp/1.0 (app personale)" } });
     const pagine = Object.values(d?.query?.pages || {}).sort((a, b) => a.index - b.index);
     return pagine.filter((p) => p.thumbnail && p.thumbnail.height >= p.thumbnail.width * 0.9)   // verticali: locandine e copertine, non loghi
       .map((p) => ({ url: p.thumbnail.source, fonte: `Wikipedia · ${p.title}` }));

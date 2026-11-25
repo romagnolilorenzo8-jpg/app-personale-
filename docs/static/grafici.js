@@ -1,4 +1,4 @@
-/* Scrigno — grafici in SVG, senza librerie.
+/* LifeApp — grafici in SVG, senza librerie.
    Regole (skill dataviz): colori verificati per daltonismo (viola · arancio · verde acqua, in quest'ordine),
    un solo asse, barre sottili con angoli arrotondati solo in cima, linee da 2px, punti con anello,
    legenda quando le serie sono 2 o più, dettagli al passaggio del dito/mouse, tabella dei dati sempre disponibile.

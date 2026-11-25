@@ -1,4 +1,4 @@
-/* Scrigno — modalità iPhone: tutto salvato nella memoria del telefono, senza server.
+/* LifeApp — modalità iPhone: tutto salvato nella memoria del telefono, senza server.
    Risponde alle stesse richieste "/api/..." del server, così l'interfaccia è identica. */
 (function () {
   "use strict";
@@ -272,7 +272,7 @@
   const esc = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
   const utc = (local) => new Date(local).toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
   function ics(eventi) {
-    const r = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Scrigno//IT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+    const r = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//LifeApp//IT", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
     for (const a of eventi) {
       r.push("BEGIN:VEVENT", `UID:${a.uid}`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`, `SUMMARY:${esc((a.icona ? a.icona + " " : "") + a.titolo)}`);
       if (a.tutto_il_giorno) {
@@ -319,7 +319,7 @@
     const coda = new DataView(await blob.slice(Math.max(0, blob.size - 65557)).arrayBuffer());
     let i = coda.byteLength - 22;
     while (i >= 0 && coda.getUint32(i, true) !== 0x06054b50) i--;
-    if (i < 0) throw errore(400, "Il file non è un backup di Scrigno");
+    if (i < 0) throw errore(400, "Il file non è un backup di LifeApp");
     const n = coda.getUint16(i + 10, true), dimC = coda.getUint32(i + 12, true), offC = coda.getUint32(i + 16, true);
     const c = new DataView(await blob.slice(offC, offC + dimC).arrayBuffer());
     const dec = new TextDecoder(), out = {};
@@ -353,13 +353,13 @@
     for (const d of manifest.documenti) { const b = await blobDoc(d.id); if (b) voci.push({ nome: d.file, blob: b }); }
     const zip = await creaZip(voci);
     await kv.set("ultimo_backup", adesso());
-    return new File([zip], `Scrigno-backup-${oggi()}.zip`, { type: "application/zip" });
+    return new File([zip], `LifeApp-backup-${oggi()}.zip`, { type: "application/zip" });
   }
   async function ripristina(file) {
     const z = await leggiZip(file);
-    if (!z["scrigno.json"]) throw errore(400, "Il file non è un backup di Scrigno");
+    if (!z["scrigno.json"]) throw errore(400, "Il file non è un backup di LifeApp");
     const m = JSON.parse(await (await z["scrigno.json"]()).text());
-    if (m.formato !== "scrigno-backup") throw errore(400, "Il file non è un backup di Scrigno");
+    if (m.formato !== "scrigno-backup") throw errore(400, "Il file non è un backup di LifeApp");
     for (const s of ARCHIVI) await svuota(s);
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
     for (const c of m.cartelle) await scrivi("cartelle", c);
@@ -379,7 +379,7 @@
   }
 
   /* ------------------------------------------------------------ diario */
-  const TIPI = ["film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso"];
+  const TIPI = ["film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso", "pasto", "attivita"];
   const numero = (v) => (v === "" || v == null || isNaN(+v) ? null : Math.round(+v * 100) / 100);
   function normExtra(tipo, e) {
     e = e || {};
@@ -413,6 +413,19 @@
       const best = set.reduce((a, s) => (f(s) > f(a) ? s : a), set[0]);
       if (set.length > 1) return { kg: best.kg, reps: best.reps, serie: set.length, set };
       return { kg: best.kg, reps: best.reps, serie: numero(e.serie) ? Math.round(numero(e.serie)) : null };
+    }
+    if (tipo === "pasto") {
+      const grammi = numero(e.grammi), kcal100 = numero(e.kcal100);
+      if (!grammi || grammi <= 0 || grammi > 5000) throw errore(400, "Indica i grammi");
+      if (kcal100 == null || kcal100 < 0 || kcal100 > 1000) throw errore(400, "Calorie per 100 g non valide");
+      const v = (k) => Math.max(0, numero(e[k]) ?? 0);
+      return { grammi, kcal100, p100: v("p100"), c100: v("c100"), g100: v("g100"), kcal: Math.round((kcal100 * grammi) / 100),
+        pasto: ["colazione", "pranzo", "cena", "spuntino"].includes(e.pasto) ? e.pasto : null, codice: e.codice ? String(e.codice).slice(0, 20) : null };
+    }
+    if (tipo === "attivita") {
+      const n = (k) => { const x = numero(e[k]); return x != null && x >= 0 ? x : null; };
+      return { sport: String(e.sport || "Altro").slice(0, 40), minuti: n("minuti"), km: n("km"), passi: n("passi"), kcal: Math.round(n("kcal") || 0),
+        fonte: ["strava", "salute"].includes(e.fonte) ? e.fonte : null, ext_id: e.ext_id ? String(e.ext_id).slice(0, 60) : null };
     }
     if (tipo === "peso") {
       const peso = numero(e.peso);
