@@ -1335,25 +1335,64 @@ const forzaStimata = (kg, reps) => (kg > 0 ? (reps <= 1 ? kg : kg * (1 + reps / 
 const kgTesto = (n) => (n == null ? "—" : (Math.round(n * 10) / 10).toLocaleString("it-IT") + " kg");
 const valoreForza = (kg, n) => (kg > 0 ? kgTesto(n) : `${Math.round(n)} rip.`);
 const chiaveEs = (n) => n.trim().toLowerCase();
-const serieDi = (e = {}) => (Array.isArray(e.set) && e.set.length ? e.set : [{ kg: e.kg || 0, reps: e.reps || 0 }]);
+const serieDi = (e = {}) => (Array.isArray(e.set) && e.set.length ? e.set : Array.from({ length: Math.min(Math.max(1, e.serie || 1), 30) }, () => ({ kg: e.kg || 0, reps: e.reps || 0 })));
 const kgCorto = (n) => (Math.round(n * 10) / 10).toLocaleString("it-IT");
 function testoSerie(e = {}) {   // "20×12 · 30×10 · 40×8 kg" oppure "80 kg × 8 · 3 serie"
   const s = serieDi(e);
+  if (s.length > 1 && s.every((x) => x.kg === s[0].kg && x.reps === s[0].reps)) return (s[0].kg ? `${kgTesto(s[0].kg)} × ${s[0].reps}` : `${s[0].reps} ripetizioni`) + ` · ${s.length} serie`;
   if (s.length > 1) return s.every((x) => !x.kg) ? s.map((x) => x.reps).join(" · ") + " ripetizioni" : s.map((x) => (x.kg ? `${kgCorto(x.kg)}×${x.reps}` : `${x.reps} rip.`)).join(" · ") + (s.some((x) => x.kg) ? " kg" : "");
   return (e.kg ? `${kgTesto(e.kg)} × ${e.reps}` : `${e.reps} ripetizioni`) + (e.serie > 1 ? ` · ${e.serie} serie` : "");
 }
+const forzaSerie = (s) => forzaStimata(s.kg || 0, s.reps || 0);
+const extraGiorno = (d) => ({ set: d.set, kg: d.best.kg, reps: d.best.reps, serie: d.set.length });
 function raggruppaEsercizi(allen) {
   const m = new Map();
   allen.slice().sort((a, b) => (a.data || "").localeCompare(b.data || "") || (a.creato || "").localeCompare(b.creato || "") || a.id - b.id)
     .forEach((x) => { const k = chiaveEs(x.titolo); if (!m.has(k)) m.set(k, { nome: x.titolo, voci: [] }); m.get(k).voci.push(x); });
   for (const g of m.values()) {
     g.corpoLibero = g.voci.every((x) => !x.extra?.kg);
-    g.forze = g.voci.map((x) => Math.max(...serieDi(x.extra).map((s) => forzaStimata(s.kg || 0, s.reps || 0))));
-    g.ultima = g.voci[g.voci.length - 1]; g.record = Math.max(...g.forze);
+    // tutte le serie dello stesso giorno = un allenamento; vale la serie migliore del giorno
+    const gg = new Map();
+    g.voci.forEach((x) => { const d = x.data || ""; if (!gg.has(d)) gg.set(d, { data: d, voci: [] }); gg.get(d).voci.push(x); });
+    g.giorni = [...gg.values()].map((d) => {
+      const set = d.voci.flatMap((x) => serieDi(x.extra)), best = set.reduce((a, x) => (forzaSerie(x) > forzaSerie(a) ? x : a), set[0]);
+      return { ...d, set, best, forza: forzaSerie(best) };
+    });
+    g.forze = g.giorni.map((d) => d.forza);
+    g.ultima = g.voci[g.voci.length - 1]; g.ultimoG = g.giorni[g.giorni.length - 1]; g.record = Math.max(...g.forze);
     g.progresso = g.forze[0] ? (g.forze[g.forze.length - 1] / g.forze[0] - 1) * 100 : 0;
   }
   return [...m.values()].sort((a, b) => (b.ultima.data || "").localeCompare(a.ultima.data || ""));
 }
+/* Giorni di allenamento: tutti gli esercizi fatti nello stesso giorno, il più recente per primo */
+function giorniAllenamento(allen) {
+  const m = new Map();
+  for (const g of raggruppaEsercizi(allen)) for (const d of g.giorni) {
+    if (!m.has(d.data)) m.set(d.data, { data: d.data, esercizi: [] });
+    m.get(d.data).esercizi.push({ nome: g.nome, corpoLibero: g.corpoLibero, ...d });
+  }
+  const l = [...m.values()].sort((a, b) => b.data.localeCompare(a.data));
+  l.forEach((d) => { d.esercizi.sort((a, b) => Math.min(...a.voci.map((x) => x.id)) - Math.min(...b.voci.map((x) => x.id)));
+    d.serie = d.esercizi.reduce((t, e) => t + e.set.length, 0); d.volume = d.esercizi.reduce((t, e) => t + e.set.reduce((u, x) => u + (x.kg || 0) * (x.reps || 0), 0), 0); });
+  return l;
+}
+const giornoLungo = (iso) => { const d = new Date(iso + "T00:00"); return `${GIORNI[d.getDay()]} ${d.getDate()} ${MESI_L[d.getMonth()]} ${d.getFullYear()}`; };
+function htmlGiorno(d) {
+  const x = new Date(d.data + "T00:00");
+  return `<a class="voce" href="#/allenamento/${d.data}"><div class="datebox" style="--c:var(--accent)"><div class="m">${MESI[x.getMonth()]}</div><div class="g">${x.getDate()}</div></div>
+    <div class="corpo"><div class="tit">${GIORNI[x.getDay()][0].toUpperCase() + GIORNI[x.getDay()].slice(1)} · ${d.esercizi.length} eserciz${d.esercizi.length === 1 ? "io" : "i"} · ${d.serie} serie</div>
+    <div class="sub">${d.esercizi.map((e) => esc(e.nome)).join(" · ")}</div></div><div class="dx">›</div></a>`;
+}
+function graficoEsercizio(el, g) {
+  el.innerHTML = "";
+  if (g.giorni.length < 2) { el.innerHTML = `<div class="small muted" style="padding:14px 4px">Hai fatto <b>${esc(g.nome)}</b> in un solo allenamento: dal prossimo vedrai qui l'andamento.</div>`; return; }
+  const lib = g.corpoLibero, vals = g.forze.map((v) => Math.round(v * 10) / 10);
+  window.Grafici.linea(el, { categorie: g.giorni.map((d) => dataIt(d.data).replace(/ \d{4}$/, "")),
+    etichette: g.giorni.map((d) => `Allenamento del ${dataIt(d.data)} · ${testoSerie(extraGiorno(d))}`),
+    serie: [{ nome: lib ? "Ripetizioni (serie migliore)" : "Forza stimata (serie migliore)", slot: 1, tipo: "linea", punti: true, valori: vals }], ...intervalloY(vals),
+    formato: (v) => (lib ? String(Math.round(v)) : kgTesto(v).replace(" kg", "")), titoloTabella: "Vedi i numeri in tabella" });
+}
+
 function bmi(peso, altezza) {
   if (!peso || !altezza) return null;
   const v = peso / Math.pow(altezza / 100, 2);
@@ -1378,7 +1417,7 @@ function intervalloY(valori) {   // asse con valori "tondi" (es. 70 · 80 · 90 
 async function vistaPalestra() {
   const [allen, pesi, prof, corse] = await Promise.all([api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=peso"), api("/api/profilo"), api("/api/diario?tipo=corsa")]);
   const stC = corse.length ? statCorse(corse) : null, ultC = stC?.l[stC.n - 1];
-  const esercizi = raggruppaEsercizi(allen), pAtt = ultimoPeso(pesi), alt = +prof.altezza || null, b = bmi(pAtt?.extra?.peso, alt);
+  const esercizi = raggruppaEsercizi(allen), esPrimo = Math.max(0, esercizi.findIndex((g) => g.giorni.length > 1)), giorni = giorniAllenamento(allen), pAtt = ultimoPeso(pesi), alt = +prof.altezza || null, b = bmi(pAtt?.extra?.peso, alt);
   app.innerHTML = `<div class="top"><a class="iconbtn" href="#/" aria-label="Indietro">‹</a><h1 style="font-size:28px">🏋️ <span class="grad">Palestra</span><small>Carichi, ripetizioni e progressi</small></h1></div>
     <div class="bilancio corpo">
       <div class="bil-griglia" style="margin-top:0">
@@ -1389,12 +1428,17 @@ async function vistaPalestra() {
     ${pesi.length >= 2 ? `<div class="grafico-card"><div class="g-tit">Il mio peso</div><div id="g-peso"></div></div>` : ""}
     <button class="btn block" id="nuovo-es" style="margin:4px 0 6px">➕ Registra un esercizio</button>
     <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “panca piana 80 kg per 8”</span></a>
+    ${esercizi.length ? `<div class="grafico-card"><div class="g-tit">📈 Andamento per esercizio</div>
+      <div class="pronti scorri" id="es-scelta">${esercizi.map((g, i) => `<button type="button" class="chip ${i === esPrimo ? "on" : ""}" data-es="${i}">${esc(g.nome)}</button>`).join("")}</div>
+      <div id="g-es"></div><p class="small muted" style="margin:6px 4px 2px">Un punto per ogni allenamento: conta la serie migliore di quel giorno.</p></div>
+      <div class="sezione"><h2>🗓️ Allenamenti</h2>${giorni.length > 4 ? `<a href="#/allenamento">Tutti (${giorni.length}) ›</a>` : `<span class="muted small">${giorni.length}</span>`}</div>
+      <div class="lista" id="allenamenti">${giorni.slice(0, 4).map(htmlGiorno).join("")}</div>` : ""}
     ${esercizi.length ? `<div class="sezione"><h2>I miei esercizi</h2><span class="muted small">${esercizi.length}</span></div>
-      <div class="esercizi">${esercizi.map((g, i) => { const u = g.ultima.extra || {};
+      <div class="esercizi">${esercizi.map((g, i) => { const u = extraGiorno(g.ultimoG);
         return `<a class="esercizio" href="#/palestra/${encodeURIComponent(g.nome)}">
-          <div class="es-testa"><b>${esc(g.nome)}</b>${g.voci.length > 1 ? `<span class="tag ${g.progresso >= 0 ? "ok" : "danger"}">${g.progresso >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(g.progresso))}%</span>` : ""}</div>
+          <div class="es-testa"><b>${esc(g.nome)}</b>${g.giorni.length > 1 ? `<span class="tag ${g.progresso >= 0 ? "ok" : "danger"}">${g.progresso >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(g.progresso))}%</span>` : ""}</div>
           <div class="es-ultima">${testoSerie(u)}</div>
-          <div class="es-piede"><span class="muted small">${g.corpoLibero ? "Record" : "Forza stimata"}: <b>${valoreForza(u.kg, g.corpoLibero ? g.record : g.forze[g.forze.length - 1])}</b><br>${dataIt(g.ultima.data)}</span>${scintilla(g.forze)}</div></a>`; }).join("")}</div>`
+          <div class="es-piede"><span class="muted small">${g.corpoLibero ? "Record" : "Forza stimata"}: <b>${valoreForza(u.kg, g.corpoLibero ? g.record : g.forze[g.forze.length - 1])}</b><br>${g.giorni.length} allenament${g.giorni.length === 1 ? "o" : "i"} · ${dataIt(g.ultimoG.data).replace(/ \d{4}$/, "")}</span>${scintilla(g.forze)}</div></a>`; }).join("")}</div>`
       : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio ancora.<br>Tocca <b>Registra un esercizio</b> o scrivilo in chat.</div>`}
     <div class="sezione"><h2>🏃 Corsa</h2>${stC ? `<a href="#/corsa">Grafici ›</a>` : ""}</div>
     <a class="palestra-card" href="#/corsa" id="card-corsa" style="margin:0 0 8px"><span class="pc-ico">🏃</span><div style="flex:1;min-width:0">
@@ -1405,6 +1449,10 @@ async function vistaPalestra() {
   const ric = () => vistaPalestra();
   $("#nuovo-es").onclick = () => registraEsercizio(null, ric);
   $("#p-corsa").onclick = () => registraCorsa(null, ric);
+  if ($("#g-es")) {
+    graficoEsercizio($("#g-es"), esercizi[esPrimo]);
+    $("#es-scelta").onclick = (e) => { const b = e.target.closest("[data-es]"); if (!b) return; $$("#es-scelta .chip").forEach((x) => x.classList.toggle("on", x === b)); graficoEsercizio($("#g-es"), esercizi[+b.dataset.es]); };
+  }
   $("#agg-peso").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   $("#agg-alt").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   if ($("#g-peso")) {
@@ -1419,36 +1467,65 @@ async function vistaEsercizio(nome) {
   const allen = await api("/api/diario?tipo=allenamento");
   const g = raggruppaEsercizi(allen).find((x) => chiaveEs(x.nome) === chiaveEs(nome));
   if (!g) { location.hash = "#/palestra"; return; }
-  const ultimaF = g.forze[g.forze.length - 1], lib = g.corpoLibero;
-  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:26px">${esc(g.nome)}<small>${g.voci.length} registrazion${g.voci.length === 1 ? "e" : "i"}</small></h1></div>
+  const ultimaF = g.forze[g.forze.length - 1], lib = g.corpoLibero, n = g.giorni.length;
+  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:26px">${esc(g.nome)}<small>${n} allenament${n === 1 ? "o" : "i"}</small></h1></div>
     <div class="bilancio">
-      <div class="bil-top"><div><div class="bil-et">${lib ? "Ripetizioni (ultima volta)" : "Forza stimata (ultima volta)"}</div><div class="bil-num">${valoreForza(g.ultima.extra.kg, ultimaF)}</div>
+      <div class="bil-top"><div><div class="bil-et">${lib ? "Ripetizioni (ultimo allenamento)" : "Forza stimata (ultimo allenamento)"}</div><div class="bil-num">${valoreForza(g.ultimoG.best.kg, ultimaF)}</div>
         <div class="bil-sub">${lib ? "esercizio a corpo libero" : "il peso che potresti sollevare una volta sola"}</div></div><div class="bil-ico">🏋️</div></div>
       <div class="bil-griglia">
         <div><div class="bil-et">Record</div><div class="bil-n">${valoreForza(lib ? 0 : 1, g.record)}</div></div>
-        <div><div class="bil-et">Progresso</div><div class="bil-n ${g.progresso >= 0 ? "su" : "giu"}">${g.voci.length > 1 ? (g.progresso >= 0 ? "+" : "") + dec(g.progresso, 0) + "%" : "—"}</div><div class="bil-sub">dalla prima volta</div></div>
+        <div><div class="bil-et">Progresso</div><div class="bil-n ${g.progresso >= 0 ? "su" : "giu"}">${n > 1 ? (g.progresso >= 0 ? "+" : "") + dec(g.progresso, 0) + "%" : "—"}</div><div class="bil-sub">dal primo allenamento</div></div>
       </div></div>
-    ${g.voci.length >= 2 ? `<div class="grafico-card"><div class="g-tit">${lib ? "Ripetizioni nel tempo" : "Forza stimata nel tempo"}</div><div id="g-forza"></div>
-      ${lib ? "" : `<p class="small muted" style="margin:6px 4px 2px">Calcolo: carico × (1 + ripetizioni ÷ 30). Esempio: 80 kg × 8 ≈ 101 kg, cioè più forte di 100 kg × 1. Così il grafico è proporzionato anche se cambi peso e ripetizioni.</p>`}</div>` : ""}
+    <div class="grafico-card"><div class="g-tit">${lib ? "Ripetizioni" : "Forza stimata"} per allenamento</div><div id="g-forza"></div>
+      <p class="small muted" style="margin:6px 4px 2px">Un punto per ogni giorno di allenamento, con la serie migliore di quel giorno.${lib ? "" : " Forza stimata = carico × (1 + ripetizioni ÷ 30): così 80 kg × 8 (≈ 101 kg) vale più di 100 kg × 1."}</p></div>
     <button class="btn block" id="agg-serie" style="margin:4px 0 4px">➕ Aggiungi ${esc(g.nome)}</button>
-    <div class="sezione"><h2>Storico</h2></div>
-    <div class="lista" id="storico">${g.voci.slice().reverse().map((x) => { const e = x.extra || {}, f = Math.max(...serieDi(e).map((s) => forzaStimata(s.kg || 0, s.reps || 0)));
-      return `<div class="voce" data-al="${x.id}"><div class="datebox" style="--c:var(--accent)"><div class="m">${MESI[new Date(x.data + "T00:00").getMonth()]}</div><div class="g">${new Date(x.data + "T00:00").getDate()}</div></div>
-        <div class="corpo"><div class="tit">${testoSerie(e)}</div>
-        <div class="sub">${lib ? "" : `Forza stimata ${kgTesto(f)}`}${f === g.record && g.voci.length > 1 ? " · 🏆 record" : ""}${x.commento ? " · " + esc(x.commento) : ""}</div></div><div class="dx">›</div></div>`; }).join("")}</div>`;
+    <div class="sezione"><h2>Allenamenti</h2></div>
+    <div class="lista" id="storico">${g.giorni.slice().reverse().map((d) => { const x = new Date(d.data + "T00:00"), com = d.voci.map((v) => v.commento).filter(Boolean).join(" · ");
+      return `<div class="voce" ${d.voci.length > 1 ? `data-giorno="${d.data}"` : `data-al="${d.voci[0].id}"`}><div class="datebox" style="--c:var(--accent)"><div class="m">${MESI[x.getMonth()]}</div><div class="g">${x.getDate()}</div></div>
+        <div class="corpo"><div class="tit">${testoSerie(extraGiorno(d))}</div>
+        <div class="sub">${lib ? `${d.set.length} serie` : `Forza stimata ${kgTesto(d.forza)}`}${d.forza === g.record && n > 1 ? " · 🏆 record" : ""}${com ? " · " + esc(com) : ""}</div></div><div class="dx">›</div></div>`; }).join("")}</div>`;
   const ric = () => vistaEsercizio(g.nome);
   $("#agg-serie").onclick = () => registraEsercizio(g.nome, ric);
-  $("#storico").onclick = (e) => { const v = e.target.closest("[data-al]"); if (v) registraEsercizio(g.nome, ric, g.voci.find((x) => x.id === +v.dataset.al)); };
-  if ($("#g-forza")) {
-    const vals = g.forze.map((v) => Math.round(v * 10) / 10);
-    window.Grafici.linea($("#g-forza"), { categorie: g.voci.map((x) => dataIt(x.data).replace(/ \d{4}$/, "")),
-      etichette: g.voci.map((x) => `${dataIt(x.data)} · ${testoSerie(x.extra)}`),
-      serie: [{ nome: lib ? "Ripetizioni" : "Forza stimata", slot: 1, tipo: "linea", punti: true, valori: vals }], ...intervalloY(vals),
-      formato: (v) => (lib ? String(Math.round(v)) : kgTesto(v).replace(" kg", "")), titoloTabella: "Vedi i numeri in tabella" });
-  }
+  $("#storico").onclick = (e) => {
+    const v = e.target.closest("[data-al], [data-giorno]"); if (!v) return;
+    if (v.dataset.giorno) location.hash = "#/allenamento/" + v.dataset.giorno;
+    else registraEsercizio(g.nome, ric, g.voci.find((x) => x.id === +v.dataset.al));
+  };
+  graficoEsercizio($("#g-forza"), g);
 }
 
-async function registraEsercizio(nome, dopo, voce) {
+/* Un giorno di allenamento (tutti gli esercizi di quel giorno) oppure l'elenco di tutti i giorni */
+async function vistaAllenamento(data) {
+  const allen = await api("/api/diario?tipo=allenamento"), giorni = giorniAllenamento(allen);
+  if (!data) {
+    app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:28px">🗓️ <span class="grad">Allenamenti</span><small>${giorni.length} giorni in palestra</small></h1></div>
+      ${giorni.length ? `<div class="lista">${giorni.map(htmlGiorno).join("")}</div>` : `<div class="vuoto"><span class="big">🏋️</span>Nessun allenamento ancora.</div>`}`;
+    return;
+  }
+  const i = giorni.findIndex((d) => d.data === data), d = giorni[i];
+  const prima = giorni[i + 1], dopoG = i > 0 ? giorni[i - 1] : null;
+  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:26px">Allenamento<small>${giornoLungo(data)}</small></h1></div>
+    <div class="giorno-nav">${prima ? `<a class="chip" href="#/allenamento/${prima.data}">‹ ${dataIt(prima.data).replace(/ \d{4}$/, "")}</a>` : "<span></span>"}
+      ${dopoG ? `<a class="chip" href="#/allenamento/${dopoG.data}">${dataIt(dopoG.data).replace(/ \d{4}$/, "")} ›</a>` : "<span></span>"}</div>
+    ${d ? `<div class="bilancio corpo"><div class="bil-griglia" style="margin-top:0">
+        <div class="corpo-dato"><div class="bil-et">Esercizi</div><div class="bil-n">${d.esercizi.length}</div></div>
+        <div class="corpo-dato"><div class="bil-et">Serie</div><div class="bil-n">${d.serie}</div></div>
+        <div class="corpo-dato"><div class="bil-et">Volume</div><div class="bil-n">${Math.round(d.volume).toLocaleString("it-IT")} kg</div><div class="bil-sub">carico × ripetizioni</div></div></div></div>
+      <div class="lista" id="giorno-es">${d.esercizi.map((e) => e.voci.map((v) => `<div class="voce" data-al="${v.id}"><div class="thumb">🏋️</div><div class="corpo"><div class="tit">${esc(e.nome)}</div>
+        <div class="sub">${testoSerie(v.extra)}${v.commento ? " · " + esc(v.commento) : ""}</div></div>
+        <a class="dx link-btn" href="#/palestra/${encodeURIComponent(e.nome)}" aria-label="Andamento di ${esc(e.nome)}">📈</a></div>`).join("")).join("")}</div>`
+      : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio in questo giorno.</div>`}
+    <button class="btn block" id="agg-giorno" style="margin-top:12px">➕ Aggiungi un esercizio a questo allenamento</button>`;
+  const ric = () => vistaAllenamento(data);
+  $("#agg-giorno").onclick = () => registraEsercizio(null, ric, null, data);
+  $("#giorno-es") && ($("#giorno-es").onclick = (ev) => {
+    if (ev.target.closest("a")) return;
+    const v = ev.target.closest("[data-al]"); if (!v) return;
+    const x = allen.find((y) => y.id === +v.dataset.al); registraEsercizio(x.titolo, ric, x);
+  });
+}
+
+async function registraEsercizio(nome, dopo, voce, dataPre = null) {
   const nomi = raggruppaEsercizi(await api("/api/diario?tipo=allenamento")).map((g) => g.nome);
   const e = voce?.extra || {};
   const v = foglio(`<h3>🏋️ ${voce ? "Modifica" : "Registra un esercizio"} ${xBtn}</h3><form id="fe">
@@ -1459,7 +1536,7 @@ async function registraEsercizio(nome, dopo, voce) {
     <div id="righe-serie"></div>
     <button type="button" class="btn sec block" id="piu-serie" style="margin:2px 0 10px">➕ Aggiungi serie</button>
     <div class="anteprima-forza" id="ant-forza"></div>
-    <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || oggiIso())}"></label>
+    <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || dataPre || oggiIso())}"></label>
     <label class="campo"><span>Note <i class="muted">(facoltativo)</i></span><input type="text" name="commento" value="${esc(voce?.commento || "")}" placeholder="Es. con fermo al petto, presa stretta…"></label>
     <button class="btn block">Salva</button>
     ${voce ? `<button type="button" class="btn danger block" id="del-es" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
@@ -2435,7 +2512,7 @@ async function renderPagina() {
   $$(".velo, .visore").forEach((v) => v.remove());
   const h = decodeURIComponent(location.hash.slice(2));
   const [sez, arg] = [h.split("/")[0], h.split("/").slice(1).join("/")];
-  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home", palestra: "home", corsa: "home" }[sez] || sez;
+  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home", palestra: "home", corsa: "home", allenamento: "home" }[sez] || sez;
   document.body.classList.toggle("in-chat", sez === "chat");
   $$("#tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
   scrollTo(0, 0);
@@ -2449,6 +2526,7 @@ async function renderPagina() {
     else if (sez === "io") await vistaIo();
     else if (sez === "palestra") await (arg ? vistaEsercizio(arg) : vistaPalestra());
     else if (sez === "corsa") await vistaCorsa();
+    else if (sez === "allenamento") await vistaAllenamento(arg);
     else if (sez === "chat") vistaChat(arg || "");
     else if (sez === "altro") await (LOC ? vistaAltroLocale() : vistaAltroServer());
     else if (sez === "scadenze") await vistaScadenze();

@@ -810,3 +810,10 @@ div.corpo-dato { cursor: default; }
 .tempo-riga b { color: var(--muted); }
 [data-g].auto input { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 10%, var(--card2)) !important; }
 [data-g].auto > span::after { content: " · calcolato"; color: var(--accent); font-weight: 600; }
+
+/* --- palestra: giorni di allenamento */
+.giorno-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; }
+.pronti.scorri { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 2px 0 8px; padding-bottom: 2px; }
+.pronti.scorri::-webkit-scrollbar { display: none; }
+.pronti.scorri .chip { flex: none; }
+#giorno-es .dx.link-btn { font-size: 20px; text-decoration: none; padding: 6px; }
