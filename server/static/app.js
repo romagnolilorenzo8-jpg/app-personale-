@@ -1902,6 +1902,7 @@ function impostaStrava(dopo) {
       <button class="btn block" id="st-sync" style="margin-top:10px">🔄 Controlla adesso</button>
       <button class="btn danger block" id="st-via" style="margin-top:8px">Scollega Strava</button>`
     : `<p class="muted small" style="margin-top:-6px">Si fa <b>una volta sola</b> (circa 3 minuti). Poi corse, camminate e allenamenti di Strava compaiono qui da soli, con le calorie.</p>
+      <div class="avviso" style="margin:0 0 12px"><div class="av-ico">ℹ️</div><div style="flex:1" class="small">Da giugno 2026 Strava permette di creare l'applicazione solo a chi ha <b>l'abbonamento Strava</b>. Se non ce l'hai, usa <b>Salute di iPhone</b> (nella pagina Calorie): in Strava attiva l'invio delle attività a Salute e le calorie arrivano lo stesso.</div></div>
       ${passo(1, `Apri <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> e accedi con il tuo account.`)}
       ${passo(2, `Crea un'applicazione: <b>Nome</b> LifeApp · <b>Categoria</b> Visualizer · <b>Sito web</b> e <b>Dominio di callback</b>:${cod(location.hostname)}`)}
       ${passo(3, "Copia qui <b>ID client</b> e <b>Segreto client</b>: restano solo su questo telefono.")}
