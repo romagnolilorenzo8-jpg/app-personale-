@@ -1055,7 +1055,7 @@ def _ev_ics(r) -> dict:
 
 
 # ======================================================================= diario
-TIPI_DIARIO = ("film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso", "pasto", "attivita")
+TIPI_DIARIO = ("film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso", "corsa")
 
 
 class VoceDiario(BaseModel):
@@ -1123,22 +1123,17 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
             return {"kg": best["kg"], "reps": best["reps"], "serie": len(st), "set": st}
         serie = _numero(e.get("serie"))
         return {"kg": best["kg"], "reps": best["reps"], "serie": round(serie) if serie else None}
-    if tipo == "pasto":
-        grammi, kcal100 = _numero(e.get("grammi")), _numero(e.get("kcal100"))
-        if not grammi or not 0 < grammi <= 5000:
-            raise HTTPException(400, "Indica i grammi")
-        if kcal100 is None or not 0 <= kcal100 <= 1000:
-            raise HTTPException(400, "Calorie per 100 g non valide")
-        v = lambda k: max(0, _numero(e.get(k)) or 0)
-        return {"grammi": grammi, "kcal100": kcal100, "p100": v("p100"), "c100": v("c100"), "g100": v("g100"), "kcal": round(kcal100 * grammi / 100),
-                "pasto": e.get("pasto") if e.get("pasto") in ("colazione", "pranzo", "cena", "spuntino") else None,
-                "codice": str(e["codice"])[:20] if e.get("codice") else None}
-    if tipo == "attivita":
-        def n(k):
-            x = _numero(e.get(k))
-            return x if x is not None and x >= 0 else None
-        return {"sport": str(e.get("sport") or "Altro")[:40], "minuti": n("minuti"), "km": n("km"), "passi": n("passi"), "kcal": round(n("kcal") or 0),
-                "fonte": e.get("fonte") if e.get("fonte") in ("strava", "salute") else None, "ext_id": str(e["ext_id"])[:60] if e.get("ext_id") else None}
+    if tipo == "corsa":
+        km = _numero(e.get("km"))
+        try:
+            secondi = round(float(e.get("secondi") or 0))
+        except (TypeError, ValueError):
+            secondi = 0
+        if not km or not 0 < km <= 500:
+            raise HTTPException(400, "Distanza non valida")
+        if not 0 < secondi <= 172800:
+            raise HTTPException(400, "Tempo non valido")
+        return {"km": km, "secondi": secondi, "passo": round(secondi / km)}
     if tipo == "peso":
         peso = _numero(e.get("peso"))
         if not peso or not 20 <= peso <= 400:

@@ -379,7 +379,7 @@
   }
 
   /* ------------------------------------------------------------ diario */
-  const TIPI = ["film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso", "pasto", "attivita"];
+  const TIPI = ["film", "libro", "serie", "compleanno", "esame", "acquisto", "allenamento", "peso", "corsa"];
   const numero = (v) => (v === "" || v == null || isNaN(+v) ? null : Math.round(+v * 100) / 100);
   function normExtra(tipo, e) {
     e = e || {};
@@ -414,18 +414,11 @@
       if (set.length > 1) return { kg: best.kg, reps: best.reps, serie: set.length, set };
       return { kg: best.kg, reps: best.reps, serie: numero(e.serie) ? Math.round(numero(e.serie)) : null };
     }
-    if (tipo === "pasto") {
-      const grammi = numero(e.grammi), kcal100 = numero(e.kcal100);
-      if (!grammi || grammi <= 0 || grammi > 5000) throw errore(400, "Indica i grammi");
-      if (kcal100 == null || kcal100 < 0 || kcal100 > 1000) throw errore(400, "Calorie per 100 g non valide");
-      const v = (k) => Math.max(0, numero(e[k]) ?? 0);
-      return { grammi, kcal100, p100: v("p100"), c100: v("c100"), g100: v("g100"), kcal: Math.round((kcal100 * grammi) / 100),
-        pasto: ["colazione", "pranzo", "cena", "spuntino"].includes(e.pasto) ? e.pasto : null, codice: e.codice ? String(e.codice).slice(0, 20) : null };
-    }
-    if (tipo === "attivita") {
-      const n = (k) => { const x = numero(e[k]); return x != null && x >= 0 ? x : null; };
-      return { sport: String(e.sport || "Altro").slice(0, 40), minuti: n("minuti"), km: n("km"), passi: n("passi"), kcal: Math.round(n("kcal") || 0),
-        fonte: ["strava", "salute"].includes(e.fonte) ? e.fonte : null, ext_id: e.ext_id ? String(e.ext_id).slice(0, 60) : null };
+    if (tipo === "corsa") {
+      const km = numero(e.km), secondi = Math.round(+e.secondi || 0);
+      if (!km || km <= 0 || km > 500) throw errore(400, "Distanza non valida");
+      if (!secondi || secondi <= 0 || secondi > 172800) throw errore(400, "Tempo non valido");
+      return { km, secondi, passo: Math.round(secondi / km) };
     }
     if (tipo === "peso") {
       const peso = numero(e.peso);

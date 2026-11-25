@@ -553,7 +553,6 @@ async function vistaHome() {
         <a class="palestra-card" href="#/palestra" style="order:4"><span class="pc-ico">🏋️</span><div style="flex:1;min-width:0"><b>Palestra</b>
           <div class="small muted">${ultimoEs ? `Ultimo: ${esc(ultimoEs.nome)} ${ultimoEs.ultima.extra.kg ? kgTesto(ultimoEs.ultima.extra.kg) + " × " + ultimoEs.ultima.extra.reps : ultimoEs.ultima.extra.reps + " rip."} · ${dataIt(ultimoEs.ultima.data).replace(/ \d{4}$/, "")}` : "Registra carichi e ripetizioni e guarda i tuoi progressi"}</div></div>
           ${pesoOra ? `<span class="pc-peso">${kgTesto(pesoOra.extra.peso)}</span>` : ""}<span class="dx">›</span></a>
-        <div id="salute-banner" style="order:4"></div>
         <div style="order:4">
           ${S.daSmistare ? `<a class="avviso" href="#/da-smistare"><div class="av-ico">📥</div><div style="flex:1"><b>${S.daSmistare} document${S.daSmistare === 1 ? "o" : "i"} da sistemare</b><div class="small muted">Tocca per metterl${S.daSmistare === 1 ? "o" : "i"} nella cartella giusta</div></div><span class="dx">›</span></a>` : ""}
           ${backupVecchio ? `<a class="avviso" href="#/altro"><div class="av-ico">💾</div><div style="flex:1"><b>Fai un backup</b><div class="small muted">${info.ultimo_backup ? "L'ultimo è del " + dataIt(info.ultimo_backup.slice(0, 10)) : "Non hai ancora salvato una copia"} — serve 1 minuto</div></div><span class="dx">›</span></a>` : ""}
@@ -579,7 +578,6 @@ async function vistaHome() {
     if (h === "app") location.hash = "#/agenda";
     if (h === "pw") location.hash = "#/password";
   };
-  bannerSalute($("#salute-banner"), () => render());
   $("#nuova-rad").onclick = async (e) => {
     e.preventDefault();
     const nome = await chiedi("Nuova cartella principale", "", { placeholder: "Es. Animali, Scuola, Viaggi…" }); if (!nome) return;
@@ -1378,8 +1376,8 @@ function intervalloY(valori) {   // asse con valori "tondi" (es. 70 · 80 · 90 
 }
 
 async function vistaPalestra() {
-  const [allen, pesi, prof, ctxC] = await Promise.all([api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=peso"), api("/api/profilo"), contestoCalorie()]);
-  const dC = calcoloGiorno(oggiIso(), ctxC), attRec = ctxC.att.filter((x) => x.extra?.fonte !== "salute").sort((a, b) => (b.data || "").localeCompare(a.data || "") || b.id - a.id).slice(0, 5);
+  const [allen, pesi, prof, corse] = await Promise.all([api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=peso"), api("/api/profilo"), api("/api/diario?tipo=corsa")]);
+  const stC = corse.length ? statCorse(corse) : null, ultC = stC?.l[stC.n - 1];
   const esercizi = raggruppaEsercizi(allen), pAtt = ultimoPeso(pesi), alt = +prof.altezza || null, b = bmi(pAtt?.extra?.peso, alt);
   app.innerHTML = `<div class="top"><a class="iconbtn" href="#/" aria-label="Indietro">‹</a><h1 style="font-size:28px">🏋️ <span class="grad">Palestra</span><small>Carichi, ripetizioni e progressi</small></h1></div>
     <div class="bilancio corpo">
@@ -1388,8 +1386,6 @@ async function vistaPalestra() {
         <button class="corpo-dato" id="agg-alt"><div class="bil-et">Altezza</div><div class="bil-n">${alt ? alt + " cm" : "—"}</div><div class="bil-sub">${alt ? "" : "tocca per inserirla"}</div></button>
         <div class="corpo-dato"><div class="bil-et">BMI</div><div class="bil-n">${b ? dec(b.v, 1) : "—"}</div><div class="bil-sub">${b ? b.etichetta : "serve peso e altezza"}</div></div>
       </div></div>
-    <a class="palestra-card" href="#/calorie" id="card-cal" style="margin:0 0 12px"><span class="pc-ico">🔥</span><div style="flex:1;min-width:0"><b>Calorie di oggi</b>
-      <div class="small muted">${nK(dC.mangiate)} mangiate · ${nK(dC.attivo)} bruciate con attività${dC.bilancio != null ? ` · bilancio ${testoBilancio(dC.bilancio)}` : ""}</div></div><span class="dx">›</span></a>
     ${pesi.length >= 2 ? `<div class="grafico-card"><div class="g-tit">Il mio peso</div><div id="g-peso"></div></div>` : ""}
     <button class="btn block" id="nuovo-es" style="margin:4px 0 6px">➕ Registra un esercizio</button>
     <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “panca piana 80 kg per 8”</span></a>
@@ -1400,13 +1396,15 @@ async function vistaPalestra() {
           <div class="es-ultima">${testoSerie(u)}</div>
           <div class="es-piede"><span class="muted small">${g.corpoLibero ? "Record" : "Forza stimata"}: <b>${valoreForza(u.kg, g.corpoLibero ? g.record : g.forze[g.forze.length - 1])}</b><br>${dataIt(g.ultima.data)}</span>${scintilla(g.forze)}</div></a>`; }).join("")}</div>`
       : `<div class="vuoto"><span class="big">🏋️</span>Nessun esercizio ancora.<br>Tocca <b>Registra un esercizio</b> o scrivilo in chat.</div>`}
-    <div class="sezione"><h2>🏃 Attività</h2><a href="#/calorie">Calorie ›</a></div>
-    ${attRec.length ? `<div class="lista" id="att-rec">${attRec.map(htmlAttivita).join("")}</div>` : `<div class="small muted" style="padding:0 4px 8px">Corse, camminate, partite: aggiungile qui, oppure arrivano da Salute di iPhone (pagina Calorie).</div>`}
-    <div class="riga" style="margin-top:10px"><button class="btn sec" id="p-att">🏃 Aggiungi attività</button><a class="btn sec" href="#/calorie">❤️ Dati di Salute</a></div>`;
+    <div class="sezione"><h2>🏃 Corsa</h2>${stC ? `<a href="#/corsa">Grafici ›</a>` : ""}</div>
+    <a class="palestra-card" href="#/corsa" id="card-corsa" style="margin:0 0 8px"><span class="pc-ico">🏃</span><div style="flex:1;min-width:0">
+      <b>${ultC ? `${kmT(ultC.extra.km)} km · ${tempoTesto(ultC.extra.secondi)} · ${passoTesto(ultC.extra.passo)} /km` : "Nessuna corsa ancora"}</b>
+      <div class="small muted">${ultC ? `Ultima: ${dataIt(ultC.data)} · ${kmT(stC.mese)} km questo mese` : "Segna km e tempo: il passo e i grafici li faccio io"}</div></div>
+      ${stC && stC.n > 1 ? scintilla(stC.l.slice(-12).map((x) => -x.extra.passo)) : ""}<span class="dx">›</span></a>
+    <button class="btn sec block" id="p-corsa">➕ Registra una corsa</button>`;
   const ric = () => vistaPalestra();
   $("#nuovo-es").onclick = () => registraEsercizio(null, ric);
-  $("#p-att").onclick = () => aggiungiAttivita({ dopo: ric });
-  $$("#att-rec [data-att]").forEach((el) => (el.onclick = () => aggiungiAttivita({ voce: attRec.find((x) => x.id === +el.dataset.att), dopo: ric })));
+  $("#p-corsa").onclick = () => registraCorsa(null, ric);
   $("#agg-peso").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   $("#agg-alt").onclick = () => aggiornaCorpo(prof, pAtt, ric);
   if ($("#g-peso")) {
@@ -1506,367 +1504,137 @@ async function registraEsercizio(nome, dopo, voce) {
   });
 }
 
-/* ================================================================== CALORIE: cibo, attività, Salute */
-memo.set("strava", null);   // Strava non si usa più: tolgo eventuali chiavi salvate
-const PASTI_N = { colazione: "☕ Colazione", pranzo: "🍝 Pranzo", cena: "🍽️ Cena", spuntino: "🍎 Spuntini" };
-const pastoOra = () => { const h = new Date().getHours(); return h < 11 ? "colazione" : h < 15 ? "pranzo" : h < 18 ? "spuntino" : "cena"; };
-const nK = (n) => Math.round(n || 0).toLocaleString("it-IT");
-const n1 = (n) => (Math.round((n || 0) * 10) / 10).toLocaleString("it-IT");
-const isoGiorno = (iso, d) => { const x = new Date(iso + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + d); return x.toISOString().slice(0, 10); };
-const quandoFa = (sec) => { const m = Math.round((Date.now() / 1000 - sec) / 60); return m < 1 ? "adesso" : m < 60 ? `${m} min fa` : m < 1440 ? `${Math.round(m / 60)} ore fa` : `${Math.round(m / 1440)} giorni fa`; };
-const icoSport = (s) => (window.Salute.SPORT[s] || window.Salute.SPORT.Altro).ico;
+/* ================================================================== CORSA */
+const d2 = (n) => String(n).padStart(2, "0");
+const kmT = (n) => (Math.round((n || 0) * 100) / 100).toLocaleString("it-IT", { maximumFractionDigits: 2 });
+const tempoTesto = (s) => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return h ? `${h}:${d2(m)}:${d2(x)}` : `${m}:${d2(x)}`; };
+const passoTesto = (s) => { if (!s) return "—"; s = Math.round(s); return `${Math.floor(s / 60)}:${d2(s % 60)}`; };
+const ordinaCorse = (l) => l.slice().sort((a, b) => (a.data || "").localeCompare(b.data || "") || a.id - b.id);
+function statCorse(corse) {
+  const l = ordinaCorse(corse), mese = oggiIso().slice(0, 7);
+  const km = l.reduce((t, x) => t + x.extra.km, 0), sec = l.reduce((t, x) => t + x.extra.secondi, 0);
+  const valide = l.filter((x) => x.extra.km >= 1);   // il record di passo conta da 1 km in su
+  return { l, n: l.length, km, sec, passo: km ? sec / km : null,
+    migliore: (valide.length ? valide : l).reduce((a, x) => (x.extra.passo < a.extra.passo ? x : a), (valide.length ? valide : l)[0]),
+    lunga: l.reduce((a, x) => (x.extra.km > a.extra.km ? x : a), l[0]),
+    mese: l.filter((x) => (x.data || "").startsWith(mese)).reduce((t, x) => t + x.extra.km, 0) };
+}
+function ticksPasso(vals) {   // asse del passo con tacche "tonde" (es. 5:00 · 5:30 · 6:00), valori negativi = più in alto è più veloce
+  const lo0 = Math.min(...vals), hi0 = Math.max(...vals), r = hi0 - lo0;
+  const passo = [5, 10, 15, 30, 60, 120, 300].find((k) => (r + 2 * k) / k <= 6) || 600;
+  const lo = Math.floor((lo0 - (r ? r * 0.1 : passo / 2)) / passo) * passo, hi = Math.ceil((hi0 + (r ? r * 0.1 : passo / 2)) / passo) * passo;
+  const tickY = []; for (let v = lo; v <= hi + 0.1; v += passo) tickY.push(v);
+  return { yMin: lo, yMax: hi, tickY };
+}
+const lunedi = (iso) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+const piuGiorni = (iso, n) => { const d = new Date(iso + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 
-const cibiMiei = () => { try { return JSON.parse(memo.get("cibi") || "[]"); } catch { return []; } };
-function ricordaCibo(a) {   // prodotti scansionati o inseriti a mano: si ritrovano nella ricerca, anche senza internet
-  const l = cibiMiei().filter((x) => x.nome.toLowerCase() !== a.nome.toLowerCase());
-  l.unshift({ nome: a.nome, kcal: a.kcal, p: a.p || 0, c: a.c || 0, g: a.g || 0, pezzo: a.pezzo || null, porz: a.porz || 100, codice: a.codice || null });
-  memo.set("cibi", JSON.stringify(l.slice(0, 300)));
-}
-function alimentiNoti(pasti) {   // i miei prodotti + i cibi già mangiati (con i loro valori e l'ultima quantità)
-  const out = [...cibiMiei()], visti = new Set(out.map((x) => x.nome.toLowerCase()));
-  pasti.slice().sort((a, b) => (b.data || "").localeCompare(a.data || "") || b.id - a.id).forEach((x) => {
-    const k = x.titolo.toLowerCase(); if (visti.has(k)) return; visti.add(k);
-    const e = x.extra || {};
-    out.push({ nome: x.titolo, kcal: e.kcal100, p: e.p100, c: e.c100, g: e.g100, porz: e.grammi, pezzo: null, codice: e.codice, recente: true });
-  });
-  return out;
+function htmlCorsa(x, st) {
+  const e = x.extra, d = new Date(x.data + "T00:00");
+  const rec = st && st.n > 1 && x.id === st.migliore.id ? " · 🏆 miglior passo" : st && st.n > 1 && x.id === st.lunga.id ? " · 🏅 la più lunga" : "";
+  return `<div class="voce" data-corsa="${x.id}"><div class="datebox" style="--c:var(--accent)"><div class="m">${MESI[d.getMonth()]}</div><div class="g">${d.getDate()}</div></div>
+    <div class="corpo"><div class="tit">${kmT(e.km)} km · ${tempoTesto(e.secondi)}</div><div class="sub">${passoTesto(e.passo)} /km${rec}${x.commento ? " · " + esc(x.commento) : ""}</div></div><div class="dx">›</div></div>`;
 }
 
-async function contestoCalorie() {
-  const [pasti, att, pesi, prof] = await Promise.all([api("/api/diario?tipo=pasto"), api("/api/diario?tipo=attivita"), api("/api/diario?tipo=peso"), api("/api/profilo")]);
-  const peso = ultimoPeso(pesi)?.extra?.peso || null, altezza = +prof.altezza || null, anni = eta(prof.nascita);
-  return { pasti, att, prof, peso, altezza, anni, base: window.Salute.bmr({ sesso: prof.sesso, eta: anni, peso, altezza }) };
-}
-/* Il giorno in numeri. Se ci sono i dati di Salute (calorie attive di tutta la giornata, allenamenti compresi)
-   uso quelli; altrimenti sommo le attività. Base: metabolismo a riposo (× 1,2 senza dati di Salute). */
-function calcoloGiorno(g, ctx) {
-  const P = ctx.pasti.filter((x) => x.data === g), A = ctx.att.filter((x) => x.data === g);
-  const sal = A.find((x) => x.extra?.fonte === "salute"), altre = A.filter((x) => x !== sal);
-  const sommaAtt = altre.reduce((s, x) => s + (x.extra?.kcal || 0), 0);
-  const attivo = sal ? Math.max(sal.extra.kcal || 0, sommaAtt) : sommaAtt;
-  const base = ctx.base ? (sal ? ctx.base : Math.round(ctx.base * 1.2)) : null;
-  const mac = (k) => P.reduce((s, x) => s + ((x.extra?.[k] || 0) * (x.extra?.grammi || 0)) / 100, 0);
-  const mangiate = P.reduce((s, x) => s + (x.extra?.kcal || 0), 0);
-  return { P, A, sal, altre, mangiate, attivo, base, p: mac("p100"), c: mac("c100"), g: mac("g100"),
-    passi: sal?.extra?.passi || A.reduce((s, x) => s + (x.extra?.passi || 0), 0), bilancio: base != null ? mangiate - base - attivo : null };
-}
-const testoBilancio = (b) => (b == null ? "—" : `${b > 0 ? "+" : b < 0 ? "−" : ""}${nK(Math.abs(b))}`);
-
-async function vistaCalorie(arg) {
-  const g = /^\d{4}-\d{2}-\d{2}$/.test(arg || "") ? arg : oggiIso(), oggi = g === oggiIso();
-  const ctx = await contestoCalorie(), d = calcoloGiorno(g, ctx);
-  const etich = oggi ? "Oggi" : g === isoGiorno(oggiIso(), -1) ? "Ieri" : `${GIORNI[new Date(g + "T00:00").getDay()]} ${dataIt(g)}`;
-  const kM = d.p * 4 + d.c * 4 + d.g * 9 || 1;
-  const gruppi = [...Object.keys(PASTI_N), null].map((k) => ({ k, l: d.P.filter((x) => (x.extra?.pasto || null) === k) })).filter((x) => x.l.length);
-  const giorni7 = Array.from({ length: 7 }, (_, i) => isoGiorno(g, i - 6)), dati7 = giorni7.map((x) => calcoloGiorno(x, ctx));
-  const conDati7 = dati7.some((x) => x.mangiate || x.attivo);
-  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:28px">🔥 <span class="grad">Calorie</span><small>Cibo, attività e bilancio</small></h1></div>
-    <div class="giorno-nav"><a class="iconbtn" href="#/calorie/${isoGiorno(g, -1)}" aria-label="Giorno prima">‹</a><b id="cal-giorno">${esc(etich)}</b>
-      <a class="iconbtn" href="#/calorie/${isoGiorno(g, 1)}" aria-label="Giorno dopo" ${oggi ? 'style="visibility:hidden"' : ""}>›</a></div>
-    <div class="bilancio">
-      <div class="bil-top"><div><div class="bil-et">Mangiate</div><div class="bil-num" id="cal-mangiate">${nK(d.mangiate)} kcal</div>
-        <div class="bil-sub">${d.base != null ? `Bruciate in tutto: ${nK(d.base + d.attivo)} kcal (${nK(d.base)} base + ${nK(d.attivo)} attività)` : "Indica sesso, età e altezza per calcolare quanto bruci a riposo"}</div></div><div class="bil-ico">🔥</div></div>
+async function vistaCorsa() {
+  const corse = await api("/api/diario?tipo=corsa");
+  const st = corse.length ? statCorse(corse) : null;
+  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/palestra" aria-label="Indietro">‹</a><h1 style="font-size:28px">🏃 <span class="grad">Corsa</span><small>Km, tempo e passo medio</small></h1></div>
+    ${st ? `<div class="bilancio"><div class="bil-top"><div><div class="bil-et">Km totali</div><div class="bil-num">${kmT(st.km)} km</div>
+        <div class="bil-sub">${st.n} cors${st.n === 1 ? "a" : "e"} · ${tempoTesto(st.sec)} di corsa</div></div><div class="bil-ico">🏃</div></div>
       <div class="bil-griglia">
-        <div><div class="bil-et">Attività</div><div class="bil-n" id="cal-attivo">${nK(d.attivo)} kcal</div><div class="bil-sub">${d.passi ? `${nK(d.passi)} passi` : "bruciate muovendoti"}</div></div>
-        <div><div class="bil-et">Bilancio</div><div class="bil-n" id="cal-bilancio">${testoBilancio(d.bilancio)}${d.bilancio != null ? " kcal" : ""}</div>
-          <div class="bil-sub">${d.bilancio == null ? "serve il fabbisogno" : d.bilancio > 0 ? "più di quanto bruci" : "meno di quanto bruci"}</div></div>
-      </div></div>
-    ${d.mangiate ? `<div class="card macro"><div class="macro-barra" role="img" aria-label="Proteine ${Math.round((d.p * 400) / kM)}%, carboidrati ${Math.round((d.c * 400) / kM)}%, grassi ${Math.round((d.g * 900) / kM)}%">
-        <i class="s1" style="width:${(d.p * 400) / kM}%"></i><i class="s2" style="width:${(d.c * 400) / kM}%"></i><i class="s3" style="width:${(d.g * 900) / kM}%"></i></div>
-      <div class="macro-leg"><span><i class="s1"></i>Proteine <b>${n1(d.p)} g</b></span><span><i class="s2"></i>Carboidrati <b>${n1(d.c)} g</b></span><span><i class="s3"></i>Grassi <b>${n1(d.g)} g</b></span></div></div>` : ""}
-    <div id="salute-banner"></div>
-    <div class="azioni-cal"><button class="btn" id="add-cibo">🍽️ Cibo</button><button class="btn sec" id="add-scan">📷 Codice</button><button class="btn sec" id="add-att">🏃 Attività</button></div>
-    <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “a pranzo 80 g di pasta e 2 uova” o “ho corso 5 km in 30 minuti”</span></a>
-    ${gruppi.length ? gruppi.map(({ k, l }) => `<div class="sezione"><h2>${k ? PASTI_N[k] : "🍴 Altro"}</h2><span class="muted small">${nK(l.reduce((s, x) => s + x.extra.kcal, 0))} kcal</span></div>
-      <div class="lista">${l.map((x) => `<div class="voce" data-pasto="${x.id}"><div class="corpo"><div class="tit">${esc(x.titolo)}</div>
-        <div class="sub">${n1(x.extra.grammi)} g · P ${n1((x.extra.p100 * x.extra.grammi) / 100)} · C ${n1((x.extra.c100 * x.extra.grammi) / 100)} · G ${n1((x.extra.g100 * x.extra.grammi) / 100)}</div></div>
-        <div class="dx kcal"><b>${nK(x.extra.kcal)}</b> kcal</div></div>`).join("")}</div>`).join("")
-      : `<div class="vuoto" style="padding:22px 10px"><span class="big">🍽️</span>Niente cibo segnato ${oggi ? "oggi" : "in questo giorno"}.</div>`}
-    ${d.A.length ? `<div class="sezione"><h2>🏃 Attività</h2><span class="muted small">${nK(d.attivo)} kcal</span></div>
-      <div class="lista">${d.A.map((x) => htmlAttivita(x)).join("")}</div>` : ""}
-    ${conDati7 ? `<div class="grafico-card" style="margin-top:18px"><div class="g-tit">Ultimi 7 giorni</div><div id="g-cal"></div></div>` : ""}
-    <div class="sezione"><h2>Collegamenti</h2></div>
-    <div class="lista">
-      <div class="voce" id="v-salute"><div class="thumb">❤️</div><div class="corpo"><div class="tit">Salute di iPhone · Fitness</div><div class="sub">Passi e calorie attive della giornata</div></div><div class="dx">›</div></div>
-      <div class="voce" id="v-base"><div class="thumb">⚖️</div><div class="corpo"><div class="tit">Fabbisogno a riposo</div><div class="sub">${ctx.base ? `${nK(ctx.base)} kcal al giorno (${ctx.prof.sesso === "F" ? "donna" : "uomo"}, ${ctx.anni} anni, ${kgTesto(ctx.peso)}, ${ctx.altezza} cm)` : "Serve sesso, età, peso e altezza"}</div></div><div class="dx">›</div></div>
-    </div>
-    <p class="small muted" style="margin:10px 4px">Le calorie sono stime: valori medi degli alimenti (o dell'etichetta, se scansioni il codice), attività calcolate dal tuo peso, fabbisogno con la formula di Mifflin-St Jeor.</p>`;
-  const ric = () => vistaCalorie(g);
-  $("#add-cibo").onclick = () => aggiungiCibo({ data: g, dopo: ric });
-  $("#add-scan").onclick = () => aggiungiCibo({ data: g, dopo: ric, scansiona: true });
-  $("#add-att").onclick = () => aggiungiAttivita({ data: g, dopo: ric });
-  $$("[data-pasto]").forEach((el) => (el.onclick = () => aggiungiCibo({ voce: d.P.find((x) => x.id === +el.dataset.pasto), dopo: ric })));
-  $$("[data-att]").forEach((el) => (el.onclick = () => aggiungiAttivita({ voce: d.A.find((x) => x.id === +el.dataset.att), dopo: ric })));
-  $("#v-salute").onclick = () => importaSalute(ric);
-  $("#v-base").onclick = () => impostaFabbisogno(ctx, ric);
-  if ($("#g-cal")) {
-    const serie = [{ nome: "Mangiate", slot: 1, valori: dati7.map((x) => Math.round(x.mangiate)) },
-      { nome: ctx.base ? "Bruciate" : "Bruciate con attività", slot: 2, valori: dati7.map((x) => (x.mangiate || x.attivo ? Math.round((x.base || 0) + x.attivo) : 0)) }];
-    window.Grafici.colonne($("#g-cal"), { categorie: giorni7.map((x) => dataIt(x).replace(/ \d{4}$/, "")), serie, formato: (v) => nK(v), titoloTabella: "Vedi i numeri in tabella" });
+        <div><div class="bil-et">Passo medio</div><div class="bil-n">${passoTesto(st.passo)}</div><div class="bil-sub">min/km</div></div>
+        <div><div class="bil-et">Miglior passo</div><div class="bil-n">${passoTesto(st.migliore.extra.passo)}</div><div class="bil-sub">${dataIt(st.migliore.data).replace(/ \d{4}$/, "")}</div></div>
+        <div><div class="bil-et">La più lunga</div><div class="bil-n">${kmT(st.lunga.extra.km)} km</div><div class="bil-sub">${dataIt(st.lunga.data).replace(/ \d{4}$/, "")}</div></div>
+        <div><div class="bil-et">Questo mese</div><div class="bil-n">${kmT(st.mese)} km</div></div>
+      </div></div>` : ""}
+    <button class="btn block" id="nuova-corsa" style="margin:4px 0 6px">➕ Registra una corsa</button>
+    <a class="chat-invito" href="#/chat"><span>💬</span><span>Oppure scrivi in chat: “ho corso 5 km in 28 minuti”</span></a>
+    ${st && st.n >= 2 ? `<div class="grafico-card"><div class="g-tit">Passo medio</div><div id="g-passo"></div><p class="small muted" style="margin:6px 4px 2px">Minuti al km: più in alto = più veloce.</p></div>` : ""}
+    ${st ? `<div class="grafico-card"><div class="g-tit">Km a settimana</div><div id="g-km"></div></div>` : ""}
+    ${st && st.n >= 2 ? `<div class="grafico-card"><div class="g-tit">Km per corsa</div><div id="g-dist"></div></div>` : ""}
+    ${st ? `<div class="sezione"><h2>Le mie corse</h2><span class="muted small">${st.n}</span></div>
+      <div class="lista" id="corse">${st.l.slice().reverse().map((x) => htmlCorsa(x, st)).join("")}</div>`
+      : `<div class="vuoto"><span class="big">🏃</span>Nessuna corsa ancora.<br>Tocca <b>Registra una corsa</b>: scrivi km e tempo, il passo lo calcolo io.</div>`}`;
+  const ric = () => vistaCorsa();
+  $("#nuova-corsa").onclick = () => registraCorsa(null, ric);
+  $("#corse") && ($("#corse").onclick = (e) => { const v = e.target.closest("[data-corsa]"); if (v) registraCorsa(corse.find((x) => x.id === +v.dataset.corsa), ric); });
+  const corto = (iso) => dataIt(iso).replace(/ \d{4}$/, "");
+  if ($("#g-passo")) {
+    const vals = st.l.map((x) => -Math.round(x.extra.passo));
+    window.Grafici.linea($("#g-passo"), { categorie: st.l.map((x) => corto(x.data)), etichette: st.l.map((x) => `${corto(x.data)} · ${kmT(x.extra.km)} km in ${tempoTesto(x.extra.secondi)}`),
+      serie: [{ nome: "Passo medio", slot: 1, tipo: "linea", punti: true, valori: vals }], ...ticksPasso(vals), formato: (v) => passoTesto(-v), titoloTabella: "Vedi i numeri in tabella" });
   }
-  if (oggi) bannerSalute($("#salute-banner"), ric, true);
-}
-function htmlAttivita(x) {
-  const e = x.extra || {};
-  const det = [e.km ? `${n1(e.km)} km` : "", e.minuti ? `${e.minuti} min` : "", e.passi ? `${nK(e.passi)} passi` : ""].filter(Boolean).join(" · ");
-  return `<div class="voce" data-att="${x.id}"><div class="thumb">${icoSport(e.sport)}</div><div class="corpo"><div class="tit">${esc(x.titolo)}${e.fonte === "salute" ? ` <span class="tag fonte-salute">Salute</span>` : ""}</div>
-    <div class="sub">${esc([dataIt(x.data).replace(/ \d{4}$/, ""), det].filter(Boolean).join(" · "))}</div></div><div class="dx kcal"><b>${nK(e.kcal)}</b> kcal</div></div>`;
+  if ($("#g-km")) {
+    const fine = lunedi(oggiIso()), sett = Array.from({ length: 12 }, (_, i) => piuGiorni(fine, (i - 11) * 7));
+    const km = sett.map((w) => Math.round(st.l.filter((x) => lunedi(x.data) === w).reduce((t, x) => t + x.extra.km, 0) * 10) / 10);
+    window.Grafici.colonne($("#g-km"), { categorie: sett.map(corto), serie: [{ nome: "Km", slot: 1, valori: km }], formato: (v) => kmT(v), titoloTabella: "Vedi i km in tabella",
+      etichettaCategoria: (c) => c });
+  }
+  if ($("#g-dist")) {
+    const ult = st.l.slice(-20);
+    window.Grafici.colonne($("#g-dist"), { categorie: ult.map((x) => corto(x.data)), serie: [{ nome: "Km", slot: 3, valori: ult.map((x) => x.extra.km) }], formato: (v) => kmT(v), titoloTabella: "Vedi le corse in tabella" });
+  }
 }
 
-/* ------------------------------------------------------------------ aggiungere cibo */
-async function aggiungiCibo({ voce = null, data = oggiIso(), pasto = null, nome = "", grammi = null, dopo, scansiona = false } = {}) {
-  const noti = alimentiNoti(await api("/api/diario?tipo=pasto"));
-  const e = voce?.extra || {};
-  let sel = voce ? { nome: voce.titolo, kcal: e.kcal100, p: e.p100, c: e.c100, g: e.g100, codice: e.codice, porz: e.grammi } : null;
-  const num = (n, extra = "") => `type="number" inputmode="decimal" min="0" step="any" ${extra}`;
-  const v = foglio(`<h3>🍽️ ${voce ? "Modifica" : "Aggiungi cibo"} ${xBtn}</h3><form id="fcb" autocomplete="off" novalidate>
-    <label class="campo"><span>Cosa hai mangiato</span><input type="search" name="titolo" enterkeyhint="search" placeholder="Cerca: pasta, mela, yogurt…" value="${esc(voce?.titolo || nome)}"></label>
-    <div class="cb-sugg" id="cb-sugg"></div>
-    ${voce ? "" : `<div class="riga" style="margin:0 0 12px"><button type="button" class="btn sec" id="cb-scan">📷 Codice a barre</button><button type="button" class="btn sec" id="cb-web">🌐 Cerca online</button></div>`}
-    <div class="riga"><label class="campo"><span>Quanto (g o ml)</span><input name="grammi" ${num(0, 'max="5000"')} value="${e.grammi ?? grammi ?? ""}"></label>
-      <label class="campo"><span>Pasto</span><select name="pasto">${Object.entries(PASTI_N).map(([k, t]) => `<option value="${k}" ${k === (e.pasto || pasto || pastoOra()) ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>
-    <div class="pronti" id="cb-dosi" style="margin:-4px 0 12px"></div>
-    <details class="card" id="cb-valori"><summary><span>Valori per 100 g <span class="muted small" id="cb-fonte"></span></span></summary><div class="dentro">
-      <div class="riga"><label class="campo"><span>Calorie (kcal)</span><input name="kcal100" ${num(0, 'max="1000"')}></label><label class="campo"><span>Proteine (g)</span><input name="p100" ${num(0, 'max="100"')}></label></div>
-      <div class="riga"><label class="campo"><span>Carboidrati (g)</span><input name="c100" ${num(0, 'max="100"')}></label><label class="campo"><span>Grassi (g)</span><input name="g100" ${num(0, 'max="100"')}></label></div>
-    </div></details>
-    <div class="anteprima-forza" id="cb-ant" style="margin-top:10px"></div>
-    <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || data)}"></label>
-    <button class="btn block">Salva</button>
-    ${voce ? `<button type="button" class="btn danger block" id="cb-del" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
-  const f = $("#fcb", v), sugg = $("#cb-sugg", v);
-  const val = (n) => (f[n].value === "" ? null : +f[n].value);
-  const anteprima = () => {
-    const gr = val("grammi"), k = val("kcal100");
-    $("#cb-ant", v).innerHTML = gr && k != null ? `🔥 <b>${nK((k * gr) / 100)} kcal</b> <span class="muted">· P ${n1(((val("p100") || 0) * gr) / 100)} g · C ${n1(((val("c100") || 0) * gr) / 100)} g · G ${n1(((val("g100") || 0) * gr) / 100)} g</span>` : "";
+/* Modulo: si scrivono due valori tra km, tempo e passo; il terzo lo calcolo io */
+function registraCorsa(voce, dopo) {
+  const e = voce?.extra || {}, t = Math.round(e.secondi || 0), pa = Math.round(e.passo || 0);
+  const nm = (n, v, ph, extra = "") => `<input type="number" name="${n}" inputmode="numeric" min="0" ${extra} value="${v ?? ""}" placeholder="${ph}">`;
+  const v = foglio(`<h3>🏃 ${voce ? "Modifica corsa" : "Registra una corsa"} ${xBtn}</h3>
+    <p class="small muted" style="margin-top:-6px">Scrivi <b>due</b> di questi tre valori: il terzo lo calcolo io.</p>
+    <form id="fco" novalidate>
+      <label class="campo" data-g="km"><span>Distanza (km)</span><input type="number" name="km" inputmode="decimal" step="any" min="0" value="${e.km ?? ""}" placeholder="es. 5,2"></label>
+      <div class="campo" data-g="tempo"><span>Tempo</span><div class="tempo-riga">${nm("th", t >= 3600 ? Math.floor(t / 3600) : "", "ore", 'max="48"')}<b>:</b>${nm("tm", t ? Math.floor((t % 3600) / 60) : "", "min", 'max="59"')}<b>:</b>${nm("ts", t ? t % 60 : "", "sec", 'max="59"')}</div></div>
+      <div class="campo" data-g="passo"><span>Passo medio (min/km)</span><div class="tempo-riga passo">${nm("pm", pa ? Math.floor(pa / 60) : "", "min", 'max="30"')}<b>:</b>${nm("ps", pa ? pa % 60 : "", "sec", 'max="59"')}<span class="muted">/km</span></div></div>
+      <div class="anteprima-forza" id="co-ant"></div>
+      <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || oggiIso())}"></label>
+      <label class="campo"><span>Note <i class="muted">(facoltativo)</i></span><input type="text" name="commento" value="${esc(voce?.commento || "")}" placeholder="Es. lungomare, ripetute, gara…"></label>
+      <button class="btn block">Salva</button>
+      ${voce ? `<button type="button" class="btn danger block" id="co-del" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
+  const f = $("#fco", v);
+  const n = (k) => (f[k].value === "" ? 0 : +f[k].value);
+  const leggi = { km: () => (f.km.value === "" ? null : +f.km.value) || null, tempo: () => n("th") * 3600 + n("tm") * 60 + n("ts") || null, passo: () => n("pm") * 60 + n("ps") || null };
+  const scrivi = {
+    km: (x) => (f.km.value = Math.round(x * 100) / 100),
+    tempo: (x) => { x = Math.round(x); f.th.value = x >= 3600 ? Math.floor(x / 3600) : ""; f.tm.value = Math.floor((x % 3600) / 60); f.ts.value = x % 60; },
+    passo: (x) => { x = Math.round(x); f.pm.value = Math.floor(x / 60); f.ps.value = x % 60; },
   };
-  const scegli = (a) => {
-    sel = a; f.titolo.value = a.nome;
-    f.kcal100.value = a.kcal ?? ""; f.p100.value = a.p ?? ""; f.c100.value = a.c ?? ""; f.g100.value = a.g ?? "";
-    if (!f.grammi.value) f.grammi.value = a.porz || a.pezzo || 100;
-    const dosi = [a.pezzo && a.pezzo !== a.porz ? [a.pezzo, `1 ${a.unita || "pezzo"} · ${a.pezzo} g`] : null, a.porz ? [a.porz, `${a.recente ? "come l'ultima volta" : "porzione"} · ${n1(a.porz)} g`] : null, [100, "100 g"]].filter(Boolean);
-    $("#cb-dosi", v).innerHTML = dosi.map(([q, t]) => `<button type="button" class="chip" data-q="${q}">${esc(t)}</button>`).join("");
-    $("#cb-fonte", v).textContent = a.codice ? "· dall'etichetta (Open Food Facts)" : a.recente ? "· come l'ultima volta" : "· valori medi";
-    $("#cb-valori", v).open = a.kcal == null;
-    sugg.innerHTML = ""; anteprima();
+  let ordine = [];
+  const calcola = () => {
+    $$("[data-g]", v).forEach((g) => g.classList.remove("auto"));
+    // tengo ferma la distanza quando possibile: si ricalcola il passo, oppure il tempo se hai cambiato il passo
+    const L = ordine[0], km = leggi.km(), te = leggi.tempo(), pa = leggi.passo();
+    const c = L === "passo" ? (km ? "tempo" : "km") : L === "km" ? (te ? "passo" : "tempo") : L === "tempo" ? (km ? "passo" : "km") : null;
+    const servono = { passo: km && te, tempo: km && pa, km: te && pa };
+    if (c && servono[c]) {
+      if (c === "passo") scrivi.passo(te / km); else if (c === "tempo") scrivi.tempo(km * pa); else scrivi.km(te / pa);
+      $(`[data-g=${c}]`, v).classList.add("auto");
+    }
+    const kmF = leggi.km(), teF = leggi.tempo();
+    $("#co-ant", v).innerHTML = kmF && teF ? `🏃 <b>${kmT(kmF)} km</b> in <b>${tempoTesto(teF)}</b> · passo <b>${passoTesto(teF / kmF)} /km</b> · ${(kmF / (teF / 3600)).toLocaleString("it-IT", { maximumFractionDigits: 1 })} km/h` : "";
   };
-  const mostra = (lista, vuoto = "") => {
-    sugg.innerHTML = lista.length ? lista.map((a, i) => `<button type="button" class="cb-voce" data-i="${i}"><span>${esc(a.nome)}</span><span class="muted small">${a.kcal != null ? nK(a.kcal) + " kcal/100 g" : ""}${a.codice ? " · 🏷️" : a.recente ? " · 🕘" : ""}</span></button>`).join("") : vuoto;
-    $$("[data-i]", sugg).forEach((b) => (b.onclick = () => scegli(lista[+b.dataset.i])));
-  };
-  f.titolo.oninput = () => { sel = null; mostra(window.Salute.suggerimenti(f.titolo.value, noti, 8), f.titolo.value.trim().length > 1 ? `<div class="small muted" style="padding:4px 6px 10px">Non lo trovo: prova <b>Cerca online</b> o il <b>codice a barre</b>, oppure scrivi i valori per 100 g.</div>` : ""); };
-  ["grammi", "kcal100", "p100", "c100", "g100"].forEach((n) => (f[n].oninput = anteprima));
-  $("#cb-dosi", v).onclick = (ev) => { const b = ev.target.closest("[data-q]"); if (b) { f.grammi.value = b.dataset.q; anteprima(); } };
-  const daCodice = async (codice) => {
-    const s = $("#cb-fonte", v); toast("🔎 Cerco il prodotto…", 1500);
-    try {
-      const p = await window.Salute.prodotto(codice);
-      if (p) { ricordaCibo(p); scegli(p); toast(`🏷️ ${p.nome}`); }
-      else { sel = { codice }; $("#cb-valori", v).open = true; s.textContent = `· codice ${codice}`; toast("Prodotto non trovato: scrivi nome e valori dall'etichetta (li ricorderò)", 4500); f.titolo.focus(); }
-    } catch (err) { toast("⚠️ " + err.message); }
-  };
-  $("#cb-scan", v) && ($("#cb-scan", v).onclick = async () => { const c = await scansionaCodice(); if (c) daCodice(c); });
-  $("#cb-web", v) && ($("#cb-web", v).onclick = async () => {
-    const q = f.titolo.value.trim(); if (!q) { toast("Scrivi prima cosa cercare"); f.titolo.focus(); return; }
-    sugg.innerHTML = `<div class="small muted" style="padding:6px">🌐 Cerco “${esc(q)}” su Open Food Facts…</div>`;
-    try { const l = await window.Salute.cercaOnline(q); mostra(l.map((x) => ({ ...x, online: true })), `<div class="small muted" style="padding:6px">Nessun risultato online. Scrivi i valori dall'etichetta.</div>`);
-      $$("[data-i]", sugg).forEach((b) => { const x = l[+b.dataset.i]; b.onclick = () => { ricordaCibo(x); scegli(x); }; }); }
-    catch (err) { sugg.innerHTML = `<div class="small muted" style="padding:6px">⚠️ ${esc(err.message)}</div>`; }
-  });
-  if (voce) scegli(sel);
-  else if (nome) { const a = window.Salute.cercaAlimento(nome, noti); if (a) scegli(a); else { f.titolo.dispatchEvent(new Event("input")); $("#cb-valori", v).open = true; } }
+  $$("[data-g]", v).forEach((g) => g.addEventListener("input", () => { ordine = [g.dataset.g, ...ordine.filter((x) => x !== g.dataset.g)]; calcola(); }));
+  calcola();
   f.onsubmit = async (ev) => {
     ev.preventDefault();
-    const titolo = f.titolo.value.trim(), gr = val("grammi"), k = val("kcal100");
-    if (!titolo) { toast("Scrivi cosa hai mangiato"); f.titolo.focus(); return; }
-    if (!gr || gr <= 0) { toast("Scrivi quanti grammi"); f.grammi.focus(); return; }
-    if (k == null) { $("#cb-valori", v).open = true; toast("Scrivi le calorie per 100 g (le trovi sull'etichetta)"); f.kcal100.focus(); return; }
-    const extra = { grammi: gr, kcal100: k, p100: val("p100") || 0, c100: val("c100") || 0, g100: val("g100") || 0, pasto: f.pasto.value, codice: sel?.codice || null };
-    const daTabella = window.Salute.ALIMENTI.some((a) => a.nome === titolo && a.kcal === k);
-    if (!daTabella) ricordaCibo({ nome: titolo, kcal: k, p: extra.p100, c: extra.c100, g: extra.g100, porz: gr, codice: extra.codice });
-    const dati = { tipo: "pasto", titolo, data: f.data.value || oggiIso(), extra };
+    const km = leggi.km(), te = leggi.tempo();
+    if (!km || !te) { toast("Scrivi due valori tra distanza, tempo e passo"); return; }
+    const dati = { tipo: "corsa", titolo: "Corsa", data: f.data.value || oggiIso(), commento: f.commento.value.trim(), extra: { km, secondi: te } };
     try {
+      const prima = (await api("/api/diario?tipo=corsa")).filter((x) => x.id !== voce?.id && x.extra.km >= 1);
       const x = await api(voce ? `/api/diario/${voce.id}` : "/api/diario", { method: voce ? "PUT" : "POST", json: voce ? { ...voce, ...dati } : dati });
-      v.chiudi(); toast(`🍽️ ${x.titolo}: ${nK(x.extra.kcal)} kcal`); if (dopo) dopo();
+      const rec = prima.length && x.extra.km >= 1 && x.extra.passo < Math.min(...prima.map((y) => y.extra.passo));
+      v.chiudi(); toast(rec ? `🏆 Nuovo record di passo: ${passoTesto(x.extra.passo)} /km!` : `🏃 Salvata: ${kmT(x.extra.km)} km a ${passoTesto(x.extra.passo)} /km`, 3500); if (dopo) dopo();
     } catch (err) { toast("⚠️ " + err.message); }
   };
-  $("#cb-del", v) && ($("#cb-del", v).onclick = async () => {
-    if (!(await conferma("Eliminare questo cibo?"))) return;
-    await api(`/api/diario/${voce.id}`, { method: "DELETE" }); v.chiudi(); toast("🗑️ Eliminato"); if (dopo) dopo();
-  });
-  if (scansiona) $("#cb-scan", v).click();
-  else if (!voce && !nome && matchMedia("(pointer:fine)").matches) f.titolo.focus();
-}
-
-/* ------------------------------------------------------------------ lettore di codici a barre (ZXing, caricato solo quando serve) */
-async function caricaZxing() {
-  if (window.ZXing) return;
-  await new Promise((ok, ko) => { const s = document.createElement("script"); s.src = "static/zxing.min.js"; s.onload = ok; s.onerror = () => ko(new Error("Lettore di codici non disponibile")); document.head.appendChild(s); });
-}
-function suggerimentiZxing() {
-  const h = new Map(), F = window.ZXing.BarcodeFormat;
-  h.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, [F.EAN_13, F.EAN_8, F.UPC_A, F.UPC_E]);
-  h.set(window.ZXing.DecodeHintType.TRY_HARDER, true);
-  return h;
-}
-function scansionaCodice() {
-  return new Promise((risolvi) => {
-    let fatto = false, lettore = null;
-    const fine = (c) => { if (fatto) return; fatto = true; try { lettore?.reset(); } catch { /* */ } v.remove(); risolvi(c); };
-    const v = foglio(`<h3>📷 Codice a barre ${xBtn}</h3>
-      <div class="scanner"><video id="sc-video" playsinline muted autoplay></video><div class="sc-mirino"></div><div class="sc-stato" id="sc-stato">Avvio la fotocamera…</div></div>
-      <p class="small muted" style="margin:8px 2px">Inquadra il codice a barre della confezione: lo leggo da solo.</p>
-      <button type="button" class="btn sec block" id="sc-foto">🖼️ Leggilo da una foto</button>
-      <form id="sc-man" class="riga" style="margin-top:10px"><input type="text" name="codice" inputmode="numeric" autocomplete="off" placeholder="Oppure scrivi le cifre sotto il codice"><button class="btn">Cerca</button></form>`,
-      { onClose: () => fine(null) });
-    const stato = (t) => { const s = $("#sc-stato", v); if (s) s.textContent = t; };
-    caricaZxing().then(async () => {
-      if (fatto) return;
-      if (!navigator.mediaDevices?.getUserMedia) return stato("Fotocamera non disponibile: usa una foto o scrivi le cifre.");
-      lettore = new window.ZXing.BrowserMultiFormatReader(suggerimentiZxing(), 250);
-      try {
-        await lettore.decodeFromConstraints({ video: { facingMode: "environment" } }, $("#sc-video", v), (r) => { if (r && !fatto) { navigator.vibrate?.(40); fine(r.getText()); } });
-        stato("");
-      } catch { stato("Non posso usare la fotocamera: consenti l'accesso, oppure usa una foto o scrivi le cifre."); }
-    }).catch((e) => stato(e.message));
-    $("#sc-foto", v).onclick = () => {
-      const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
-      inp.onchange = async () => {
-        const file = inp.files[0]; if (!file) return;
-        stato("Leggo la foto…");
-        try {
-          await caricaZxing();
-          const url = URL.createObjectURL(file);
-          try { const r = await new window.ZXing.BrowserMultiFormatReader(suggerimentiZxing()).decodeFromImageUrl(url); fine(r.getText()); }
-          finally { URL.revokeObjectURL(url); }
-        } catch { stato(""); toast("Non riesco a leggere il codice: fai la foto più da vicino, dritta e con luce", 4000); }
-      };
-      inp.click();
-    };
-    $("#sc-man", v).onsubmit = (e) => { e.preventDefault(); const c = e.target.codice.value.replace(/\D/g, ""); if (c.length < 6) return toast("Scrivi tutte le cifre del codice"); fine(c); };
+  $("#co-del", v) && ($("#co-del", v).onclick = async () => {
+    if (!(await conferma("Eliminare questa corsa?"))) return;
+    await api(`/api/diario/${voce.id}`, { method: "DELETE" }); v.chiudi(); toast("🗑️ Eliminata"); if (dopo) dopo();
   });
 }
 
-/* ------------------------------------------------------------------ attività */
-async function aggiungiAttivita({ voce = null, data = oggiIso(), dopo } = {}) {
-  const peso = ultimoPeso(await api("/api/diario?tipo=peso"))?.extra?.peso || 70;
-  const e = voce?.extra || {};
-  let sport = e.sport || "Corsa";
-  const sport_l = Object.entries(window.Salute.SPORT).filter(([k]) => k !== "Movimento (Salute)" || e.sport === k);
-  const v = foglio(`<h3>🏃 ${voce ? "Modifica attività" : "Aggiungi attività"} ${xBtn}</h3><form id="fat" novalidate>
-    <div class="pronti" id="at-sport" style="margin-bottom:12px">${sport_l.map(([k, s]) => `<button type="button" class="chip ${k === sport ? "on" : ""}" data-s="${esc(k)}">${s.ico} ${esc(k)}</button>`).join("")}</div>
-    <label class="campo"><span>Titolo <i class="muted">(facoltativo)</i></span><input type="text" name="titolo" value="${esc(voce?.titolo || "")}" placeholder="Es. Corsa al parco"></label>
-    <div class="riga"><label class="campo"><span>Minuti</span><input type="number" name="minuti" inputmode="numeric" min="0" value="${e.minuti ?? ""}"></label>
-      <label class="campo"><span>Km</span><input type="number" name="km" inputmode="decimal" step="any" min="0" value="${e.km ?? ""}"></label>
-      <label class="campo"><span>Passi</span><input type="number" name="passi" inputmode="numeric" min="0" value="${e.passi ?? ""}"></label></div>
-    <label class="campo"><span>Calorie bruciate <i class="muted">(se le sai)</i></span><input type="number" name="kcal" inputmode="numeric" min="0" value="${voce ? e.kcal ?? "" : ""}" placeholder="le calcolo io"></label>
-    <div class="anteprima-forza" id="at-ant"></div>
-    <label class="campo"><span>Data</span><input type="date" name="data" value="${esc(voce?.data || data)}"></label>
-    <button class="btn block">Salva</button>
-    ${voce ? `<button type="button" class="btn danger block" id="at-del" style="margin-top:8px">🗑️ Elimina</button>` : ""}</form>`);
-  const f = $("#fat", v), num = (n) => (f[n].value === "" ? null : +f[n].value);
-  const stima = () => window.Salute.kcalAttivita({ sport, minuti: num("minuti"), km: num("km"), passi: num("passi") }, peso);
-  const ant = () => { const k = stima(); $("#at-ant", v).innerHTML = f.kcal.value === "" && k ? `🔥 Stima: <b>${nK(k)} kcal</b> <span class="muted">(con il tuo peso di ${kgTesto(peso)})</span>` : ""; };
-  $("#at-sport", v).onclick = (ev) => { const b = ev.target.closest("[data-s]"); if (!b) return; sport = b.dataset.s; $$("[data-s]", v).forEach((x) => x.classList.toggle("on", x === b)); ant(); };
-  ["minuti", "km", "passi", "kcal"].forEach((n) => (f[n].oninput = ant)); ant();
-  f.onsubmit = async (ev) => {
-    ev.preventDefault();
-    if (!num("minuti") && !num("km") && !num("passi") && !num("kcal")) { toast("Scrivi almeno i minuti"); f.minuti.focus(); return; }
-    const dati = { tipo: "attivita", titolo: f.titolo.value.trim() || sport, data: f.data.value || oggiIso(),
-      extra: { ...e, sport, minuti: num("minuti"), km: num("km"), passi: num("passi"), kcal: num("kcal") ?? stima() } };
-    try {
-      const x = await api(voce ? `/api/diario/${voce.id}` : "/api/diario", { method: voce ? "PUT" : "POST", json: voce ? { ...voce, ...dati } : dati });
-      v.chiudi(); toast(`${icoSport(sport)} ${x.titolo}: ${nK(x.extra.kcal)} kcal`); if (dopo) dopo();
-    } catch (err) { toast("⚠️ " + err.message); }
-  };
-  $("#at-del", v) && ($("#at-del", v).onclick = async () => {
-    if (!(await conferma("Eliminare questa attività?", "Elimina"))) return;
-    await api(`/api/diario/${voce.id}`, { method: "DELETE" });
-    if (e.ext_id) { const sc = JSON.parse(memo.get("scartate") || "[]"); sc.push(e.ext_id); memo.set("scartate", JSON.stringify(sc.slice(-500))); }
-    v.chiudi(); toast("🗑️ Eliminata"); if (dopo) dopo();
-  });
-}
-
-/* ------------------------------------------------------------------ fabbisogno a riposo */
-function impostaFabbisogno(ctx, dopo) {
-  const p = ctx.prof;
-  const v = foglio(`<h3>⚖️ Fabbisogno a riposo ${xBtn}</h3>
-    <p class="muted small" style="margin-top:-6px">Servono per stimare quante calorie bruci anche senza fare niente (formula di Mifflin-St Jeor).</p>
-    <form id="ffb"><div class="pronti" style="margin-bottom:12px"><button type="button" class="chip ${p.sesso !== "F" && p.sesso ? "on" : ""}" data-sx="M">👨 Uomo</button><button type="button" class="chip ${p.sesso === "F" ? "on" : ""}" data-sx="F">👩 Donna</button></div>
-      <label class="campo"><span>Data di nascita</span><input type="date" name="nascita" value="${esc(p.nascita || "")}"></label>
-      <div class="riga"><label class="campo"><span>Altezza (cm)</span><input type="number" name="altezza" inputmode="numeric" min="100" max="230" value="${esc(p.altezza || "")}"></label>
-        <label class="campo"><span>Peso (kg)</span><input type="number" name="peso" inputmode="decimal" step="0.1" min="25" max="300" value="${ctx.peso ?? ""}"></label></div>
-      <button class="btn block">Salva</button></form>`);
-  let sesso = p.sesso || null;
-  $$("[data-sx]", v).forEach((b) => (b.onclick = () => { sesso = b.dataset.sx; $$("[data-sx]", v).forEach((x) => x.classList.toggle("on", x === b)); }));
-  $("#ffb", v).onsubmit = async (ev) => {
-    ev.preventDefault();
-    const f = ev.target;
-    if (!sesso) return toast("Scegli uomo o donna");
-    if (!f.nascita.value || !f.altezza.value || !f.peso.value) return toast("Compila tutti i campi");
-    await api("/api/profilo", { method: "PUT", json: { ...p, sesso, nascita: f.nascita.value, altezza: String(Math.round(+f.altezza.value)) } });
-    if (+f.peso.value !== ctx.peso) await api("/api/diario", { method: "POST", json: { tipo: "peso", titolo: "Peso", data: oggiIso(), extra: { peso: +f.peso.value } } });
-    v.chiudi(); toast("✅ Salvato"); if (dopo) dopo();
-  };
-}
-
-/* ------------------------------------------------------------------ Salute di iPhone (tramite Comando Rapido) */
-const istruzioniSalute = () => `
-  ${passo(1, "Apri l'app <b>Comandi</b> (icona viola e blu) → in basso <b>Comandi</b> → in alto a destra <b>＋</b>. Tocca il nome in alto e chiamalo <b>LifeApp Salute</b>.")}
-  ${passo(2, "Tocca <b>Cerca azioni</b>, scrivi <b>campioni</b> e scegli <b>Trova campioni di Salute</b>. Tocca la parola blu dopo <b>Tipo</b> e scegli <b>Energia attiva</b>. Sotto deve esserci <b>Data di inizio · è oggi</b>: se manca, tocca <b>Aggiungi filtro</b> e impostalo così.")}
-  ${passo(3, "Cerca <b>statistiche</b> e aggiungi <b>Calcola statistiche</b>. Tocca la parola blu (<b>Media</b>) e scegli <b>Somma</b>.")}
-  ${passo(4, "Ripeti i passi 2 e 3 per i passi: <b>Trova campioni di Salute</b> con Tipo <b>Passi</b> (sempre <b>è oggi</b>), poi <b>Calcola statistiche</b> → <b>Somma</b>.")}
-  ${passo(5, "Cerca <b>testo</b> e aggiungi l'azione <b>Testo</b>. Tocca dentro e scrivi <b>LifeApp</b> e uno spazio. Nella barra sopra la tastiera tocca <b>Data corrente</b> e scrivi uno spazio. Poi, sempre nella barra, tocca <b>Seleziona variabile</b> e tocca l'azione <b>Calcola statistiche</b> delle calorie (la prima). Scrivi uno spazio, ancora <b>Seleziona variabile</b> e tocca la seconda <b>Calcola statistiche</b> (i passi). Deve venire: <b>LifeApp [Data corrente] [Statistiche] [Statistiche]</b>.")}
-  ${passo(6, "Cerca <b>appunti</b> e aggiungi <b>Copia negli appunti</b>. Tocca <b>▶︎</b> in basso: la prima volta consenti l'accesso a Salute. Fine!")}
-  ${passo(7, "Per farlo <b>partire da solo ogni sera</b>: in basso tocca <b>Automazione</b> → <b>＋</b> (o <b>Nuova automazione</b>) → <b>Ora del giorno</b> → scegli <b>21:30</b> e <b>Ogni giorno</b> → seleziona <b>Esegui immediatamente</b> → <b>Avanti</b> → scegli <b>LifeApp Salute</b>.")}
-  ${passo(8, "Quando apri LifeApp tocca il riquadro rosso <b>Aggiorna da Salute</b> e poi <b>Incolla</b>. Puoi anche far partire il comando a mano quando vuoi, per avere i dati aggiornati in quel momento.")}`;
-async function salvaSalute(righe) {
-  const att = await api("/api/diario?tipo=attivita", { fresco: true });
-  for (const r of righe) {
-    const id = "salute-" + r.data, gia = att.find((x) => x.extra?.ext_id === id);
-    const dati = { tipo: "attivita", titolo: "Movimento della giornata", data: r.data, extra: { sport: "Movimento (Salute)", passi: r.passi, kcal: r.kcal, minuti: null, km: null, fonte: "salute", ext_id: id } };
-    await api(gia ? `/api/diario/${gia.id}` : "/api/diario", { method: gia ? "PUT" : "POST", json: gia ? { ...gia, ...dati } : dati });
-  }
-  memo.set("salute-usata", "1"); memo.set("salute-ultimo", String(Date.now()));
-  const u = righe[righe.length - 1];
-  toast(`❤️ ${u.data === oggiIso() ? "Oggi" : dataIt(u.data).replace(/ \d{4}$/, "")}: ${nK(u.passi)} passi, ${nK(u.kcal)} kcal attive`, 3500);
-}
-/* Un tocco: leggo gli appunti (iPhone chiede "Incolla"); se non ci sono i dati apro la scheda con le istruzioni */
-async function aggiornaDaSalute(dopo) {
-  let t = null;
-  try { t = await navigator.clipboard.readText(); } catch { /* permesso negato o non disponibile */ }
-  const righe = t ? window.Salute.leggiSalute(t, oggiIso()) : [];
-  if (righe.length) { await salvaSalute(righe); if (dopo) dopo(); return; }
-  importaSalute(dopo, t == null ? "" : "Negli appunti non ci sono i dati di Salute: fai partire il comando <b>LifeApp Salute</b> (o aspetta l'automazione della sera) e riprova.");
-}
-async function bannerSalute(el, dopo, sempre = false) {
-  if (!el || (!sempre && !memo.get("salute-usata"))) return;
-  const oggiS = (await api("/api/diario?tipo=attivita")).find((x) => x.extra?.ext_id === "salute-" + oggiIso());
-  const ultimo = +memo.get("salute-ultimo") || 0;
-  if (oggiS && Date.now() - ultimo < 3 * 3600e3) { el.innerHTML = ""; return; }
-  el.innerHTML = `<button type="button" class="avviso salute-avviso"><div class="av-ico">❤️</div><div style="flex:1;text-align:left"><b>Aggiorna da Salute</b>
-    <div class="small muted">${oggiS ? `Oggi finora: ${nK(oggiS.extra.passi)} passi · ${nK(oggiS.extra.kcal)} kcal attive` : "Passi e calorie attive · un tocco"}</div></div><span class="dx">›</span></button>`;
-  el.firstElementChild.onclick = () => aggiornaDaSalute(dopo);
-}
-function importaSalute(dopo, messaggio = "") {
-  const v = foglio(`<h3>❤️ Salute di iPhone ${xBtn}</h3>
-    ${messaggio ? `<div class="avviso" style="margin:0 0 12px"><div class="av-ico">ℹ️</div><div style="flex:1" class="small">${messaggio}</div></div>` : ""}
-    <p class="muted small" style="margin-top:-6px">Porta in LifeApp <b>passi</b> e <b>calorie attive</b> di iPhone e Apple Watch (gli stessi dell'app Fitness, comprese le attività che Strava manda a Salute).</p>
-    <button class="btn block" id="sa-incolla">📋 Incolla dati di Salute</button>
-    <textarea id="sa-testo" rows="2" placeholder="Oppure tieni premuto qui → Incolla" style="margin-top:10px"></textarea>
-    <button class="btn sec block" id="sa-ok" style="margin-top:8px">Importa</button>
-    <details class="card" style="margin-top:12px" ${memo.get("salute-usata") ? "" : "open"}><summary><span class="sum-ico">⚙️</span><span>Come preparare il Comando Rapido<br><span class="small muted">Una volta sola, circa 5 minuti</span></span></summary><div class="dentro">${istruzioniSalute()}</div></details>`);
-  const importa = async (t) => {
-    const righe = window.Salute.leggiSalute(t, oggiIso());
-    if (!righe.length) return toast("⚠️ Non trovo i dati: fai partire prima il comando “LifeApp Salute”", 4000);
-    await salvaSalute(righe); v.chiudi(); if (dopo) dopo();
-  };
-  $("#sa-incolla", v).onclick = async () => {
-    try { const t = await navigator.clipboard.readText(); $("#sa-testo", v).value = t; await importa(t); }
-    catch { toast("Tieni premuto nel riquadro e scegli Incolla"); $("#sa-testo", v).focus(); }
-  };
-  $("#sa-ok", v).onclick = () => importa($("#sa-testo", v).value);
-}
+memo.set("strava", null); memo.set("cibi", null);   // pulizia di funzioni tolte
 
 function aggiornaCorpo(prof, pAtt, dopo) {
   const v = foglio(`<h3>⚖️ Peso e altezza ${xBtn}</h3><form id="fc">
@@ -2340,7 +2108,7 @@ function apriIcsCompleanni(lista) {
 }
 
 /* ================================================================== CHAT */
-const AIUTO = ["a pranzo 80 g di pasta e 2 uova", "ho corso 5 km in 30 minuti", "quante calorie ho mangiato oggi?", "panca piana 80 kg per 8", "oggi peso 72,5 kg", "importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "esame di Fisica da 12 cfu", "primo modulo di Fisica con 27", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
+const AIUTO = ["ho corso 5 km in 28 minuti", "corsa 8 km passo 5:30", "quanti km ho corso?", "panca piana 80 kg per 8", "oggi peso 72,5 kg", "importa i compleanni dai promemoria", "ho comprato una maglia a 40 euro", "ho passato l'esame di Analisi 1 con 28", "esame di Fisica da 12 cfu", "primo modulo di Fisica con 27", "bilancio", "il 6 agosto è il compleanno di Marco Rossi", "stasera ho visto il film After, bellissimo", "ho letto Il nome della rosa di Umberto Eco",
   "il 16 dicembre dentista dalle 10 alle 11", "quando è il compleanno di Marco?", "che film ho visto?"];
 const chatStoria = () => { try { return JSON.parse(memo.get("chat") || "[]"); } catch { return []; } };
 const chatSalva = (l) => memo.set("chat", JSON.stringify(l.slice(-150)));
@@ -2382,7 +2150,6 @@ function vistaChat(precompila) {
       if (a.t === "calComp") apriIcsCompleanni([a.voce]);
       if (a.t === "importaComp") importaCompleanni(null);
       if (a.t === "calApp") aggiungiAlCalendario(a.voce);
-      if (a.t === "cibo") aggiungiCibo({ nome: a.nome, grammi: a.grammi, data: a.data, pasto: a.pasto, dopo: () => aggiungi({ da: "scrigno", testo: "🍽️ Salvato. Da ora lo conosco anch'io: la prossima volta basta scriverlo." }) });
       if (a.t === "annullaTutti") { for (const u of a.urls) await api(u, { method: "DELETE" }); b.closest(".msg-az").remove(); aggiungi({ da: "scrigno", testo: "↩️ Annullato, non l'ho salvato." }); }
     } catch (err) { toast("⚠️ " + err.message); }
   };
@@ -2482,31 +2249,15 @@ async function rispondi(testo) {
       (r.kg ? `Forza stimata: <b>${kgTesto(f)}</b>` : "") + (record ? `<br>🏆 <b>Nuovo record!</b> Prima era ${valoreForza(r.kg, prima.record)}.` : prima ? `<br><span class="muted">Il tuo record resta ${valoreForza(r.kg, prima.record)}.</span>` : ""),
       azioni: [{ t: "apri", hash: `#/palestra/${encodeURIComponent(x.titolo)}`, etichetta: "📈 Vedi il grafico" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
   }
-  if (r.azione === "pasto") {
-    const noti = alimentiNoti(await api("/api/diario?tipo=pasto"));
-    const voci = window.Salute.leggiPasto(r.testo, noti), pasto = r.pasto || pastoOra();
-    const salvati = [], mancanti = [];
-    for (const v of voci) {
-      const a = v.alimento;
-      if (!a || a.kcal == null || !v.grammi) { mancanti.push(v); continue; }
-      salvati.push(await api("/api/diario", { method: "POST", json: { tipo: "pasto", titolo: a.nome, data: r.data,
-        extra: { grammi: v.grammi, kcal100: a.kcal, p100: a.p || 0, c100: a.c || 0, g100: a.g || 0, pasto, codice: a.codice || null } } }));
-    }
-    const A_PASTO = { colazione: "a colazione", pranzo: "a pranzo", cena: "a cena", spuntino: "come spuntino" };
-    const d = calcoloGiorno(r.data, await contestoCalorie()), tot = salvati.reduce((s, x) => s + x.extra.kcal, 0);
-    let html = salvati.length ? `🍽️ Segnato ${A_PASTO[pasto]}${r.data !== oggiIso() ? ` (${giorno(r.data)})` : ""}:<br>${salvati.map((x) => `• ${esc(x.titolo)} ${n1(x.extra.grammi)} g — <b>${nK(x.extra.kcal)} kcal</b>`).join("<br>")}`
-      + `${salvati.length > 1 ? `<br>Totale: <b>${nK(tot)} kcal</b>` : ""}<br><span class="muted">${r.data === oggiIso() ? "Oggi" : "Quel giorno"}: ${nK(d.mangiate)} kcal mangiate${d.bilancio != null ? ` · bilancio ${testoBilancio(d.bilancio)} kcal` : ""}</span>` : "";
-    if (mancanti.length) html += `${html ? "<br><br>" : ""}🤔 Non conosco ${mancanti.map((x) => `<b>${esc(x.scritto)}</b>`).join(", ")}: cercalo o scansiona il codice a barre, così imparo i suoi valori.`;
-    return { da: "scrigno", html, azioni: [...mancanti.slice(0, 3).map((x) => ({ t: "cibo", nome: x.scritto, grammi: x.grammi, data: r.data, pasto, etichetta: `🔎 ${x.scritto}` })),
-      { t: "apri", hash: `#/calorie/${r.data}`, etichetta: "🔥 Calorie del giorno" }, ...(salvati.length ? [{ t: "annullaTutti", urls: salvati.map((x) => `/api/diario/${x.id}`), etichetta: "↩️ Annulla" }] : [])] };
-  }
-  if (r.azione === "attivita") {
-    const peso = ultimoPeso(await api("/api/diario?tipo=peso"))?.extra?.peso || 70;
-    const kcal = r.kcal ?? window.Salute.kcalAttivita(r, peso);
-    const x = await api("/api/diario", { method: "POST", json: { tipo: "attivita", titolo: r.sport, data: r.data, extra: { sport: r.sport, minuti: r.minuti, km: r.km, passi: r.passi, kcal } } });
-    const det = [r.km ? `${n1(r.km)} km` : "", r.minuti ? `${r.minuti} min` : "", r.passi ? `${nK(r.passi)} passi` : ""].filter(Boolean).join(" · ");
-    return { da: "scrigno", html: `${icoSport(r.sport)} Segnato: <b>${esc(r.sport)}</b>${det ? " — " + det : ""}${r.data !== oggiIso() ? ` (${giorno(r.data)})` : ""}<br>Calorie bruciate: <b>${nK(kcal)} kcal</b>${r.kcal ? "" : ` <span class="muted">(stima con il tuo peso di ${kgTesto(peso)})</span>`}`,
-      azioni: [{ t: "apri", hash: `#/calorie/${r.data}`, etichetta: "🔥 Calorie del giorno" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
+  if (r.azione === "corsa") {
+    if (!r.km || !r.secondi) return { da: "scrigno", html: `🏃 Mi serve anche ${!r.km ? "la distanza in km" : "il tempo o il passo medio"}. Scrivi ad esempio <i>ho corso 5 km in 28 minuti</i> oppure <i>corsa 8 km passo 5:30</i>.`,
+      azioni: [{ t: "apri", hash: "#/corsa", etichetta: "🏃 Apri Corsa" }] };
+    const prima = (await api("/api/diario?tipo=corsa")).filter((x) => x.extra.km >= 1);
+    const x = await api("/api/diario", { method: "POST", json: { tipo: "corsa", titolo: "Corsa", data: r.data, extra: { km: r.km, secondi: r.secondi } } });
+    const best = prima.length ? Math.min(...prima.map((y) => y.extra.passo)) : null, rec = best != null && x.extra.km >= 1 && x.extra.passo < best;
+    return { da: "scrigno", html: `🏃 Corsa segnata: <b>${kmT(x.extra.km)} km</b> in <b>${tempoTesto(x.extra.secondi)}</b>${r.data !== oggiIso() ? ` (${giorno(r.data)})` : ""}<br>Passo medio: <b>${passoTesto(x.extra.passo)} /km</b>`
+      + (rec ? `<br>🏆 <b>Nuovo record di passo!</b> Prima era ${passoTesto(best)} /km.` : best != null ? `<br><span class="muted">Il tuo miglior passo resta ${passoTesto(best)} /km.</span>` : ""),
+      azioni: [{ t: "apri", hash: "#/corsa", etichetta: "📈 Vedi i grafici" }, { t: "annulla", url: `/api/diario/${x.id}`, etichetta: "↩️ Annulla" }] };
   }
   if (r.azione === "peso") {
     const x = await api("/api/diario", { method: "POST", json: { tipo: "peso", titolo: "Peso", data: r.data, extra: { peso: r.peso } } });
@@ -2588,11 +2339,12 @@ async function rispondi(testo) {
       return { da: "scrigno", html: `🎓 Esami superati: <b>${st.n}</b>${st.idonei ? ` + ${st.idonei} idoneità` : ""}, ${st.cfu} crediti${st.inCorso ? ` (+${st.inCorso} in corso)` : ""}<br>Media ponderata: <b>${dec(st.ponderata)}</b><br>Media aritmetica: <b>${dec(st.media)}</b><br>Base di laurea: <b>${dec(st.base, 1)}</b>/110${st.lodi ? `<br>Lodi: ${st.lodi} ✨` : ""}`,
         azioni: [{ t: "apri", hash: "#/diario/esame", etichetta: "🎓 I miei esami" }] };
     }
-    if (r.cosa === "calorie") {
-      const d = calcoloGiorno(oggiIso(), await contestoCalorie());
-      return { da: "scrigno", html: `🔥 Oggi hai mangiato <b>${nK(d.mangiate)} kcal</b>${d.mangiate ? ` (proteine ${n1(d.p)} g · carboidrati ${n1(d.c)} g · grassi ${n1(d.g)} g)` : ""}<br>🏃 Attività: <b>${nK(d.attivo)} kcal</b> bruciate${d.passi ? ` · ${nK(d.passi)} passi` : ""}`
-        + (d.base != null ? `<br>⚖️ Bilancio: <b>${testoBilancio(d.bilancio)} kcal</b> (contando ${nK(d.base)} kcal bruciate a riposo)` : `<br><span class="muted">Per il bilancio completo indica sesso, età e altezza nella pagina Calorie.</span>`),
-        azioni: [{ t: "apri", hash: "#/calorie", etichetta: "🔥 Apri Calorie" }] };
+    if (r.cosa === "corsa") {
+      const l = await api("/api/diario?tipo=corsa");
+      if (!l.length) return { da: "scrigno", html: "Non hai ancora segnato corse. Scrivimi ad esempio <i>ho corso 5 km in 28 minuti</i>." };
+      const st = statCorse(l), u = st.l[st.n - 1];
+      return { da: "scrigno", html: `🏃 Hai corso <b>${kmT(st.km)} km</b> in ${st.n} cors${st.n === 1 ? "a" : "e"} (${kmT(st.mese)} km questo mese).<br>Passo medio: <b>${passoTesto(st.passo)} /km</b> · miglior passo: <b>${passoTesto(st.migliore.extra.passo)} /km</b><br>Ultima: ${kmT(u.extra.km)} km in ${tempoTesto(u.extra.secondi)} (${dataIt(u.data)})`,
+        azioni: [{ t: "apri", hash: "#/corsa", etichetta: "📈 Grafici della corsa" }] };
     }
     if (r.cosa === "palestra") {
       const es = raggruppaEsercizi(await api("/api/diario?tipo=allenamento"));
@@ -2683,7 +2435,7 @@ async function renderPagina() {
   $$(".velo, .visore").forEach((v) => v.remove());
   const h = decodeURIComponent(location.hash.slice(2));
   const [sez, arg] = [h.split("/")[0], h.split("/").slice(1).join("/")];
-  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home", palestra: "home", calorie: "home" }[sez] || sez;
+  const tab = { "": "home", c: "home", cerca: "home", raccolta: "home", scadenze: "home", "da-smistare": "home", password: "home", io: "home", palestra: "home", corsa: "home" }[sez] || sez;
   document.body.classList.toggle("in-chat", sez === "chat");
   $$("#tabbar a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
   scrollTo(0, 0);
@@ -2696,7 +2448,7 @@ async function renderPagina() {
     else if (sez === "diario") await vistaDiario(arg);
     else if (sez === "io") await vistaIo();
     else if (sez === "palestra") await (arg ? vistaEsercizio(arg) : vistaPalestra());
-    else if (sez === "calorie") await vistaCalorie(arg);
+    else if (sez === "corsa") await vistaCorsa();
     else if (sez === "chat") vistaChat(arg || "");
     else if (sez === "altro") await (LOC ? vistaAltroLocale() : vistaAltroServer());
     else if (sez === "scadenze") await vistaScadenze();

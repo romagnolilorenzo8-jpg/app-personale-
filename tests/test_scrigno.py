@@ -67,12 +67,10 @@ def test_flusso_completo():
                                     "extra": {"set": [{"kg": 20, "reps": 12}, {"kg": 30, "reps": 10}, {"kg": 40, "reps": 8}]}}).json()
     assert x["extra"] == {"kg": 40, "reps": 8, "serie": 3, "set": [{"kg": 20, "reps": 12}, {"kg": 30, "reps": 10}, {"kg": 40, "reps": 8}]}
     assert c.post("/api/diario", json={"tipo": "allenamento", "titolo": "X", "extra": {"set": [{"kg": 20, "reps": 0}]}}).status_code == 400
-    # calorie: cibo e attivita
-    x = c.post("/api/diario", json={"tipo": "pasto", "titolo": "Pasta", "extra": {"grammi": 80, "kcal100": 353, "p100": 12.5, "c100": 72, "g100": 1.5, "pasto": "pranzo"}}).json()
-    assert x["extra"]["kcal"] == 282 and x["extra"]["pasto"] == "pranzo"
-    assert c.post("/api/diario", json={"tipo": "pasto", "titolo": "X", "extra": {"grammi": 0, "kcal100": 100}}).status_code == 400
-    x = c.post("/api/diario", json={"tipo": "attivita", "titolo": "Corsa", "extra": {"sport": "Corsa", "minuti": 30, "km": 5, "kcal": 338, "fonte": "strava", "ext_id": "strava-1"}}).json()
-    assert x["extra"] == {"sport": "Corsa", "minuti": 30, "km": 5, "passi": None, "kcal": 338, "fonte": "strava", "ext_id": "strava-1"}
+    # corsa: il passo medio lo calcola il server
+    x = c.post("/api/diario", json={"tipo": "corsa", "titolo": "Corsa", "extra": {"km": 5, "secondi": 1680}}).json()
+    assert x["extra"] == {"km": 5, "secondi": 1680, "passo": 336}
+    assert c.post("/api/diario", json={"tipo": "corsa", "titolo": "Corsa", "extra": {"km": 5}}).status_code == 400
 
 
 def test_condivisione_testo_link_e_backup():
