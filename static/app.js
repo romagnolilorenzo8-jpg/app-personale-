@@ -24,7 +24,7 @@ const GRUPPI_APP = {
 };
 const gruppoDi = (cat) => Object.keys(GRUPPI_APP).find((k) => GRUPPI_APP[k].cat.includes(cat)) || "altro";
 const COL_CAT = new Proxy({}, { get: (_, c) => GRUPPI_APP[gruppoDi(c)].col });
-const CMD_CAL = "Scrigno Calendario";
+const CMD_CAL = "LifeApp Calendario";
 const CMD_INVIA = "Invia a Scrigno";
 
 const S = { cartelle: [], byId: {}, figli: {}, daSmistare: 0, stato: null };
