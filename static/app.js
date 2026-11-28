@@ -2093,28 +2093,8 @@ function htmlVoceDiario(x) {
       ? `<img loading="lazy" src="${esc(cop)}" alt="" referrerpolicy="no-referrer" onerror="this.parentNode.classList.remove('con-cop');this.replaceWith('${t.ico}')">` : t.ico}</div>
     <div class="corpo"><div class="tit">${esc(x.titolo)}</div>
     <div class="sub">${[x.autore ? esc(x.autore) : "", x.stato === "in corso" ? "📖 in corso" : "", x.data ? dataIt(x.data) : ""].filter(Boolean).join(" · ")}</div>
-    ${x.extra?.attori?.length ? `<div class="cast-riga">👥 ${x.extra.attori.slice(0, 3).map((a) => esc(a.nome)).join(" · ")}</div>` : ""}
     ${x.voto ? `<div class="stelle">${stelle(x.voto)}</div>` : ""}
     ${x.commento ? `<div class="commento">“${esc(x.commento)}”</div>` : ""}</div><div class="dx">›</div></div>`;
-}
-const iniziali = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
-const facciaAttore = (a, cls = "cast-ini") => `<span class="${cls}"><span>${esc(iniziali(a.nome))}</span>${a.foto ? `<img src="${esc(a.foto)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>`;
-function htmlCast(x) {
-  if (!["film", "serie"].includes(x.tipo) || !x.id) return "";
-  const l = x.extra?.attori || [];
-  if (!l.length) return `<div class="cast vuoto"><button type="button" class="link-btn" id="cerca-attori">👥 ${x.extra?.attori_cercati ? "Cerca di nuovo gli attori" : "Cerca gli attori principali"}</button></div>`;
-  return `<div class="cast"><div class="cast-tit">👥 Attori principali</div><div class="cast-griglia" id="cast-griglia">${l.map((a, i) => `<button type="button" class="cast-a" data-att="${i}">${facciaAttore(a)}
-    <span class="cast-n"><b>${esc(a.nome)}</b><small>${a.anno ? `classe ${a.anno}` : "anno non noto"}</small></span></button>`).join("")}</div>
-    <div class="cast-fonte">Tocca un attore per vederlo in grande · Fonte: Wikidata</div></div>`;
-}
-function apriAttore(a) {
-  const eta = a.anno ? new Date().getFullYear() - a.anno : null;
-  const grande = a.foto ? { ...a, foto: a.foto.replace(/width=\d+/, "width=900") } : a;
-  foglio(`<div class="attore">${facciaAttore(grande, "attore-foto")}
-    <div class="attore-testo"><h3>${esc(a.nome)}</h3>${a.descr ? `<p>${esc(a.descr[0].toUpperCase() + a.descr.slice(1))}</p>` : ""}
-      <div class="attore-dati">${a.anno ? `<span><small>Anno di nascita</small><b>${a.anno}</b></span><span><small>Età</small><b>circa ${eta} anni</b></span>` : `<span><small>Anno di nascita</small><b>non noto</b></span>`}</div>
-      ${a.id ? `<a class="btn sec block" href="https://www.wikidata.org/wiki/Special:GoToLinkedPage/itwiki/${esc(a.id)}" target="_blank" rel="noopener">Apri su Wikipedia</a>` : ""}
-      <button class="btn block" data-chiudi style="margin-top:8px">Chiudi</button></div></div>`, { classe: "foglio-attore" });
 }
 
 /* Menu principale del Diario: un riquadro per sezione, con un'anteprima di cosa c'è dentro */
@@ -2170,33 +2150,21 @@ async function vistaDiario(tipo) {
 /* ------------------------------------------------------------------ copertine automatiche */
 const copertineAttive = () => memo.get("copertine") !== "no";
 let cercandoCopertine = false;
-const VERS_ATTORI = 2;
 async function cercaCopertineMancanti(lista, dopo) {
   if (!copertineAttive() || cercandoCopertine || !navigator.onLine) return;
-  const serveCop = (x) => !x.extra?.copertina && !x.extra?.copertina_cercata;
-  const serveAtt = (x) => ["film", "serie"].includes(x.tipo) && x.extra?.attori_v !== VERS_ATTORI;   // nuova ricerca (con le foto) anche per chi era già stato cercato
-  const daFare = lista.filter((x) => ["film", "libro", "serie"].includes(x.tipo) && (serveCop(x) || serveAtt(x))).slice(0, 8);
+  const daFare = lista.filter((x) => ["film", "libro", "serie"].includes(x.tipo) && !x.extra?.copertina && !x.extra?.copertina_cercata).slice(0, 12);
   if (!daFare.length) return;
   cercandoCopertine = true;
   let trovate = 0;
   try {
     for (const x of daFare) {
-      const agg = {};
-      if (serveCop(x)) {
-        const c = await window.Copertine.cerca(x.tipo, x.titolo, x.autore);
-        if (c !== null) { agg.copertina = c[0]?.url || null; agg.copertina_cercata = true; if (c[0]) trovate++; }   // null: servizio non raggiungibile, riproverò
-      }
-      if (serveAtt(x)) {
-        const at = await window.Copertine.attori(x.tipo, x.titolo);
-        if (at !== null) { agg.attori = at; agg.attori_cercati = true; agg.attori_v = VERS_ATTORI; if (at.length) trovate++; }
-      }
-      if (!Object.keys(agg).length) continue;
+      const c = await window.Copertine.cerca(x.tipo, x.titolo, x.autore);
+      if (c === null) continue;   // servizio non raggiungibile: riproverò la prossima volta
       // rileggo la voce aggiornata, così non cancello un commento o un voto aggiunto nel frattempo
       const ora = (await api(`/api/diario?tipo=${x.tipo}`, { fresco: true })).find((y) => y.id === x.id);
-      if (!ora) continue;
-      if (ora.extra?.copertina) { delete agg.copertina; delete agg.copertina_cercata; }
-      if (!Object.keys(agg).length) continue;
-      await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...ora, extra: { ...(ora.extra || {}), ...agg } } });
+      if (!ora || ora.extra?.copertina) continue;
+      await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...ora, extra: { ...(ora.extra || {}), copertina: c[0]?.url || null, copertina_cercata: true } } });
+      if (c[0]) trovate++;
       await window.Copertine.attesa(400);
     }
   } finally { cercandoCopertine = false; }
@@ -2297,7 +2265,6 @@ function modificaVoceDiario(x, dopo) {
   const cop = x.extra?.copertina;
   const v = foglio(`<h3>${t.ico} ${x.id ? esc(x.titolo) : comp ? "Nuovo compleanno" : "Aggiungi " + t.nome.toLowerCase()} ${xBtn}</h3>
     ${x.id && !comp ? `<div class="scheda-cop"><button type="button" id="cambia-cop" class="cop-grande">${cop ? `<img src="${esc(cop)}" alt="" referrerpolicy="no-referrer">` : `<span>${t.ico}</span>`}<i>🖼️ ${cop ? "Cambia" : "Aggiungi"} copertina</i></button></div>` : ""}<form id="fd">
-    ${htmlCast(x)}
     <label class="campo"><span>${comp ? "Nome" : "Titolo"}</span><input type="text" name="titolo" value="${esc(x.titolo || "")}" required placeholder="${comp ? "Es. Marco Rossi" : ""}"></label>
     ${comp ? `<div class="riga"><label class="campo"><span>Giorno</span><select name="giorno">${Array.from({ length: 31 }, (_, i) => `<option ${x.giorno === i + 1 ? "selected" : ""}>${i + 1}</option>`).join("")}</select></label>
       <label class="campo" style="flex:2"><span>Mese</span><select name="mese">${MESI_L.map((m, i) => `<option value="${i + 1}" ${x.mese === i + 1 ? "selected" : ""}>${m}</option>`).join("")}</select></label>
@@ -2311,16 +2278,7 @@ function modificaVoceDiario(x, dopo) {
     ${x.id ? `<button type="button" class="btn danger block" id="del" style="margin-top:8px">🗑️ Elimina</button>` : ""}
     ${x.id && comp ? `<button type="button" class="btn sec block" id="cal1" style="margin-top:8px">📲 Promemoria ogni anno nel Calendario</button>` : ""}</form>`);
   $("#cambia-cop", v) && ($("#cambia-cop", v).onclick = () => { v.chiudi(); sceltaCopertina(x, dopo); });
-  $("#cast-griglia", v) && ($("#cast-griglia", v).onclick = (e) => { const b = e.target.closest("[data-att]"); if (b) apriAttore(x.extra.attori[+b.dataset.att]); });
-  $("#cerca-attori", v) && ($("#cerca-attori", v).onclick = async (e) => {
-    e.target.textContent = "Cerco su Wikidata…";
-    const at = await window.Copertine.attori(x.tipo, x.titolo);
-    if (at === null) { toast("⚠️ Wikidata non risponde, riprova più tardi"); e.target.textContent = "👥 Riprova"; return; }
-    if (!at.length) { toast("Non ho trovato gli attori di questo titolo"); e.target.textContent = "👥 Cerca di nuovo gli attori"; return; }
-    const ora = (await api(`/api/diario?tipo=${x.tipo}`, { fresco: true })).find((y) => y.id === x.id) || x;
-    const nuovo = await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...ora, extra: { ...(ora.extra || {}), attori: at, attori_cercati: true, attori_v: VERS_ATTORI } } });
-    v.chiudi(); modificaVoceDiario(nuovo, dopo); if (dopo) dopo();
-  });
+
   const disegnaStelle = () => $$("#si button", v).forEach((b) => b.classList.toggle("on", +b.dataset.s <= voto));
   if (!comp) { disegnaStelle(); $("#si", v).onclick = (e) => { const s = e.target.dataset.s; if (s) { voto = voto === +s ? 0 : +s; disegnaStelle(); } }; }
   $("#fd", v).onsubmit = async (e) => {

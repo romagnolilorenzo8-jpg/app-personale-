@@ -1040,18 +1040,6 @@ button.vuoto-mini { width: 100%; text-align: left; font: inherit; cursor: pointe
 .tab-palestra a { flex: 1; text-align: center; padding: 9px 4px; border-radius: 10px; color: var(--muted); font-weight: 600; font-size: 14.5px; display: flex; gap: 6px; justify-content: center; align-items: center; }
 .tab-palestra a.on { background: var(--card); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
 
-/* --- diario: attori */
-.cast-riga { font-size: 12.5px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cast { margin: -2px 0 16px; }
-.cast.vuoto { text-align: center; }
-.cast-tit { font-size: 12.5px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 0 4px 8px; }
-.cast-griglia { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; }
-.cast-a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); min-width: 0; }
-.cast-ini { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 12.5px; font-weight: 700; color: #fff; background: var(--grad); }
-.cast-n { display: flex; flex-direction: column; min-width: 0; }
-.cast-n b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cast-n small { font-size: 11.5px; color: var(--muted); }
-.cast-fonte { font-size: 11px; color: var(--muted); text-align: right; margin-top: 4px; }
 .cg-testa .btn { flex: none; white-space: nowrap; }
 .sezione > span { white-space: nowrap; font-size: 14px; flex: none; }
 .sezione h2 { min-width: 0; }
@@ -1104,23 +1092,3 @@ button.vuoto-mini { width: 100%; text-align: left; font: inherit; cursor: pointe
 .dm-cop img:nth-child(1) { transform: rotate(-8deg); } .dm-cop img:nth-child(3) { transform: rotate(8deg); }
 @media (min-width: 700px) { .diario-menu { grid-template-columns: repeat(3, 1fr); } .dm-tile { min-height: 190px; } }
 
-/* --- attori con il volto */
-.cast-a { font: inherit; color: var(--text); text-align: left; cursor: pointer; }
-.cast-a:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
-.cast-ini { position: relative; width: 42px; height: 42px; overflow: hidden; }
-.cast-ini > span { position: absolute; inset: 0; display: grid; place-items: center; }
-.cast-ini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
-.foglio-attore { padding-top: 10px; }
-.attore { text-align: center; }
-.attore-foto { position: relative; display: block; width: min(76vw, 300px); aspect-ratio: 3 / 4; margin: 4px auto 14px; border-radius: 26px; overflow: hidden;
-  background: var(--grad); color: #fff; font-size: 64px; font-weight: 700; box-shadow: 0 18px 40px rgba(0, 0, 0, .35); }
-.attore-foto > span { position: absolute; inset: 0; display: grid; place-items: center; }
-.attore-foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
-.attore-testo h3 { justify-content: center; font-size: 24px; margin: 0 0 4px; }
-.attore-testo p { color: var(--muted); margin: 0 0 12px; }
-.attore-dati { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
-.attore-dati span { background: var(--card2); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; }
-.attore-dati small { font-size: 11.5px; color: var(--muted); }
-.attore-dati b { font-size: 17px; }
-.attore-dati span:only-child { grid-column: 1 / -1; }
-.mt-sc small { opacity: .7; font-size: 11px; }
