@@ -1141,7 +1141,10 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
         return {"peso": peso}
     if tipo in ("film", "libro", "serie"):
         cop = e.get("copertina")
-        return {"copertina": cop if isinstance(cop, str) and len(cop) < 400000 else None, "copertina_cercata": bool(e.get("copertina_cercata"))}
+        attori = [{"nome": str(x["nome"])[:80], "anno": _numero(x.get("anno"))} for x in (e.get("attori") or [])[:12] if isinstance(x, dict) and x.get("nome")] \
+            if isinstance(e.get("attori"), list) else []
+        return {"copertina": cop if isinstance(cop, str) and len(cop) < 400000 else None, "copertina_cercata": bool(e.get("copertina_cercata")),
+                "attori": attori, "attori_cercati": bool(e.get("attori_cercati"))}
     return {}
 
 

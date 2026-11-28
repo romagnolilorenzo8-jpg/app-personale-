@@ -1,5 +1,6 @@
 /* LifeApp — copertine di film, serie e libri.
    Fonti pubbliche e gratuite, senza registrazione: Wikipedia (locandine), Open Library e Apple Books (libri).
+   Attori principali di film e serie: Wikidata.
    Viene inviato solo il titolo (e l'autore per i libri). Si può disattivare in Altro. */
 (function () {
   "use strict";
@@ -56,5 +57,35 @@
       img.onerror = rej; img.src = u;
     });
   }
-  window.Copertine = { cerca, riduci, attesa };
+  /* Attori principali di un film o di una serie, da Wikidata (nome e anno di nascita).
+     Restituisce [] se non trova niente, null se il servizio non risponde (si riproverà). */
+  const TIPI_FILM = ["Q11424", "Q24869", "Q202866", "Q229390", "Q506240", "Q20650540", "Q17123180", "Q1054574", "Q2484376"];
+  const TIPI_SERIE = ["Q5398426", "Q1259759", "Q526877", "Q581714", "Q63952888", "Q117467246", "Q15416", "Q21191270"];
+  const wd = (q) => json(`https://www.wikidata.org/w/api.php?${q}&format=json&origin=*`);
+  const valori = (ent, p) => (ent?.claims?.[p] || []).map((c) => c.mainsnak?.datavalue?.value).filter(Boolean);
+  async function attori(tipo, titolo, max = 8) {
+    fallite = 0;
+    const cerca = async (lingua) => (await wd(`action=wbsearchentities&search=${encodeURIComponent(titolo)}&language=${lingua}&uselang=it&type=item&limit=10`))?.search || [];
+    let cand = await cerca("it");
+    if (!cand.length && !fallite) cand = await cerca("en");
+    if (fallite) return null;
+    const parola = tipo === "serie" ? /serie|series|televisi|tv|sitcom|anime|miniserie|show/i : /film|movie|pellicola|cortometraggio|lungometraggio/i;
+    const scelti = cand.filter((c) => parola.test(c.description || "")).slice(0, 4);
+    if (!scelti.length) return [];
+    const ent = (await wd(`action=wbgetentities&ids=${scelti.map((c) => c.id).join("|")}&props=claims`))?.entities;
+    if (!ent) return null;
+    const tipi = tipo === "serie" ? TIPI_SERIE : TIPI_FILM;
+    const ordinati = scelti.map((c) => ent[c.id]).filter((e) => e && valori(e, "P161").length);
+    const opera = ordinati.find((e) => valori(e, "P31").some((v) => tipi.includes(v.id))) || ordinati[0];
+    if (!opera) return [];
+    const ids = valori(opera, "P161").map((v) => v.id).filter((v, i, a) => a.indexOf(v) === i).slice(0, max);
+    const pers = (await wd(`action=wbgetentities&ids=${ids.join("|")}&props=labels|claims&languages=it|en`))?.entities;
+    if (!pers) return null;
+    return ids.map((id) => {
+      const e = pers[id], nome = e?.labels?.it?.value || e?.labels?.en?.value;
+      const nascita = valori(e, "P569")[0]?.time;
+      return nome ? { nome, anno: nascita ? +nascita.slice(1, 5) : null } : null;
+    }).filter(Boolean);
+  }
+  window.Copertine = { cerca, riduci, attesa, attori };
 })();
