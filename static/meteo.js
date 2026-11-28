@@ -21,7 +21,16 @@
 
   const CHIAVE = "scrigno-meteo-luogo";
   const luogo = () => { try { return JSON.parse(localStorage.getItem(CHIAVE) || "null"); } catch { return null; } };
-  const salvaLuogo = (l) => { try { l ? localStorage.setItem(CHIAVE, JSON.stringify(l)) : localStorage.removeItem(CHIAVE); } catch { /* */ } cache = null; };
+  const STORICO = "scrigno-meteo-storico";
+  const storico = () => { try { const l = JSON.parse(localStorage.getItem(STORICO) || "[]"); return Array.isArray(l) ? l : []; } catch { return []; } };
+  const salvaStorico = (l) => { try { localStorage.setItem(STORICO, JSON.stringify(l.slice(0, 10))); } catch { /* */ } };
+  const stesso = (a, b) => a && b && Math.abs(a.lat - b.lat) < 0.02 && Math.abs(a.lon - b.lon) < 0.02;
+  const salvaLuogo = (l) => {
+    try { l ? localStorage.setItem(CHIAVE, JSON.stringify(l)) : localStorage.removeItem(CHIAVE); } catch { /* */ }
+    if (l && !l.gps) salvaStorico([{ nome: l.nome, zona: l.zona || "", lat: l.lat, lon: l.lon }, ...storico().filter((x) => !stesso(x, l))]);   // le città cercate restano nello storico
+    cache = null;
+  };
+  const togliStorico = (l) => salvaStorico(storico().filter((x) => !stesso(x, l)));
   const tondo = (n) => Math.round(n * 100) / 100;   // ~1 km: basta per il meteo
 
   async function json(url) {
@@ -43,9 +52,10 @@
   }
 
   let cache = null;   // { chiave, t, dati } — solo in memoria
+  const tutte = new Map();
   async function previsioni(l) {
     const k = `${l.lat},${l.lon}`;
-    if (cache && cache.chiave === k && Date.now() - cache.t < 10 * 60000) return cache.dati;
+    const c0 = tutte.get(k); if (c0 && Date.now() - c0.t < 10 * 60000) return c0.dati;
     const u = `https://api.open-meteo.com/v1/forecast?latitude=${l.lat}&longitude=${l.lon}&timezone=auto&forecast_days=4` +
       "&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,uv_index,is_day,cloud_cover" +
       "&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,weather_code,is_day" +
@@ -66,8 +76,8 @@
         raffiche: c.wind_gusts_10m, dir: direzione(c.wind_direction_10m), pressione: c.pressure_msl, uv: c.uv_index, uvTesto: uv(c.uv_index), nuvole: c.cloud_cover, pioggiaMm: c.precipitation, ora: c.time.slice(11, 16) },
       oggi: giorni[0], prossimi: giorni.slice(1, 4), ore,
     };
-    cache = { chiave: k, t: Date.now(), dati };
+    tutte.set(k, { t: Date.now(), dati });
     return dati;
   }
-  glob.Meteo = { luogo, salvaLuogo, cercaCitta, posizioneAttuale, previsioni, cielo, uv };
+  glob.Meteo = { luogo, salvaLuogo, storico, togliStorico, stesso, cercaCitta, posizioneAttuale, previsioni, cielo, uv };
 })(window);
