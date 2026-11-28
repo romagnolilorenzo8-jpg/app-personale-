@@ -1058,3 +1058,69 @@ button.vuoto-mini { width: 100%; text-align: left; font: inherit; cursor: pointe
 .mt-temp sup { margin-left: 2px; }
 @media (min-width: 1000px) { .filtri-app { flex-wrap: wrap; overflow: visible; } }
 .rapide { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); } .rapida small { line-height: 1.25; }
+
+/* --- Home: icona dell'app in alto a destra */
+.logo-app { width: 46px; height: 46px; border-radius: 13px; overflow: hidden; flex: none; box-shadow: 0 6px 18px rgba(29, 78, 216, .35), 0 0 0 1px rgba(255, 255, 255, .08) inset; }
+.logo-app img { width: 100%; height: 100%; display: block; }
+/* --- Home: prossimi appuntamenti con il colore della categoria */
+.prossimi { display: flex; flex-direction: column; gap: 6px; }
+.pr-app { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--c) 13%, var(--card)), var(--card) 55%); border: 1px solid color-mix(in srgb, var(--c) 28%, var(--line));
+  border-left: 4px solid var(--c); border-radius: 14px; padding: 10px 12px; }
+.pr-app:hover { border-color: color-mix(in srgb, var(--c) 55%, var(--line)); }
+.pr-data { width: 42px; flex: none; display: flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.pr-data small { font-size: 10.5px; font-weight: 700; text-transform: uppercase; color: var(--c); letter-spacing: .04em; }
+.pr-data b { font-size: 21px; font-variant-numeric: tabular-nums; }
+.pr-corpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pr-corpo b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-corpo > span { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-cat { font-style: normal; font-weight: 650; color: var(--text); background: color-mix(in srgb, var(--c) 20%, transparent); padding: 1px 7px; border-radius: 6px; margin-right: 6px; font-size: 11.5px; }
+.pr-quando { flex: none; font-size: 12px; font-weight: 600; color: var(--muted); }
+.pr-quando.vicino { color: var(--c); }
+/* --- meteo: città cercate */
+.mt-storico { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 10px -2px 0; padding: 0 2px 2px; }
+.mt-storico::-webkit-scrollbar { display: none; }
+.mt-sc { flex: none; border: 1px solid var(--line); background: var(--card2); color: var(--text); font: inherit; font-size: 13px; font-weight: 550; padding: 6px 11px; border-radius: 999px; cursor: pointer; }
+.mt-sc.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.mt-sc.piu { color: var(--accent); border-style: dashed; background: none; }
+
+/* --- Diario: menu principale a riquadri (stile widget) */
+.diario-menu { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.dm-tile { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; min-height: 168px; padding: 14px;
+  border-radius: 24px; color: #fff; background: linear-gradient(145deg, var(--a), var(--b)); box-shadow: 0 10px 26px color-mix(in srgb, var(--a) 30%, transparent);
+  isolation: isolate; transition: transform .2s cubic-bezier(.2, .8, .2, 1); }
+.dm-tile::before { content: ""; position: absolute; inset: 0; z-index: -1; background: radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, .28), transparent 55%); }
+.dm-tile:hover { transform: translateY(-3px); }
+.dm-tile:active { transform: scale(.97); }
+.dm-alto { display: flex; align-items: flex-start; justify-content: space-between; }
+.dm-ico { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; font-size: 26px; background: rgba(255, 255, 255, .2);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35); }
+.dm-n { font-size: 32px; font-weight: 700; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.dm-testo { display: flex; flex-direction: column; gap: 2px; min-width: 0; position: relative; z-index: 1; }
+.dm-testo b { font-size: 18px; letter-spacing: -.01em; }
+.dm-testo small { font-size: 12.5px; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-cop { position: absolute; right: 10px; bottom: 44px; display: flex; z-index: 0; }
+.dm-cop img { width: 34px; height: 50px; object-fit: cover; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .85); box-shadow: 0 4px 10px rgba(0, 0, 0, .3); margin-left: -12px; }
+.dm-cop img:nth-child(1) { transform: rotate(-8deg); } .dm-cop img:nth-child(3) { transform: rotate(8deg); }
+@media (min-width: 700px) { .diario-menu { grid-template-columns: repeat(3, 1fr); } .dm-tile { min-height: 190px; } }
+
+/* --- attori con il volto */
+.cast-a { font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.cast-a:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.cast-ini { position: relative; width: 42px; height: 42px; overflow: hidden; }
+.cast-ini > span { position: absolute; inset: 0; display: grid; place-items: center; }
+.cast-ini img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.foglio-attore { padding-top: 10px; }
+.attore { text-align: center; }
+.attore-foto { position: relative; display: block; width: min(76vw, 300px); aspect-ratio: 3 / 4; margin: 4px auto 14px; border-radius: 26px; overflow: hidden;
+  background: var(--grad); color: #fff; font-size: 64px; font-weight: 700; box-shadow: 0 18px 40px rgba(0, 0, 0, .35); }
+.attore-foto > span { position: absolute; inset: 0; display: grid; place-items: center; }
+.attore-foto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 20%; }
+.attore-testo h3 { justify-content: center; font-size: 24px; margin: 0 0 4px; }
+.attore-testo p { color: var(--muted); margin: 0 0 12px; }
+.attore-dati { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
+.attore-dati span { background: var(--card2); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; }
+.attore-dati small { font-size: 11.5px; color: var(--muted); }
+.attore-dati b { font-size: 17px; }
+.attore-dati span:only-child { grid-column: 1 / -1; }
+.mt-sc small { opacity: .7; font-size: 11px; }

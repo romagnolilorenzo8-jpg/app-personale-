@@ -62,7 +62,7 @@ $ws  = New-Object -ComObject WScript.Shell
 $lnk = $ws.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'LifeApp.lnk'))
 $lnk.TargetPath = Join-Path $dest 'avvia.bat'
 $lnk.WorkingDirectory = $dest
-$lnk.IconLocation = (Join-Path $dest 'strumenti\scrigno.ico') + ',0'
+$lnk.IconLocation = (Join-Path $dest 'strumenti\lifeapp.ico') + ',0'
 $lnk.Description = 'Avvia LifeApp'
 $lnk.Save()
 Write-Host "Creata l'icona 'LifeApp' sul Desktop." -ForegroundColor Green

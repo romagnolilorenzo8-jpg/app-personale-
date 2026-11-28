@@ -427,8 +427,10 @@
     }
     if (["film", "libro", "serie"].includes(tipo)) {
       const cop = typeof e.copertina === "string" && e.copertina.length < 400000 ? e.copertina : null;
-      const attori = Array.isArray(e.attori) ? e.attori.slice(0, 12).filter((x) => x && x.nome).map((x) => ({ nome: String(x.nome).slice(0, 80), anno: numero(x.anno) })) : [];
-      return { copertina: cop, copertina_cercata: !!e.copertina_cercata, attori, attori_cercati: !!e.attori_cercati };
+      const https = (u) => (typeof u === "string" && /^https:\/\//.test(u) && u.length < 400 ? u : null);
+      const attori = Array.isArray(e.attori) ? e.attori.slice(0, 12).filter((x) => x && x.nome).map((x) => ({ id: /^Q\d+$/.test(x.id || "") ? x.id : null, nome: String(x.nome).slice(0, 80),
+        anno: numero(x.anno), foto: https(x.foto), descr: String(x.descr || "").slice(0, 120) })) : [];
+      return { copertina: cop, copertina_cercata: !!e.copertina_cercata, attori, attori_cercati: !!e.attori_cercati, attori_v: numero(e.attori_v) };
     }
     return {};
   }

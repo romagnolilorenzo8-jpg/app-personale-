@@ -63,28 +63,46 @@
   const TIPI_SERIE = ["Q5398426", "Q1259759", "Q526877", "Q581714", "Q63952888", "Q117467246", "Q15416", "Q21191270"];
   const wd = (q) => json(`https://www.wikidata.org/w/api.php?${q}&format=json&origin=*`);
   const valori = (ent, p) => (ent?.claims?.[p] || []).map((c) => c.mainsnak?.datavalue?.value).filter(Boolean);
+  const fotoComm = (file) => (file ? `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(String(file).replace(/ /g, "_"))}?width=360` : null);
+  /* se la ricerca su Wikidata non trova il titolo, passo dalla pagina di Wikipedia (come per le copertine) */
+  async function operaDaWikipedia(tipo, titolo) {
+    for (const lingua of ["it", "en"]) {
+      const q = `${titolo} ${tipo === "serie" ? (lingua === "it" ? "serie televisiva" : "TV series") : "film"}`;
+      const d = await json(`https://${lingua}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrlimit=4&prop=pageprops&ppprop=wikibase_item&format=json&origin=*`,
+        { headers: { "Api-User-Agent": "LifeApp/1.0 (app personale)" } });
+      const ids = Object.values(d?.query?.pages || {}).sort((a, b) => a.index - b.index).map((x) => x.pageprops?.wikibase_item).filter(Boolean);
+      if (ids.length) return ids;
+    }
+    return [];
+  }
   async function attori(tipo, titolo, max = 8) {
     fallite = 0;
+    const tipi = tipo === "serie" ? TIPI_SERIE : TIPI_FILM;
+    const parola = tipo === "serie" ? /serie|series|televisi|tv|sitcom|anime|miniserie|show/i : /film|movie|pellicola|cortometraggio|lungometraggio/i;
+    // tra i candidati scelgo l'opera giusta (film o serie) che ha il cast
+    const scegli = async (ids) => {
+      if (!ids.length) return null;
+      const ent = (await wd(`action=wbgetentities&ids=${ids.join("|")}&props=claims`))?.entities;
+      if (!ent) return undefined;
+      const conCast = ids.map((id) => ent[id]).filter((e) => e && valori(e, "P161").length);
+      return conCast.find((e) => valori(e, "P31").some((v) => tipi.includes(v.id))) || conCast[0] || null;
+    };
     const cerca = async (lingua) => (await wd(`action=wbsearchentities&search=${encodeURIComponent(titolo)}&language=${lingua}&uselang=it&type=item&limit=10`))?.search || [];
     let cand = await cerca("it");
-    if (!cand.length && !fallite) cand = await cerca("en");
-    if (fallite) return null;
-    const parola = tipo === "serie" ? /serie|series|televisi|tv|sitcom|anime|miniserie|show/i : /film|movie|pellicola|cortometraggio|lungometraggio/i;
-    const scelti = cand.filter((c) => parola.test(c.description || "")).slice(0, 4);
-    if (!scelti.length) return [];
-    const ent = (await wd(`action=wbgetentities&ids=${scelti.map((c) => c.id).join("|")}&props=claims`))?.entities;
-    if (!ent) return null;
-    const tipi = tipo === "serie" ? TIPI_SERIE : TIPI_FILM;
-    const ordinati = scelti.map((c) => ent[c.id]).filter((e) => e && valori(e, "P161").length);
-    const opera = ordinati.find((e) => valori(e, "P31").some((v) => tipi.includes(v.id))) || ordinati[0];
-    if (!opera) return [];
+    if (!cand.some((c) => parola.test(c.description || "")) && !fallite) cand = [...cand, ...await cerca("en")];
+    if (fallite) return null;   // Wikidata non risponde: riproverò la prossima volta
+    let opera = await scegli(cand.filter((c) => parola.test(c.description || "")).map((c) => c.id).filter((v, i, a) => a.indexOf(v) === i).slice(0, 4));
+    if (opera === undefined) return null;
+    if (!opera) { opera = await scegli((await operaDaWikipedia(tipo, titolo)).slice(0, 3)); if (opera === undefined) return null; }
+    if (!opera) return fallite ? null : [];
     const ids = valori(opera, "P161").map((v) => v.id).filter((v, i, a) => a.indexOf(v) === i).slice(0, max);
-    const pers = (await wd(`action=wbgetentities&ids=${ids.join("|")}&props=labels|claims&languages=it|en`))?.entities;
+    const pers = (await wd(`action=wbgetentities&ids=${ids.join("|")}&props=labels|descriptions|claims&languages=it|en`))?.entities;
     if (!pers) return null;
     return ids.map((id) => {
       const e = pers[id], nome = e?.labels?.it?.value || e?.labels?.en?.value;
-      const nascita = valori(e, "P569")[0]?.time;
-      return nome ? { nome, anno: nascita ? +nascita.slice(1, 5) : null } : null;
+      const nascita = valori(e, "P569")[0]?.time, img = valori(e, "P18")[0];
+      return nome ? { id, nome, anno: nascita ? +nascita.slice(1, 5) : null, foto: typeof img === "string" ? fotoComm(img) : null,
+        descr: (e.descriptions?.it?.value || e.descriptions?.en?.value || "").slice(0, 120) } : null;
     }).filter(Boolean);
   }
   window.Copertine = { cerca, riduci, attesa, attori };

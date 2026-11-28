@@ -1141,10 +1141,13 @@ def _norm_extra(tipo: str, e: dict | None) -> dict:
         return {"peso": peso}
     if tipo in ("film", "libro", "serie"):
         cop = e.get("copertina")
-        attori = [{"nome": str(x["nome"])[:80], "anno": _numero(x.get("anno"))} for x in (e.get("attori") or [])[:12] if isinstance(x, dict) and x.get("nome")] \
-            if isinstance(e.get("attori"), list) else []
+        def https(u):
+            return u if isinstance(u, str) and u.startswith("https://") and len(u) < 400 else None
+        attori = [{"id": x.get("id") if re.fullmatch(r"Q\d+", str(x.get("id") or "")) else None, "nome": str(x["nome"])[:80], "anno": _numero(x.get("anno")),
+                   "foto": https(x.get("foto")), "descr": str(x.get("descr") or "")[:120]}
+                  for x in (e.get("attori") or [])[:12] if isinstance(x, dict) and x.get("nome")] if isinstance(e.get("attori"), list) else []
         return {"copertina": cop if isinstance(cop, str) and len(cop) < 400000 else None, "copertina_cercata": bool(e.get("copertina_cercata")),
-                "attori": attori, "attori_cercati": bool(e.get("attori_cercati"))}
+                "attori": attori, "attori_cercati": bool(e.get("attori_cercati")), "attori_v": _numero(e.get("attori_v"))}
     return {}
 
 

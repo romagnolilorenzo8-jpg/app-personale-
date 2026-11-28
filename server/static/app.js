@@ -552,6 +552,15 @@ const vociProssime = (l) => l.map((a) => { const g = GRUPPI_APP[gruppoDi(a.categ
   return { tipo: "app", data: a.inizio.slice(0, 10), ora: a.tutto_il_giorno ? "" : oraDa(a.inizio), titolo: a.titolo, ico: a.icona || g.ico, col: g.col, etichetta: g.nome, rif: a }; });
 
 /* ================================================================== HOME */
+function htmlProssimiColore(lista) {   // ogni appuntamento con il colore della sua categoria
+  return `<div class="prossimi">${lista.map((x, i) => {
+    const d = new Date(x.data + "T00:00"), g = giorniA(x.data);
+    const quando = g < 0 ? "In corso" : g === 0 ? "Oggi" : g === 1 ? "Domani" : `Tra ${g} giorni`;
+    return `<button type="button" class="pr-app" data-pc="${i}" style="--c:${x.col}"><span class="pr-data"><small>${MESI[d.getMonth()]}</small><b>${d.getDate()}</b></span>
+      <span class="pr-corpo"><b>${esc(x.ico)} ${esc(x.titolo)}</b><span><i class="pr-cat">${esc(x.etichetta)}</i>${GIORNI[d.getDay()]}${x.ora ? " · " + x.ora : ""}</span></span>
+      <span class="pr-quando ${g <= 1 ? "vicino" : ""}">${quando}</span></button>`;
+  }).join("")}</div>`;
+}
 async function vistaHome() {
   const [info, comp, appts, allen, corse] = await Promise.all([LOC ? api("/api/impostazioni") : Promise.resolve(null), api("/api/diario?tipo=compleanno"),
     api("/api/appuntamenti"), api("/api/diario?tipo=allenamento"), api("/api/diario?tipo=corsa")]);
@@ -563,7 +572,8 @@ async function vistaHome() {
   const palestraSub = [ultAll ? `🏋️ ${dataIt(ultAll.data).replace(/ \d{4}$/, "")} · ${ultAll.esercizi.length} eserciz${ultAll.esercizi.length === 1 ? "io" : "i"}` : "",
     ultC ? `🏃 ${kmT(ultC.extra.km)} km a ${passoTesto(ultC.extra.passo)}/km` : ""].filter(Boolean).join(" · ") || "Allenamenti, corse e peso";
   app.innerHTML = `
-    <div class="top home-top"><h1>${saluto}<small>${GIORNI[oggi.getDay()]} ${oggi.getDate()} ${MESI_L[oggi.getMonth()]}</small></h1></div>
+    <div class="top home-top"><h1>${saluto}<small>${GIORNI[oggi.getDay()]} ${oggi.getDate()} ${MESI_L[oggi.getMonth()]}</small></h1>
+      <a class="logo-app" href="#/io" aria-label="I miei dati"><img src="static/icona.svg" alt="LifeApp"></a></div>
     ${bannerInstalla()}
     ${compOggi.map((x) => `<a class="avviso festa" href="#/diario/compleanno"><div class="av-ico">🎂</div><div style="flex:1"><b>${infoComp(x).g === 0 ? "Oggi" : "Domani"} è il compleanno di ${esc(x.titolo)}!</b><div class="small">${infoComp(x).anni ? `Compie ${infoComp(x).anni} anni. ` : ""}Ricordati gli auguri 🎉</div></div></a>`).join("")}
     <div class="cerca-home"><svg class="ico"><use href="#i-cerca"/></svg><input type="search" id="q" placeholder="Cerca nei documenti…" enterkeyhint="search" autocomplete="off"></div>
@@ -579,7 +589,7 @@ async function vistaHome() {
         <section class="meteo" id="meteo" aria-label="Meteo"><div class="mt-carico">Carico il meteo…</div></section>
       </div>
       <div class="col">
-        <div class="sezione"><h2>Prossimi appuntamenti</h2><span><button class="link-btn" id="h-nuovo">＋ Nuovo</button> · <a href="#/agenda">Calendario</a></span></div>
+        <div class="sezione"><h2>Prossimi appuntamenti</h2><button class="link-btn" id="h-nuovo">＋ Nuovo</button></div>
         <div id="h-app"></div>
         <a class="palestra-card" href="#/palestra"><span class="pc-ico">🏋️</span><div style="flex:1;min-width:0"><b>Palestra</b><div class="small muted">${palestraSub}</div></div><span class="dx">›</span></a>
         ${S.daSmistare ? `<a class="avviso" href="#/da-smistare"><div class="av-ico">📥</div><div style="flex:1"><b>${S.daSmistare} document${S.daSmistare === 1 ? "o" : "i"} da sistemare</b><div class="small muted">Tocca per metterl${S.daSmistare === 1 ? "o" : "i"} nella cartella giusta</div></div><span class="dx">›</span></a>` : ""}
@@ -601,7 +611,7 @@ async function vistaHome() {
     appts.forEach((a) => { const k = gruppoDi(a.categoria); conte[k] = (conte[k] || 0) + 1; });
     visibili = vociProssime(appts.filter((a) => on.includes(gruppoDi(a.categoria))).slice(0, 8));
     $("#h-app").innerHTML = htmlFiltriApp(conte) + (!on.length ? `<div class="card vuoto-mini">Hai spento tutte le categorie: tocca quelle che vuoi vedere.</div>`
-      : visibili.length ? htmlProssime(visibili) : `<button class="card vuoto-mini" id="h-vuoto">✨ Niente in programma${on.length < Object.keys(GRUPPI_APP).length ? " in queste categorie" : ""}. <b>Aggiungi un appuntamento →</b></button>`);
+      : visibili.length ? htmlProssimiColore(visibili) : `<button class="card vuoto-mini" id="h-vuoto">✨ Niente in programma${on.length < Object.keys(GRUPPI_APP).length ? " in queste categorie" : ""}. <b>Aggiungi un appuntamento →</b></button>`);
   };
   collegaFiltriApp($("#h-app"), disegnaApp);
   $("#h-app").addEventListener("click", (e) => {
@@ -646,6 +656,7 @@ async function disegnaMeteo(el) {
     const nomeG = (iso) => { const x = new Date(iso + "T00:00"), g = GIORNI[x.getDay()]; return `${g[0].toUpperCase()}${g.slice(1, 3)} ${x.getDate()}`; };
     el.innerHTML = `
       <div class="mt-testa"><button class="mt-luogo" id="mt-luogo">📍 ${esc(l.nome)} <span>⌄</span></button><span class="mt-agg">aggiornato alle ${a.ora}</span></div>
+      ${htmlStoricoMeteo(l)}
       <div class="mt-ora"><div class="mt-ico">${a.ico}</div><div class="mt-temp">${Math.round(a.temp)}<sup>°</sup></div>
         <div class="mt-info"><b>${a.testo}</b><span>Percepita ${Math.round(a.percepita)}°</span><span>Max ${Math.round(o.max)}° · min ${Math.round(o.min)}°</span></div></div>
       <div class="mt-griglia">
@@ -661,17 +672,44 @@ async function disegnaMeteo(el) {
         <div class="mt-gt"><b>${Math.round(g.max)}°</b><span>${Math.round(g.min)}°</span></div>
         <div class="mt-gd"><span>Pioggia</span><b>${g.pioggia ?? 0}%</b></div><div class="mt-gd"><span>Umidità</span><b>${g.umidita ?? "—"}%</b></div><div class="mt-gd"><span>Vento</span><b>${Math.round(g.vento)} km/h</b></div></div>`).join("")}</div>`;
     $("#mt-luogo", el).onclick = () => sceltaCitta(() => disegnaMeteo(el));
+    collegaStoricoMeteo(el);
   } catch (e) {
     if (!el.isConnected) return;
-    el.innerHTML = `<div class="mt-vuoto"><div class="mt-big-ico">📡</div><b>Meteo non disponibile</b><p class="small muted">${esc(e.message)}</p><button class="btn sec" id="mt-riprova">Riprova</button></div>`;
+    el.innerHTML = `${htmlStoricoMeteo(l)}<div class="mt-vuoto"><div class="mt-big-ico">📡</div><b>Meteo non disponibile</b><p class="small muted">${esc(e.message)}</p><button class="btn sec" id="mt-riprova">Riprova</button></div>`;
     $("#mt-riprova", el).onclick = () => disegnaMeteo(el);
+    collegaStoricoMeteo(el);
   }
+}
+/* le città già cercate restano qui: un tocco e vedi il loro meteo */
+function htmlStoricoMeteo(l) {
+  const st = window.Meteo.storico();
+  return `<div class="mt-storico">${l?.gps ? "" : `<button type="button" class="mt-sc" data-gps="1">📍 Qui</button>`}
+    ${st.map((c, i) => { const doppio = st.some((d, j) => j !== i && d.nome === c.nome) && c.zona;
+      return `<button type="button" class="mt-sc ${window.Meteo.stesso(c, l) ? "on" : ""}" data-sc="${i}">${esc(c.nome)}${doppio ? ` <small>${esc(c.zona.split(",")[0])}</small>` : ""}</button>`; }).join("")}
+    <button type="button" class="mt-sc piu" data-piu="1" aria-label="Cerca un'altra città">＋ Città</button></div>`;
+}
+function collegaStoricoMeteo(el) {
+  const box = $(".mt-storico", el); if (!box) return;
+  box.onclick = async (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.piu) return sceltaCitta(() => disegnaMeteo(el));
+    if (b.dataset.gps) { try { window.Meteo.salvaLuogo(await window.Meteo.posizioneAttuale()); } catch (err) { return toast("⚠️ " + err.message, 3500); } }
+    else window.Meteo.salvaLuogo(window.Meteo.storico()[+b.dataset.sc]);
+    disegnaMeteo(el);
+  };
 }
 function sceltaCitta(dopo) {
   const v = foglio(`<h3>📍 Luogo del meteo ${xBtn}</h3>
     <button class="btn block" id="sc-gps">📍 Usa la mia posizione attuale</button>
     <form id="sc-f" class="riga" style="margin-top:12px"><input type="search" name="q" placeholder="Cerca una città…" autocomplete="off" enterkeyhint="search"><button class="btn">Cerca</button></form>
-    <div class="lista" id="sc-ris" style="margin-top:10px"></div>`);
+    <div class="lista" id="sc-ris" style="margin-top:10px"></div>
+    ${window.Meteo.storico().length ? `<div class="sezione" style="margin-top:18px"><h2>Città cercate</h2></div><div class="lista" id="sc-storico">${window.Meteo.storico().map((c, i) =>
+      `<div class="voce" data-st="${i}"><div class="thumb">🕘</div><div class="corpo"><div class="tit">${esc(c.nome)}</div><div class="sub">${esc(c.zona || "")}</div></div><button class="btn sec small" data-togli="${i}" aria-label="Togli ${esc(c.nome)}">✕</button></div>`).join("")}</div>` : ""}`);
+  $("#sc-storico", v) && ($("#sc-storico", v).onclick = (e) => {
+    const t = e.target.closest("[data-togli]");
+    if (t) { window.Meteo.togliStorico(window.Meteo.storico()[+t.dataset.togli]); t.closest(".voce").remove(); return; }
+    const r = e.target.closest("[data-st]"); if (r) { window.Meteo.salvaLuogo(window.Meteo.storico()[+r.dataset.st]); v.chiudi(); dopo(); }
+  });
   $("#sc-gps", v).onclick = async () => { try { window.Meteo.salvaLuogo(await window.Meteo.posizioneAttuale()); v.chiudi(); dopo(); } catch (e) { toast("⚠️ " + e.message, 3500); } };
   $("#sc-f", v).onsubmit = async (e) => {
     e.preventDefault();
@@ -680,7 +718,7 @@ function sceltaCitta(dopo) {
       const l = await window.Meteo.cercaCitta(q);
       $("#sc-ris", v).innerHTML = l.length ? l.map((c, i) => `<div class="voce" data-i="${i}"><div class="thumb">📍</div><div class="corpo"><div class="tit">${esc(c.nome)}</div><div class="sub">${esc(c.zona)}</div></div></div>`).join("")
         : `<div class="small muted" style="padding:12px">Nessuna città trovata</div>`;
-      $$("#sc-ris [data-i]", v).forEach((b) => (b.onclick = () => { const c = l[+b.dataset.i]; window.Meteo.salvaLuogo({ nome: c.nome, lat: c.lat, lon: c.lon }); v.chiudi(); dopo(); }));
+      $$("#sc-ris [data-i]", v).forEach((b) => (b.onclick = () => { const c = l[+b.dataset.i]; window.Meteo.salvaLuogo({ nome: c.nome, zona: c.zona, lat: c.lat, lon: c.lon }); v.chiudi(); dopo(); }));
     } catch (err) { toast("⚠️ " + err.message); }
   };
   setTimeout(() => $("#sc-f [name=q]", v)?.focus(), 80);
@@ -2060,15 +2098,47 @@ function htmlVoceDiario(x) {
     ${x.commento ? `<div class="commento">“${esc(x.commento)}”</div>` : ""}</div><div class="dx">›</div></div>`;
 }
 const iniziali = (n) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+const facciaAttore = (a, cls = "cast-ini") => `<span class="${cls}"><span>${esc(iniziali(a.nome))}</span>${a.foto ? `<img src="${esc(a.foto)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}</span>`;
 function htmlCast(x) {
   if (!["film", "serie"].includes(x.tipo) || !x.id) return "";
   const l = x.extra?.attori || [];
   if (!l.length) return `<div class="cast vuoto"><button type="button" class="link-btn" id="cerca-attori">👥 ${x.extra?.attori_cercati ? "Cerca di nuovo gli attori" : "Cerca gli attori principali"}</button></div>`;
-  return `<div class="cast"><div class="cast-tit">👥 Attori principali</div><div class="cast-griglia">${l.map((a) => `<div class="cast-a"><span class="cast-ini">${esc(iniziali(a.nome))}</span>
-    <span class="cast-n"><b>${esc(a.nome)}</b><small>${a.anno ? `classe ${a.anno}` : "anno di nascita non noto"}</small></span></div>`).join("")}</div>
-    <div class="cast-fonte">Fonte: Wikidata</div></div>`;
+  return `<div class="cast"><div class="cast-tit">👥 Attori principali</div><div class="cast-griglia" id="cast-griglia">${l.map((a, i) => `<button type="button" class="cast-a" data-att="${i}">${facciaAttore(a)}
+    <span class="cast-n"><b>${esc(a.nome)}</b><small>${a.anno ? `classe ${a.anno}` : "anno non noto"}</small></span></button>`).join("")}</div>
+    <div class="cast-fonte">Tocca un attore per vederlo in grande · Fonte: Wikidata</div></div>`;
+}
+function apriAttore(a) {
+  const eta = a.anno ? new Date().getFullYear() - a.anno : null;
+  const grande = a.foto ? { ...a, foto: a.foto.replace(/width=\d+/, "width=900") } : a;
+  foglio(`<div class="attore">${facciaAttore(grande, "attore-foto")}
+    <div class="attore-testo"><h3>${esc(a.nome)}</h3>${a.descr ? `<p>${esc(a.descr[0].toUpperCase() + a.descr.slice(1))}</p>` : ""}
+      <div class="attore-dati">${a.anno ? `<span><small>Anno di nascita</small><b>${a.anno}</b></span><span><small>Età</small><b>circa ${eta} anni</b></span>` : `<span><small>Anno di nascita</small><b>non noto</b></span>`}</div>
+      ${a.id ? `<a class="btn sec block" href="https://www.wikidata.org/wiki/Special:GoToLinkedPage/itwiki/${esc(a.id)}" target="_blank" rel="noopener">Apri su Wikipedia</a>` : ""}
+      <button class="btn block" data-chiudi style="margin-top:8px">Chiudi</button></div></div>`, { classe: "foglio-attore" });
 }
 
+/* Menu principale del Diario: un riquadro per sezione, con un'anteprima di cosa c'è dentro */
+const COLORI_D = { film: ["#6d28d9", "#db2777"], libro: ["#0369a1", "#0891b2"], serie: ["#b91c1c", "#ea580c"], compleanno: ["#be185d", "#f59e0b"], esame: ["#1d4ed8", "#7c3aed"], acquisto: ["#047857", "#0d9488"] };
+async function vistaDiarioMenu() {
+  const tutte = await api("/api/diario");
+  const di = (t) => tutte.filter((x) => x.tipo === t).sort((a, b) => (b.data || "").localeCompare(a.data || "") || b.id - a.id);
+  const comp = di("compleanno").map((x) => ({ x, i: infoComp(x) })).sort((a, b) => a.i.g - b.i.g)[0];
+  const st = statEsami(di("esame")), bil = bilancio(di("acquisto")), inCorso = di("libro").find((x) => x.stato === "in corso");
+  const sotto = {
+    film: di("film")[0] ? `Ultimo: ${di("film")[0].titolo}` : "I film che hai visto",
+    libro: inCorso ? `Stai leggendo: ${inCorso.titolo}` : di("libro")[0] ? `Ultimo: ${di("libro")[0].titolo}` : "I libri che hai letto",
+    serie: di("serie")[0] ? `Ultima: ${di("serie")[0].titolo}` : "Le serie che hai visto",
+    compleanno: comp ? `${comp.x.titolo} · ${comp.i.quando.replace("🎉 ", "").toLowerCase()}` : "Non dimenticarne nessuno",
+    esame: st.n ? `Media ${dec(st.ponderata ?? st.media, 2)} · ${st.cfu} CFU` : "Voti, crediti e media",
+    acquisto: di("acquisto").length ? `Bilancio ${segno(Math.round(bil.saldo))}` : "Spese e rivendite",
+  };
+  const copertine = (t) => di(t).filter((x) => x.extra?.copertina).slice(0, 3).map((x) => x.extra.copertina);
+  app.innerHTML = `<div class="top"><h1>Diario<small>La tua vita, in un posto solo</small></h1></div>
+    <div class="diario-menu">${Object.entries(TIPI_D).map(([k, v]) => `<a class="dm-tile" href="#/diario/${k}" style="--a:${COLORI_D[k][0]};--b:${COLORI_D[k][1]}">
+      <span class="dm-alto"><span class="dm-ico">${v.ico}</span><span class="dm-n">${di(k).length}</span></span>
+      ${copertine(k).length ? `<span class="dm-cop">${copertine(k).map((u) => `<img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">`).join("")}</span>` : ""}
+      <span class="dm-testo"><b>${v.nome}</b><small>${esc(sotto[k])}</small></span></a>`).join("")}</div>`;
+}
 async function vistaDiario(tipo) {
   tipo = TIPI_D[tipo] ? tipo : "film";
   const tutte = await api("/api/diario");
@@ -2079,8 +2149,8 @@ async function vistaDiario(tipo) {
   const tuttiAcq = lista;
   if (filtro === "venduti") lista = lista.filter((x) => x.extra?.vendita != null);
   if (filtro === "da-vendere") lista = lista.filter((x) => x.extra?.vendita == null);
-  app.innerHTML = `<div class="top"><h1>Diario<small>La mia vita: film, libri, serie e compleanni</small></h1></div>
-    <div class="segmenti">${Object.entries(TIPI_D).map(([k, v]) => `<a href="#/diario/${k}" class="${k === tipo ? "on" : ""}"><span>${v.ico}</span>${v.nome}<b>${conta(k) || ""}</b></a>`).join("")}</div>
+  app.innerHTML = `<div class="top"><a class="iconbtn" href="#/diario" aria-label="Diario">‹</a><h1>${t.ico} ${t.nome}<small>${conta(tipo) ? `${conta(tipo)} nel diario` : "Ancora vuoto"}</small></h1></div>
+
     ${tipo === "acquisto" && tuttiAcq.length ? htmlBilancio(bilancio(tuttiAcq), filtro) + `<div class="grafico-card"><div class="g-tit">Spese e incassi mese per mese</div><div id="g-acq"></div></div>` : ""}
     ${tipo === "esame" && lista.length && (statEsami(lista).n || statEsami(lista).idonei) ? htmlStatEsami(statEsami(lista)) + `<div class="grafico-card"><div class="g-tit">Andamento dei voti</div><div id="g-voti"></div></div>` : ""}
     ${tipo === "compleanno" ? `<div class="riga" style="margin:4px 0 12px"><button class="btn sec" id="imp-comp">📥 Importa dai Promemoria</button>${lista.length ? `<button class="btn sec" id="cal-comp">🔔 Notifiche</button>` : ""}</div>` : ""}
@@ -2096,15 +2166,15 @@ async function vistaDiario(tipo) {
   $("#imp-comp") && ($("#imp-comp").onclick = () => importaCompleanni(() => vistaDiario("compleanno")));
   const b = document.createElement("button"); b.className = "fab"; b.innerHTML = "<span>＋</span>";
   b.onclick = () => modificaVoceDiario({ tipo, data: oggiIso(), extra: {} }, () => vistaDiario(tipo)); app.appendChild(b);
-  const seg = $(".segmenti .on"); seg && seg.scrollIntoView({ inline: "center", block: "nearest" });
 }
 /* ------------------------------------------------------------------ copertine automatiche */
 const copertineAttive = () => memo.get("copertine") !== "no";
 let cercandoCopertine = false;
+const VERS_ATTORI = 2;
 async function cercaCopertineMancanti(lista, dopo) {
   if (!copertineAttive() || cercandoCopertine || !navigator.onLine) return;
   const serveCop = (x) => !x.extra?.copertina && !x.extra?.copertina_cercata;
-  const serveAtt = (x) => ["film", "serie"].includes(x.tipo) && !x.extra?.attori_cercati;
+  const serveAtt = (x) => ["film", "serie"].includes(x.tipo) && x.extra?.attori_v !== VERS_ATTORI;   // nuova ricerca (con le foto) anche per chi era già stato cercato
   const daFare = lista.filter((x) => ["film", "libro", "serie"].includes(x.tipo) && (serveCop(x) || serveAtt(x))).slice(0, 8);
   if (!daFare.length) return;
   cercandoCopertine = true;
@@ -2118,7 +2188,7 @@ async function cercaCopertineMancanti(lista, dopo) {
       }
       if (serveAtt(x)) {
         const at = await window.Copertine.attori(x.tipo, x.titolo);
-        if (at !== null) { agg.attori = at; agg.attori_cercati = true; if (at.length) trovate++; }
+        if (at !== null) { agg.attori = at; agg.attori_cercati = true; agg.attori_v = VERS_ATTORI; if (at.length) trovate++; }
       }
       if (!Object.keys(agg).length) continue;
       // rileggo la voce aggiornata, così non cancello un commento o un voto aggiunto nel frattempo
@@ -2241,13 +2311,14 @@ function modificaVoceDiario(x, dopo) {
     ${x.id ? `<button type="button" class="btn danger block" id="del" style="margin-top:8px">🗑️ Elimina</button>` : ""}
     ${x.id && comp ? `<button type="button" class="btn sec block" id="cal1" style="margin-top:8px">📲 Promemoria ogni anno nel Calendario</button>` : ""}</form>`);
   $("#cambia-cop", v) && ($("#cambia-cop", v).onclick = () => { v.chiudi(); sceltaCopertina(x, dopo); });
+  $("#cast-griglia", v) && ($("#cast-griglia", v).onclick = (e) => { const b = e.target.closest("[data-att]"); if (b) apriAttore(x.extra.attori[+b.dataset.att]); });
   $("#cerca-attori", v) && ($("#cerca-attori", v).onclick = async (e) => {
     e.target.textContent = "Cerco su Wikidata…";
     const at = await window.Copertine.attori(x.tipo, x.titolo);
     if (at === null) { toast("⚠️ Wikidata non risponde, riprova più tardi"); e.target.textContent = "👥 Riprova"; return; }
     if (!at.length) { toast("Non ho trovato gli attori di questo titolo"); e.target.textContent = "👥 Cerca di nuovo gli attori"; return; }
     const ora = (await api(`/api/diario?tipo=${x.tipo}`, { fresco: true })).find((y) => y.id === x.id) || x;
-    const nuovo = await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...ora, extra: { ...(ora.extra || {}), attori: at, attori_cercati: true } } });
+    const nuovo = await api(`/api/diario/${x.id}`, { method: "PUT", json: { ...ora, extra: { ...(ora.extra || {}), attori: at, attori_cercati: true, attori_v: VERS_ATTORI } } });
     v.chiudi(); modificaVoceDiario(nuovo, dopo); if (dopo) dopo();
   });
   const disegnaStelle = () => $$("#si button", v).forEach((b) => b.classList.toggle("on", +b.dataset.s <= voto));
@@ -2784,7 +2855,7 @@ async function renderPagina() {
     else if (sez === "da-smistare") await vistaDaSmistare();
     else if (sez === "agenda") await vistaAgenda();
     else if (sez === "password") await vistaPassword();
-    else if (sez === "diario") await vistaDiario(arg);
+    else if (sez === "diario") await (arg ? vistaDiario(arg) : vistaDiarioMenu());
     else if (sez === "io") await vistaIo();
     else if (sez === "palestra") await (arg ? vistaEsercizio(arg) : vistaPalestra());
     else if (sez === "corsa") await vistaCorsa();
